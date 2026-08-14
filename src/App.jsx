@@ -3,10 +3,6 @@ import { fetchMembres, inviterMembre, validerMembre } from "./lib/membres";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin } from "./lib/groups";
 
-// ⚠️ À remplacer par le vrai group_id une fois qu'un groupe existe
-// dans la table "groups" de Supabase (copie son UUID ici).
-const GROUP_ID = "6a5d15cf-39d8-4afa-9d4c-08caa3109531";
-
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
 // telle quelle une fois déployée (Vercel, Netlify, etc.)
@@ -128,9 +124,9 @@ export default function AppPrototype() {
         {estSuperAdmin ? (
           <SuperAdminScreen />
         ) : groupeAdmin ? (
-          <AdminGroupeScreen />
+          <AdminGroupeScreen groupId={groupeAdmin.group?.id} nomGroupe={groupeAdmin.group?.nom} />
         ) : groupeMembreSimple ? (
-          <MembreScreen />
+          <MembreScreen groupId={groupeMembreSimple.group?.id} nomGroupe={groupeMembreSimple.group?.nom} />
         ) : (
           <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", color: C.sub, padding: "20px", textAlign: "center" }}>
             Ton compte est connecté, mais tu n'as pas encore de rôle actif dans un groupe.
@@ -432,7 +428,7 @@ function SuperAdminScreen() {
 // ============================================================
 // ÉCRAN 3 — ADMIN DE GROUPE (modules Tontine / Banque / Assurance / Bilan / Membres)
 // ============================================================
-function AdminGroupeScreen() {
+function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [view, setView] = useState("tontine");
   const [showCreateTontine, setShowCreateTontine] = useState(false);
   const [tontineNom, setTontineNom] = useState("");
@@ -469,20 +465,20 @@ function AdminGroupeScreen() {
 
   const rechargerMembres = async () => {
     try {
-      const data = await fetchMembres(GROUP_ID);
+      const data = await fetchMembres(groupId);
       setMembres(data);
       setMembresErreurChargement("");
     } catch (e) {
       console.error("Erreur de chargement des membres", e);
-      setMembresErreurChargement("Impossible de charger les membres depuis Supabase — vérifie GROUP_ID et ta connexion.");
+      setMembresErreurChargement("Impossible de charger les membres depuis Supabase — vérifie ta connexion.");
     } finally {
       setLoadingData(false);
     }
   };
 
   useEffect(() => {
-    rechargerMembres();
-  }, []);
+    if (groupId) rechargerMembres();
+  }, [groupId]);
 
   const DEFAULT_TOURS = [
     { tour: 1, beneficiaire: "Jean Mballa", montant: "300 000 FCFA", mode: "Ordre fixe", statut: "clôturé" },
@@ -769,7 +765,7 @@ function AdminGroupeScreen() {
   return (
     <div style={{ minHeight: "680px", background: C.bg, display: "flex", color: C.ink }}>
       <Sidebar
-        role="Admin Groupe" sub="Tontine Les Bâtisseurs"
+        role="Admin Groupe" sub={nomGroupe || "—"}
         items={[
           { icon: <Banknote size={16} />, label: "Tontine", key: "tontine" },
           { icon: <PiggyBank size={16} />, label: "Banque", key: "banque" },
@@ -1811,7 +1807,7 @@ function AdminGroupeScreen() {
                 return;
               }
               try {
-                await inviterMembre(GROUP_ID, {
+                await inviterMembre(groupId, {
                   nom: inviteNom.trim(),
                   telephone: inviteTelephone.trim(),
                   typeMembre: roleType,
