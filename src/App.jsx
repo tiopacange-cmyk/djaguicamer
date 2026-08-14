@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { fetchMembres, inviterMembre, validerMembre } from "./lib/membres";
+import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange } from "./lib/auth";
+import { fetchGroupes, creerGroupeAvecAdmin } from "./lib/groups";
 
 // ⚠️ À remplacer par le vrai group_id une fois qu'un groupe existe
 // dans la table "groups" de Supabase (copie son UUID ici).
@@ -44,40 +46,97 @@ const C = {
 };
 
 export default function AppPrototype() {
-  const [screen, setScreen] = useState("connexion");
+  const [chargementSession, setChargementSession] = useState(true);
+  const [connecte, setConnecte] = useState(false);
+  const [monProfil, setMonProfil] = useState(null);
+  const [mesGroupes, setMesGroupes] = useState([]);
 
-  const tabs = [
-    { key: "connexion", label: "Connexion" },
-    { key: "super_admin", label: "Super Admin" },
-    { key: "admin_groupe", label: "Admin Groupe" },
-    { key: "membre", label: "Membre" },
-  ];
+  const chargerSessionEtRole = async () => {
+    setChargementSession(true);
+    try {
+      const session = await getSession();
+      if (!session) {
+        setConnecte(false);
+        setMonProfil(null);
+        setMesGroupes([]);
+        return;
+      }
+      setConnecte(true);
+      const [profil, groupes] = await Promise.all([getMonProfil(), getMesGroupes()]);
+      setMonProfil(profil);
+      setMesGroupes(groupes);
+    } catch (e) {
+      console.error("Erreur de chargement de session", e);
+      setConnecte(false);
+    } finally {
+      setChargementSession(false);
+    }
+  };
+
+  useEffect(() => {
+    chargerSessionEtRole();
+    const sub = onAuthStateChange(() => {
+      chargerSessionEtRole();
+    });
+    return () => sub?.unsubscribe?.();
+  }, []);
+
+  const handleDeconnexion = async () => {
+    await signOut();
+    setConnecte(false);
+    setMonProfil(null);
+    setMesGroupes([]);
+  };
+
+  if (chargementSession) {
+    return (
+      <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", color: C.sub, fontFamily: "'Sora','Segoe UI',sans-serif" }}>
+        Chargement...
+      </div>
+    );
+  }
+
+  if (!connecte) {
+    return (
+      <div style={{ fontFamily: "'Sora','Segoe UI',sans-serif" }}>
+        <ConnexionScreen onLoggedIn={chargerSessionEtRole} />
+      </div>
+    );
+  }
+
+  // Détermine quel écran afficher selon le rôle réel de la personne connectée
+  const estSuperAdmin = monProfil?.is_super_admin === true;
+  const groupeAdmin = mesGroupes.find((g) => g.is_admin || g.is_president);
+  const groupeMembreSimple = mesGroupes.find((g) => !g.is_admin && !g.is_president);
 
   return (
     <div style={{ fontFamily: "'Sora','Segoe UI',sans-serif", background: "#0E1210" }}>
-      {/* Sélecteur d'écran — outil de revue, pas partie de l'appli */}
-      <div style={{ display: "flex", gap: "6px", padding: "10px 12px", background: "#0E1210" }}>
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setScreen(t.key)}
-            style={{
-              padding: "8px 14px", borderRadius: "8px", border: "none", cursor: "pointer",
-              fontSize: "12px", fontWeight: 600,
-              background: screen === t.key ? C.accent : "#1D2420",
-              color: screen === t.key ? "#1B2420" : "#9AA69C",
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* Barre de session — visible sur tous les écrans une fois connecté */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", background: "#0E1210" }}>
+        <span style={{ fontSize: "12px", color: "#9AA69C" }}>
+          Connecté : {monProfil?.nom_complet || "—"} {estSuperAdmin ? "(Super Admin)" : ""}
+        </span>
+        <button
+          onClick={handleDeconnexion}
+          style={{ display: "flex", alignItems: "center", gap: "6px", background: "#1D2420", color: "#9AA69C", border: "none", borderRadius: "8px", padding: "6px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+        >
+          <LogOut size={13} /> Déconnexion
+        </button>
       </div>
 
       <div style={{ minHeight: "680px" }}>
-        {screen === "connexion" && <ConnexionScreen />}
-        {screen === "super_admin" && <SuperAdminScreen />}
-        {screen === "admin_groupe" && <AdminGroupeScreen />}
-        {screen === "membre" && <MembreScreen />}
+        {estSuperAdmin ? (
+          <SuperAdminScreen />
+        ) : groupeAdmin ? (
+          <AdminGroupeScreen />
+        ) : groupeMembreSimple ? (
+          <MembreScreen />
+        ) : (
+          <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", color: C.sub, padding: "20px", textAlign: "center" }}>
+            Ton compte est connecté, mais tu n'as pas encore de rôle actif dans un groupe.
+            <br />Contacte l'admin de ton groupe ou le Super Admin.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -86,13 +145,35 @@ export default function AppPrototype() {
 // ============================================================
 // ÉCRAN 1 — CONNEXION
 // ============================================================
-function ConnexionScreen() {
+function ConnexionScreen({ onLoggedIn }) {
   const [dark, setDark] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [erreur, setErreur] = useState("");
+  const [chargement, setChargement] = useState(false);
   const bg = dark ? "#14181A" : C.bg;
   const panelBg = dark ? "#1E2427" : C.panel;
   const ink = dark ? "#F2EEE3" : C.ink;
   const sub = dark ? "#9AA69C" : C.sub;
   const border = dark ? "#2B3336" : C.border;
+
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      setErreur("Renseigne ton email et ton mot de passe.");
+      return;
+    }
+    setChargement(true);
+    setErreur("");
+    try {
+      await signIn({ email: email.trim(), password });
+      onLoggedIn();
+    } catch (e) {
+      console.error("Erreur de connexion", e);
+      setErreur("Email ou mot de passe incorrect.");
+    } finally {
+      setChargement(false);
+    }
+  };
 
   return (
     <div style={{ minHeight: "680px", background: bg, display: "flex", flexDirection: "column", position: "relative" }}>
@@ -106,23 +187,50 @@ function ConnexionScreen() {
             <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", borderRadius: "14px", background: `linear-gradient(135deg, ${C.accent2}, ${C.accent})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Users size={26} color="#FAF6ED" />
             </div>
-            <div style={{ fontSize: "11px", letterSpacing: "0.12em", textTransform: "uppercase", color: C.accent, fontWeight: 600, marginBottom: "6px" }}>Espace du groupe</div>
-            <h1 style={{ fontSize: "22px", fontWeight: 700, color: ink, margin: 0 }}>Tontine Les Bâtisseurs</h1>
+            <div style={{ fontSize: "11px", letterSpacing: "0.12em", textTransform: "uppercase", color: C.accent, fontWeight: 600, marginBottom: "6px" }}>Connexion</div>
+            <h1 style={{ fontSize: "22px", fontWeight: 700, color: ink, margin: 0 }}>Plateforme Tontine</h1>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-            <Field label="Identifiant / Téléphone" placeholder="Ex. 6XX XXX XXX" border={border} dark={dark} sub={sub} ink={ink} />
+            <div>
+              <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Ex. toi@exemple.com"
+                style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
+              />
+            </div>
             <div>
               <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>Mot de passe</label>
               <div style={{ position: "relative" }}>
                 <Lock size={15} color={sub} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
-                <input type="password" placeholder="••••••••" style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px 12px 38px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }} />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                  placeholder="••••••••"
+                  style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px 12px 38px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
+                />
               </div>
               <div style={{ textAlign: "right", marginTop: "6px" }}>
                 <span style={{ fontSize: "12px", color: C.accent, cursor: "pointer", fontWeight: 600 }}>Mot de passe oublié ?</span>
               </div>
             </div>
-            <button style={{ marginTop: "10px", width: "100%", padding: "13px", borderRadius: "10px", border: "none", background: C.accent2, color: "#FAF6ED", fontSize: "14px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", cursor: "pointer" }}>
-              Se connecter <ChevronRight size={16} />
+
+            {erreur && (
+              <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                {erreur}
+              </div>
+            )}
+
+            <button
+              onClick={handleLogin}
+              disabled={chargement}
+              style={{ marginTop: "10px", width: "100%", padding: "13px", borderRadius: "10px", border: "none", background: C.accent2, color: "#FAF6ED", fontSize: "14px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", cursor: chargement ? "default" : "pointer", opacity: chargement ? 0.7 : 1 }}
+            >
+              {chargement ? "Connexion..." : "Se connecter"} <ChevronRight size={16} />
             </button>
           </div>
         </div>
@@ -144,24 +252,42 @@ function Field({ label, placeholder, border, dark, sub, ink }) {
 }
 
 // ============================================================
-// ÉCRAN 2 — SUPER ADMIN (résumé condensé)
+// ÉCRAN 2 — SUPER ADMIN
 // ============================================================
 function SuperAdminScreen() {
   const [view, setView] = useState("groupes");
-  const groups = [
-    { name: "Tontine Les Bâtisseurs", admin: "Marc Ateba", members: 24, plan: "Pro", cycle: "Annuel", status: "actif", expires: "12 Jan 2027" },
-    { name: "Association Étoile du Sud", admin: "Christelle Fouda", members: 41, plan: "Standard", cycle: "Mensuel", status: "actif", expires: "03 Sept 2026" },
-    { name: "Coopérative Nkolbisson", admin: "Paul Mvondo", members: 17, plan: "Basic", cycle: "Mensuel", status: "en retard", expires: "28 Juil 2026" },
-    { name: "Groupe Sanaga Entraide", admin: "Éric Nnomo", members: 9, plan: "Essai", cycle: "7 j. restants", status: "essai", expires: "19 Août 2026" },
-  ];
+  const [groupes, setGroupes] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState("");
+
+  const [showCreateGroupe, setShowCreateGroupe] = useState(false);
+  const [nomGroupe, setNomGroupe] = useState("");
+  const [adminNom, setAdminNom] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [creationEnCours, setCreationEnCours] = useState(false);
+  const [creationErreur, setCreationErreur] = useState("");
+  const [resultatCreation, setResultatCreation] = useState(null);
+
+  const chargerGroupes = async () => {
+    setChargement(true);
+    try {
+      const data = await fetchGroupes();
+      setGroupes(data);
+      setErreur("");
+    } catch (e) {
+      console.error("Erreur de chargement des groupes", e);
+      setErreur("Impossible de charger les groupes — vérifie que ton compte est bien marqué Super Admin.");
+    } finally {
+      setChargement(false);
+    }
+  };
+
+  useEffect(() => {
+    chargerGroupes();
+  }, []);
+
   const planColor = { Basic: C.sub, Standard: C.accent2, Pro: C.accent, Essai: C.purple };
   const statusStyle = { actif: { bg: C.ok, fg: C.accent2 }, "en retard": { bg: C.warnBg, fg: C.warn }, essai: { bg: "#EBE6F5", fg: C.purple } };
-  const auditLog = [
-    { date: "12 Août 2026, 09:14", action: "Réinitialisation mot de passe", group: "Coopérative Nkolbisson", type: "urgence" },
-    { date: "10 Août 2026, 16:02", action: "Groupe créé", group: "Groupe Sanaga Entraide", type: "création" },
-    { date: "05 Août 2026, 11:47", action: "Abonnement modifié", group: "Tontine Les Bâtisseurs", type: "abonnement" },
-  ];
-  const typeStyle = { urgence: { bg: "#FBF1DC", fg: C.accent }, création: { bg: C.ok, fg: C.accent2 }, abonnement: { bg: "#EBE6F5", fg: C.purple } };
 
   return (
     <div style={{ minHeight: "680px", background: C.bg, display: "flex", color: C.ink }}>
@@ -176,35 +302,129 @@ function SuperAdminScreen() {
       <div style={{ flex: 1, padding: "32px 40px" }}>
         {view === "groupes" && (
           <>
-            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Groupes enregistrés</h1>
-            <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>Création + abonnement uniquement — aucune visibilité sur les données internes.</p>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Groupes enregistrés</h1>
+                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
+                  {chargement ? "Chargement..." : `${groupes.length} groupe(s).`} Création + abonnement uniquement — aucune visibilité sur les données internes.
+                </p>
+              </div>
+              <button
+                style={btnPrimary}
+                onClick={() => {
+                  setNomGroupe(""); setAdminNom(""); setAdminEmail("");
+                  setCreationErreur(""); setResultatCreation(null);
+                  setShowCreateGroupe(true);
+                }}
+              >
+                <Plus size={15} /> Nouveau groupe
+              </button>
+            </div>
+
+            {erreur && (
+              <div style={{ marginTop: "16px", fontSize: "12.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>
+                {erreur}
+              </div>
+            )}
+
+            <div style={{ marginTop: "22px" }} />
             <Table
-              cols={["Groupe", "Admin", "Membres", "Formule", "Échéance", "Statut"]}
-              widths="1.8fr 1.1fr 0.7fr 0.9fr 1fr 1.1fr"
-              rows={groups.map((g) => [
-                <b>{g.name}</b>, g.admin, g.members,
-                <span><span style={{ color: planColor[g.plan], fontWeight: 700 }}>{g.plan}</span> <span style={{ color: C.sub, fontSize: 11 }}>· {g.cycle}</span></span>,
-                <span style={{ color: C.sub, fontSize: 12 }}>{g.expires}</span>,
-                <Badge bg={statusStyle[g.status].bg} fg={statusStyle[g.status].fg}>{g.status}</Badge>,
-              ])}
+              cols={["Groupe", "Formule", "Échéance", "Statut"]}
+              widths="2fr 1.1fr 1.2fr 1.1fr"
+              rows={groupes.map((g) => {
+                const abo = g.subscriptions?.[0];
+                return [
+                  <b>{g.nom}</b>,
+                  abo ? (
+                    <span><span style={{ color: planColor[abo.formule] || C.sub, fontWeight: 700 }}>{abo.formule}</span> {abo.periodicite && <span style={{ color: C.sub, fontSize: 11 }}>· {abo.periodicite}</span>}</span>
+                  ) : "—",
+                  abo?.date_expiration ? <span style={{ color: C.sub, fontSize: 12 }}>{new Date(abo.date_expiration).toLocaleDateString("fr-FR")}</span> : "—",
+                  abo ? <Badge bg={(statusStyle[abo.statut] || statusStyle.actif).bg} fg={(statusStyle[abo.statut] || statusStyle.actif).fg}>{abo.statut}</Badge> : "—",
+                ];
+              })}
             />
           </>
         )}
+
         {view === "audit" && (
           <>
             <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Journal d'audit</h1>
-            <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>Historique en lecture seule des actions Super Admin.</p>
-            <Table
-              cols={["Date", "Action", "Groupe", "Type"]}
-              widths="1.3fr 1.6fr 1.6fr 1fr"
-              rows={auditLog.map((e) => [
-                <span style={{ color: C.sub, fontSize: 12 }}>{e.date}</span>, <b>{e.action}</b>, e.group,
-                <Badge bg={typeStyle[e.type].bg} fg={typeStyle[e.type].fg}>{e.type}</Badge>,
-              ])}
-            />
+            <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>
+              Historique en lecture seule des actions Super Admin (branchement des entrées à venir).
+            </p>
           </>
         )}
       </div>
+
+      {showCreateGroupe && (
+        <Modal onClose={() => setShowCreateGroupe(false)} title="Créer un nouveau groupe">
+          {!resultatCreation ? (
+            <>
+              <FormField label="Nom du groupe" placeholder="Ex. Tontine Les Bâtisseurs" value={nomGroupe} onChange={(e) => setNomGroupe(e.target.value)} />
+              <FormField label="Nom de l'administrateur" placeholder="Ex. Jean Mballa" value={adminNom} onChange={(e) => setAdminNom(e.target.value)} />
+              <FormField label="Email de l'administrateur" placeholder="Ex. jean.mballa@exemple.com" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
+
+              {creationErreur && (
+                <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                  {creationErreur}
+                </div>
+              )}
+
+              <button
+                disabled={creationEnCours}
+                style={{ marginTop: "8px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: creationEnCours ? "default" : "pointer", opacity: creationEnCours ? 0.7 : 1 }}
+                onClick={async () => {
+                  if (!nomGroupe.trim() || !adminNom.trim() || !adminEmail.trim()) {
+                    setCreationErreur("Tous les champs sont obligatoires.");
+                    return;
+                  }
+                  setCreationEnCours(true);
+                  setCreationErreur("");
+                  try {
+                    const resultat = await creerGroupeAvecAdmin({
+                      nomGroupe: nomGroupe.trim(),
+                      adminNom: adminNom.trim(),
+                      adminEmail: adminEmail.trim(),
+                    });
+                    setResultatCreation(resultat);
+                    await chargerGroupes();
+                  } catch (e) {
+                    console.error("Erreur de création du groupe", e);
+                    setCreationErreur(e.message || "Erreur lors de la création du groupe.");
+                  } finally {
+                    setCreationEnCours(false);
+                  }
+                }}
+              >
+                {creationEnCours ? "Création en cours..." : "Créer le groupe et l'admin"}
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: "12.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "10px 12px", display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                <CheckCircle2 size={16} style={{ flexShrink: 0, marginTop: "2px" }} />
+                <div>
+                  Groupe <b>{resultatCreation.groupe.nom}</b> créé avec succès.
+                </div>
+              </div>
+              <div style={{ fontSize: "12px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "12px" }}>
+                <div style={{ marginBottom: "6px" }}>Identifiants de l'administrateur à lui communiquer :</div>
+                <div><b>Email :</b> {resultatCreation.adminEmail}</div>
+                <div><b>Mot de passe temporaire :</b> {resultatCreation.motDePasseTemp}</div>
+                <div style={{ color: C.sub, marginTop: "6px", fontSize: "11px" }}>
+                  L'admin devra changer ce mot de passe dès sa première connexion (à mettre en place).
+                </div>
+              </div>
+              <button
+                style={{ marginTop: "8px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+                onClick={() => setShowCreateGroupe(false)}
+              >
+                Terminer
+              </button>
+            </>
+          )}
+        </Modal>
+      )}
     </div>
   );
 }
