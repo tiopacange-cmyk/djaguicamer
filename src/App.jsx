@@ -3,7 +3,7 @@ import { fetchMembres, inviterMembre, validerMembre } from "./lib/membres";
 
 // ⚠️ À remplacer par le vrai group_id une fois qu'un groupe existe
 // dans la table "groups" de Supabase (copie son UUID ici).
-const GROUP_ID = "6a5d15cf-39d8-4afa-9d4c-08caa3109531";";
+const GROUP_ID = "6a5d15cf-39d8-4afa-9d4c-08caa3109531";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
