@@ -143,7 +143,7 @@ export default function AppPrototype() {
 // ============================================================
 function ConnexionScreen({ onLoggedIn }) {
   const [dark, setDark] = useState(false);
-  const [email, setEmail] = useState("");
+  const [identifiant, setIdentifiant] = useState("");
   const [password, setPassword] = useState("");
   const [erreur, setErreur] = useState("");
   const [chargement, setChargement] = useState(false);
@@ -154,18 +154,18 @@ function ConnexionScreen({ onLoggedIn }) {
   const border = dark ? "#2B3336" : C.border;
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      setErreur("Renseigne ton email et ton mot de passe.");
+    if (!identifiant.trim() || !password.trim()) {
+      setErreur("Renseigne ton identifiant et ton mot de passe.");
       return;
     }
     setChargement(true);
     setErreur("");
     try {
-      await signIn({ email: email.trim(), password });
+      await signIn({ identifiant: identifiant.trim(), password });
       onLoggedIn();
     } catch (e) {
       console.error("Erreur de connexion", e);
-      setErreur("Email ou mot de passe incorrect.");
+      setErreur("Identifiant ou mot de passe incorrect.");
     } finally {
       setChargement(false);
     }
@@ -188,12 +188,12 @@ function ConnexionScreen({ onLoggedIn }) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
             <div>
-              <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>Email</label>
+              <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>Identifiant</label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Ex. toi@exemple.com"
+                type="text"
+                value={identifiant}
+                onChange={(e) => setIdentifiant(e.target.value)}
+                placeholder="Ex. jeanmballa42"
                 style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
               />
             </div>
@@ -405,8 +405,9 @@ function SuperAdminScreen() {
               </div>
               <div style={{ fontSize: "12px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "12px" }}>
                 <div style={{ marginBottom: "6px" }}>Identifiants de l'administrateur à lui communiquer :</div>
-                <div><b>Email :</b> {resultatCreation.adminEmail}</div>
+                <div><b>Identifiant de connexion :</b> {resultatCreation.identifiant}</div>
                 <div><b>Mot de passe temporaire :</b> {resultatCreation.motDePasseTemp}</div>
+                <div style={{ color: C.sub, fontSize: "11px", marginTop: "4px" }}>(Email associé : {resultatCreation.adminEmail})</div>
                 <div style={{ color: C.sub, marginTop: "6px", fontSize: "11px" }}>
                   L'admin devra changer ce mot de passe dès sa première connexion (à mettre en place).
                 </div>
@@ -623,7 +624,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [editTelephone, setEditTelephone] = useState("");
   const [editError, setEditError] = useState("");
   const [editSuccess, setEditSuccess] = useState(false);
-  const [inviteMotDePasseTemp, setInviteMotDePasseTemp] = useState("");
+  const [inviteIdentifiant, setInviteIdentifiant] = useState("");
   const [showRapportJournalier, setShowRapportJournalier] = useState(false);
   const [showRapportMensuel, setShowRapportMensuel] = useState(false);
   const [showExportBilan, setShowExportBilan] = useState(false);
@@ -1841,8 +1842,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
           )}
           {inviteSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <CheckCircle2 size={14} /> Invitation envoyée — {inviteNom} apparaît maintenant "en attente". Il activera son compte lui-même plus tard.
+            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                <CheckCircle2 size={14} /> Invitation envoyée — {inviteNom} apparaît maintenant "en attente".
+              </div>
+              {inviteIdentifiant && (
+                <div>Identifiant de connexion à lui communiquer : <b>{inviteIdentifiant}</b> (il choisira son mot de passe en activant son compte).</div>
+              )}
             </div>
           )}
 
@@ -1855,7 +1861,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 return;
               }
               try {
-                await inviterMembre(groupId, {
+                const resultat = await inviterMembre(groupId, {
                   nom: inviteNom.trim(),
                   email: inviteEmail.trim(),
                   telephone: inviteTelephone.trim(),
@@ -1866,6 +1872,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 await rechargerMembres();
                 setInviteError("");
                 setInviteSuccess(true);
+                setInviteIdentifiant(resultat.identifiant);
                 setInviteNom("");
                 setInviteTelephone("");
                 setInviteEmail("");
@@ -1873,7 +1880,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 setTimeout(() => {
                   setShowInviteMember(false);
                   setInviteSuccess(false);
-                }, 1800);
+                  setInviteIdentifiant("");
+                }, 3000);
               } catch (e) {
                 console.error("Erreur d'invitation", e);
                 setInviteError(e.message || "Erreur lors de l'envoi de l'invitation.");
