@@ -1,25 +1,32 @@
 import { supabase } from "./supabaseClient";
 
 // Inscription d'un nouvel utilisateur (email + mot de passe),
-// puis création de son profil dans la table "profiles"
-export async function signUp({ email, password, nomComplet }) {
+// puis création (ou liaison) de son profil dans la table "profiles"
+export async function signUp({ email, password, nomComplet, identifiant }) {
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw error;
 
-  // Si un compte auth a été créé, on crée aussi son profil
   if (data.user) {
     const { error: profileError } = await supabase
       .from("profiles")
-      .insert({ id: data.user.id, nom_complet: nomComplet });
-    // Si le profil existe déjà (ex. re-tentative), on ignore l'erreur de doublon
+      .insert({ auth_user_id: data.user.id, nom_complet: nomComplet, email, identifiant });
     if (profileError && profileError.code !== "23505") throw profileError;
   }
 
   return data;
 }
 
-// Connexion avec email + mot de passe
-export async function signIn({ email, password }) {
+// Connexion avec identifiant (court) + mot de passe.
+// On retrouve l'email correspondant à l'identifiant, puis on se
+// connecte normalement avec cet email en interne.
+export async function signIn({ identifiant, password }) {
+  const { data: email, error: lookupError } = await supabase.rpc(
+    "get_email_pour_identifiant",
+    { p_identifiant: identifiant }
+  );
+  if (lookupError) throw lookupError;
+  if (!email) throw new Error("Identifiant introuvable.");
+
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
   return data;
@@ -47,7 +54,7 @@ export async function getMonProfil() {
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
-    .eq("id", userData.user.id)
+    .eq("auth_user_id", userData.user.id)
     .single();
 
   if (error) throw error;
@@ -56,9 +63,8 @@ export async function getMonProfil() {
 
 // Récupère tous les groupes/rôles de l'utilisateur connecté
 export async function getMesGroupes() {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
-  if (!userData.user) return [];
+  const monProfil = await getMonProfil();
+  if (!monProfil) return [];
 
   const { data, error } = await supabase
     .from("group_members")
@@ -66,7 +72,7 @@ export async function getMesGroupes() {
       id, is_admin, is_president, statut, type_membre,
       group:groups ( id, nom )
     `)
-    .eq("profile_id", userData.user.id)
+    .eq("profile_id", monProfil.id)
     .eq("statut", "actif");
 
   if (error) throw error;
