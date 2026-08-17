@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { fetchMembres, inviterMembre, validerMembre } from "./lib/membres";
+import { fetchMembres, inviterMembre, validerMembre, modifierMembre } from "./lib/membres";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin } from "./lib/groups";
 
@@ -615,6 +615,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [inviteCaution, setInviteCaution] = useState("");
   const [inviteError, setInviteError] = useState("");
   const [inviteSuccess, setInviteSuccess] = useState(false);
+
+  const [showEditMembre, setShowEditMembre] = useState(false);
+  const [editMembre, setEditMembre] = useState(null);
+  const [editNom, setEditNom] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editTelephone, setEditTelephone] = useState("");
+  const [editError, setEditError] = useState("");
+  const [editSuccess, setEditSuccess] = useState(false);
   const [inviteMotDePasseTemp, setInviteMotDePasseTemp] = useState("");
   const [showRapportJournalier, setShowRapportJournalier] = useState(false);
   const [showRapportMensuel, setShowRapportMensuel] = useState(false);
@@ -1059,33 +1067,49 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   </p>
                 )}
               </div>
-              <button style={btnPrimary} onClick={() => { setInviteNom(""); setInviteTelephone(""); setInviteEmail(""); setInviteCaution(""); setInviteError(""); setInviteSuccess(false); setInviteMotDePasseTemp(""); setShowInviteMember(true); }}><Plus size={15} /> Inviter un membre</button>
+              <button style={btnPrimary} onClick={() => { setInviteNom(""); setInviteTelephone(""); setInviteEmail(""); setInviteCaution(""); setInviteError(""); setInviteSuccess(false); setShowInviteMember(true); }}><Plus size={15} /> Inviter un membre</button>
             </div>
             <div style={{ marginTop: "22px" }} />
-            <Table cols={["Nom", "Rôle", "Statut", ""]} widths="1.5fr 1.1fr 1fr 1.3fr"
+            <Table cols={["Nom", "Rôle", "Compte", "Statut", ""]} widths="1.3fr 1fr 1fr 0.9fr 1.5fr"
               rows={membres.map((m, i) => [
                 m.nom, m.role,
+                <Badge bg={m.compteActive ? C.ok : "#EEE"} fg={m.compteActive ? C.accent2 : C.sub}>{m.compteActive ? "activé" : "non activé"}</Badge>,
                 <Badge bg={m.statut === "actif" ? C.ok : C.warnBg} fg={m.statut === "actif" ? C.accent2 : C.warn}>{m.statut}</Badge>,
-                m.statut === "en attente" ? (
+                <div style={{ display: "flex", gap: "6px" }}>
+                  {m.statut === "en attente" && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          // ⚠️ validateurId : à remplacer par l'id du membre connecté (Président)
+                          await validerMembre(m.id, m.id);
+                          await rechargerMembres();
+                        } catch (e) {
+                          console.error("Erreur de validation du membre", e);
+                        }
+                      }}
+                      style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                    >
+                      Valider
+                    </button>
+                  )}
                   <button
-                    onClick={async () => {
-                      try {
-                        // ⚠️ validateurId : à remplacer par l'id du membre connecté (Président)
-                        // une fois l'authentification branchée.
-                        await validerMembre(m.id, m.id);
-                        await rechargerMembres();
-                      } catch (e) {
-                        console.error("Erreur de validation du membre", e);
-                      }
+                    onClick={() => {
+                      setEditMembre(m);
+                      setEditNom(m.nom);
+                      setEditEmail(m.email || "");
+                      setEditTelephone(m.telephone || "");
+                      setEditError("");
+                      setEditSuccess(false);
+                      setShowEditMembre(true);
                     }}
-                    style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "7px", padding: "6px 12px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                    style={{ background: "transparent", color: C.accent2, border: `1px solid ${C.border}`, borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
                   >
-                    Valider (Président)
+                    Modifier
                   </button>
-                ) : null,
+                </div>,
               ])} />
             <div style={{ fontSize: "11px", color: C.sub, marginTop: "10px" }}>
-              Les membres invités sont sauvegardés automatiquement et restent visibles même après rechargement de la page.
+              Les membres invités sont sauvegardés automatiquement. "Compte non activé" signifie que le membre n'a pas encore créé son mot de passe de connexion.
             </div>
           </>
         )}
@@ -1796,13 +1820,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
           )}
           {inviteSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-                <CheckCircle2 size={14} /> Invitation envoyée — {inviteNom} apparaît maintenant "en attente".
-              </div>
-              {inviteMotDePasseTemp && (
-                <div>Mot de passe temporaire à lui communiquer : <b>{inviteMotDePasseTemp}</b></div>
-              )}
+            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <CheckCircle2 size={14} /> Invitation envoyée — {inviteNom} apparaît maintenant "en attente". Il activera son compte lui-même plus tard.
             </div>
           )}
 
@@ -1815,7 +1834,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 return;
               }
               try {
-                const resultat = await inviterMembre(groupId, {
+                await inviterMembre(groupId, {
                   nom: inviteNom.trim(),
                   email: inviteEmail.trim(),
                   telephone: inviteTelephone.trim(),
@@ -1826,7 +1845,6 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 await rechargerMembres();
                 setInviteError("");
                 setInviteSuccess(true);
-                setInviteMotDePasseTemp(resultat.motDePasseTemp);
                 setInviteNom("");
                 setInviteTelephone("");
                 setInviteEmail("");
@@ -1834,8 +1852,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 setTimeout(() => {
                   setShowInviteMember(false);
                   setInviteSuccess(false);
-                  setInviteMotDePasseTemp("");
-                }, 3000);
+                }, 1800);
               } catch (e) {
                 console.error("Erreur d'invitation", e);
                 setInviteError(e.message || "Erreur lors de l'envoi de l'invitation.");
@@ -1844,6 +1861,60 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             }}
           >
             Envoyer l'invitation
+          </button>
+        </Modal>
+      )}
+
+      {showEditMembre && editMembre && (
+        <Modal onClose={() => setShowEditMembre(false)} title="Modifier un membre">
+          <FormField label="Nom complet" placeholder="Ex. André Fotso" value={editNom} onChange={(e) => setEditNom(e.target.value)} />
+          <FormField label="Email" placeholder="Ex. andre.fotso@exemple.com" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+          <FormField label="Téléphone" placeholder="Ex. 6XX XXX XXX" value={editTelephone} onChange={(e) => setEditTelephone(e.target.value)} />
+
+          <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+            Le mot de passe de connexion n'est jamais modifiable ici — seul le membre lui-même peut le changer, une fois son compte activé.
+          </div>
+
+          {editError && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {editError}
+            </div>
+          )}
+          {editSuccess && (
+            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <CheckCircle2 size={14} /> Informations mises à jour.
+            </div>
+          )}
+
+          <button
+            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            onClick={async () => {
+              if (!editNom.trim()) {
+                setEditError("Le nom complet est obligatoire.");
+                setEditSuccess(false);
+                return;
+              }
+              try {
+                await modifierMembre(editMembre.profileId, {
+                  nom: editNom.trim(),
+                  email: editEmail.trim(),
+                  telephone: editTelephone.trim(),
+                });
+                await rechargerMembres();
+                setEditError("");
+                setEditSuccess(true);
+                setTimeout(() => {
+                  setShowEditMembre(false);
+                  setEditSuccess(false);
+                }, 1200);
+              } catch (e) {
+                console.error("Erreur de modification du membre", e);
+                setEditError(e.message || "Erreur lors de la modification.");
+                setEditSuccess(false);
+              }
+            }}
+          >
+            Enregistrer les modifications
           </button>
         </Modal>
       )}
