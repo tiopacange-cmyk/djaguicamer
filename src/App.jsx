@@ -625,6 +625,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [editError, setEditError] = useState("");
   const [editSuccess, setEditSuccess] = useState(false);
   const [inviteIdentifiant, setInviteIdentifiant] = useState("");
+  const [inviteMotDePasseTemp, setInviteMotDePasseTemp] = useState("");
   const [showRapportJournalier, setShowRapportJournalier] = useState(false);
   const [showRapportMensuel, setShowRapportMensuel] = useState(false);
   const [showExportBilan, setShowExportBilan] = useState(false);
@@ -1068,13 +1069,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   </p>
                 )}
               </div>
-              <button style={btnPrimary} onClick={() => { setInviteNom(""); setInviteTelephone(""); setInviteEmail(""); setInviteCaution(""); setInviteError(""); setInviteSuccess(false); setShowInviteMember(true); }}><Plus size={15} /> Inviter un membre</button>
+              <button style={btnPrimary} onClick={() => { setInviteNom(""); setInviteTelephone(""); setInviteEmail(""); setInviteCaution(""); setInviteError(""); setInviteSuccess(false); setInviteIdentifiant(""); setInviteMotDePasseTemp(""); setShowInviteMember(true); }}><Plus size={15} /> Inviter un membre</button>
             </div>
             <div style={{ marginTop: "22px" }} />
-            <Table cols={["Nom", "Rôle", "Compte", "Statut", ""]} widths="1.3fr 1fr 1fr 0.9fr 1.5fr"
+            <Table cols={["Nom", "Identifiant", "Rôle", "Statut", ""]} widths="1.2fr 1.1fr 0.9fr 0.9fr 1.5fr"
               rows={membres.map((m, i) => [
-                m.nom, m.role,
-                <Badge bg={m.compteActive ? C.ok : "#EEE"} fg={m.compteActive ? C.accent2 : C.sub}>{m.compteActive ? "activé" : "non activé"}</Badge>,
+                m.nom,
+                <span style={{ color: C.sub, fontSize: 12 }}>{m.identifiant || "—"}</span>,
+                m.role,
                 <Badge bg={m.statut === "actif" ? C.ok : C.warnBg} fg={m.statut === "actif" ? C.accent2 : C.warn}>{m.statut}</Badge>,
                 <div style={{ display: "flex", gap: "6px" }}>
                   {m.statut === "en attente" && (
@@ -1844,11 +1846,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           {inviteSuccess && (
             <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-                <CheckCircle2 size={14} /> Invitation envoyée — {inviteNom} apparaît maintenant "en attente".
+                <CheckCircle2 size={14} /> Membre créé — {inviteNom} apparaît maintenant "en attente".
               </div>
-              {inviteIdentifiant && (
-                <div>Identifiant de connexion à lui communiquer : <b>{inviteIdentifiant}</b> (il choisira son mot de passe en activant son compte).</div>
-              )}
+              <div>Identifiant : <b>{inviteIdentifiant}</b></div>
+              <div>Mot de passe temporaire : <b>{inviteMotDePasseTemp}</b></div>
+              <div style={{ color: C.sub, fontSize: "10.5px", marginTop: "4px" }}>
+                Il pourra changer ce mot de passe une fois connecté à son compte.
+              </div>
             </div>
           )}
 
@@ -1873,6 +1877,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 setInviteError("");
                 setInviteSuccess(true);
                 setInviteIdentifiant(resultat.identifiant);
+                setInviteMotDePasseTemp(resultat.motDePasseTemp);
                 setInviteNom("");
                 setInviteTelephone("");
                 setInviteEmail("");
@@ -1881,7 +1886,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   setShowInviteMember(false);
                   setInviteSuccess(false);
                   setInviteIdentifiant("");
-                }, 3000);
+                  setInviteMotDePasseTemp("");
+                }, 5000);
               } catch (e) {
                 console.error("Erreur d'invitation", e);
                 setInviteError(e.message || "Erreur lors de l'envoi de l'invitation.");
