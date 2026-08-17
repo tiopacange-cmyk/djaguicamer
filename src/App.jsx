@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { fetchMembres, inviterMembre, validerMembre, modifierMembre } from "./lib/membres";
+import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre } from "./lib/membres";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin } from "./lib/groups";
 
@@ -1090,6 +1090,27 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
                     >
                       Valider
+                    </button>
+                  )}
+                  {(m.statut === "actif" || m.statut === "inactif") && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const nouveauStatut = m.statut === "actif" ? "inactif" : "actif";
+                          await toggleActifMembre(m.id, nouveauStatut);
+                          await rechargerMembres();
+                        } catch (e) {
+                          console.error("Erreur de changement de statut du membre", e);
+                        }
+                      }}
+                      style={{
+                        background: m.statut === "actif" ? "transparent" : C.accent2,
+                        color: m.statut === "actif" ? C.warn : "#FAF6ED",
+                        border: m.statut === "actif" ? `1px solid ${C.warn}66` : "none",
+                        borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer",
+                      }}
+                    >
+                      {m.statut === "actif" ? "Rendre inactif" : "Réactiver"}
                     </button>
                   )}
                   <button
