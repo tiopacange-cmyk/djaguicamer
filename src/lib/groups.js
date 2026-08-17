@@ -6,8 +6,12 @@ function genererMotDePasseTemp() {
   return `Tontine-${nombre}`;
 }
 
-// Liste tous les groupes (réservé au Super Admin — nécessite d'être
-// authentifié avec un compte marqué is_super_admin = true, sinon RLS bloque)
+// Génère un identifiant court à partir du nom (ex. "Jean Mballa" -> "jeanmballa")
+function genererIdentifiant(nom) {
+  return nom.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+}
+
+// Liste tous les groupes (réservé au Super Admin)
 export async function fetchGroupes() {
   const { data, error } = await supabase
     .from("groups")
@@ -22,12 +26,14 @@ export async function fetchGroupes() {
 }
 
 // Crée un nouveau groupe + un compte admin pour ce groupe.
-// Retourne le mot de passe temporaire à communiquer à l'admin
-// (dans un vrai produit, ce serait un email d'invitation automatique).
+// L'admin reçoit tout de suite un vrai compte de connexion, avec
+// un identifiant court (dérivé de son nom) pour se connecter facilement.
 export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, formule = "Essai" }) {
   const motDePasseTemp = genererMotDePasseTemp();
+  const identifiantBase = genererIdentifiant(adminNom);
+  // Ajoute un petit suffixe aléatoire pour limiter les risques de collision
+  const identifiant = `${identifiantBase}${Math.floor(10 + Math.random() * 90)}`;
 
-  // 1. Créer le compte auth de l'admin
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: adminEmail,
     password: motDePasseTemp,
@@ -35,13 +41,13 @@ export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, fo
   if (authError) throw authError;
   if (!authData.user) throw new Error("Impossible de créer le compte administrateur.");
 
-  // 2. Créer son profil
-  const { error: profileError } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .insert({ id: authData.user.id, nom_complet: adminNom });
-  if (profileError && profileError.code !== "23505") throw profileError;
+    .insert({ auth_user_id: authData.user.id, nom_complet: adminNom, email: adminEmail, identifiant })
+    .select()
+    .single();
+  if (profileError) throw profileError;
 
-  // 3. Créer le groupe
   const { data: groupe, error: groupeError } = await supabase
     .from("groups")
     .insert({ nom: nomGroupe })
@@ -49,7 +55,6 @@ export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, fo
     .single();
   if (groupeError) throw groupeError;
 
-  // 4. Créer l'abonnement (formule Essai par défaut, 14 jours)
   const dateExpiration = new Date();
   dateExpiration.setDate(dateExpiration.getDate() + 14);
   const { error: subError } = await supabase.from("subscriptions").insert({
@@ -60,15 +65,14 @@ export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, fo
   });
   if (subError) throw subError;
 
-  // 5. Associer l'admin au groupe, avec droits admin
   const { error: memberError } = await supabase.from("group_members").insert({
     group_id: groupe.id,
-    profile_id: authData.user.id,
+    profile_id: profile.id,
     type_membre: "Membre du bureau",
     is_admin: true,
     statut: "actif",
   });
   if (memberError) throw memberError;
 
-  return { groupe, motDePasseTemp, adminEmail };
+  return { groupe, motDePasseTemp, adminEmail, identifiant };
 }
