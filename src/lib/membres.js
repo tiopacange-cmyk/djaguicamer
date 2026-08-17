@@ -1,5 +1,9 @@
 import { supabase } from "./supabaseClient";
 
+function genererIdentifiant(nom) {
+  return nom.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+}
+
 // ============================================================
 // MEMBRES DU GROUPE
 // ============================================================
@@ -15,7 +19,7 @@ export async function fetchMembres(groupId) {
       caution,
       created_at,
       poste:postes_bureau ( nom ),
-      profile:profiles ( id, nom_complet, telephone, email, auth_user_id )
+      profile:profiles ( id, nom_complet, telephone, email, identifiant, auth_user_id )
     `)
     .eq("group_id", groupId)
     .order("created_at", { ascending: true });
@@ -28,19 +32,24 @@ export async function fetchMembres(groupId) {
     nom: m.profile?.nom_complet || "—",
     telephone: m.profile?.telephone || "",
     email: m.profile?.email || "",
+    identifiant: m.profile?.identifiant || "",
     role: m.type_membre === "Membre du bureau" ? (m.poste?.nom || "Bureau") : "Membre",
     statut: m.statut,
     compteActive: !!m.profile?.auth_user_id,
   }));
 }
 
-// Invite un nouveau membre : crée son profil (sans compte de
-// connexion pour l'instant — il l'activera lui-même plus tard),
-// puis son appartenance au groupe avec le statut "en attente".
+// Invite un nouveau membre : crée son profil (avec un identifiant
+// court généré automatiquement, sans compte de connexion pour
+// l'instant — il l'activera lui-même plus tard), puis son
+// appartenance au groupe avec le statut "en attente".
 export async function inviterMembre(groupId, { nom, email, telephone, typeMembre, posteId, caution }) {
+  const identifiantBase = genererIdentifiant(nom);
+  const identifiant = `${identifiantBase}${Math.floor(10 + Math.random() * 90)}`;
+
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .insert({ nom_complet: nom, email, telephone })
+    .insert({ nom_complet: nom, email, telephone, identifiant })
     .select()
     .single();
   if (profileError) throw profileError;
@@ -60,7 +69,7 @@ export async function inviterMembre(groupId, { nom, email, telephone, typeMembre
 
   if (membreError) throw membreError;
 
-  return { membre, email };
+  return { membre, email, identifiant };
 }
 
 // Modifie les informations d'un membre déjà inscrit (jamais son
