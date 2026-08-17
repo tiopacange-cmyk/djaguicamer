@@ -40,28 +40,38 @@ export async function fetchMembres(groupId) {
   }));
 }
 
-// Invite un nouveau membre : crée d'abord son profil, puis son
-// appartenance au groupe avec le statut "en attente"
-export async function inviterMembre(groupId, { nom, telephone, typeMembre, posteId, caution }) {
-  // 1. Créer le profil (nécessite un compte auth déjà existant pour
-  //    cette personne — dans un vrai flux, on enverrait une invitation
-  //    par SMS/email qui crée le compte. Ici on suppose que le profil
-  //    existe déjà, identifié par son numéro de téléphone, ou on le
-  //    crée manuellement en attendant que la personne active son compte.)
-  const { data: profile, error: profileError } = await supabase
+// Génère un mot de passe temporaire lisible (ex. Tontine-4821)
+function genererMotDePasseTemp() {
+  const nombre = Math.floor(1000 + Math.random() * 9000);
+  return `Tontine-${nombre}`;
+}
+
+// Invite un nouveau membre : crée son compte de connexion (email +
+// mot de passe temporaire), son profil, puis son appartenance au
+// groupe avec le statut "en attente" (à valider par le Président).
+export async function inviterMembre(groupId, { nom, email, telephone, typeMembre, posteId, caution }) {
+  const motDePasseTemp = genererMotDePasseTemp();
+
+  // 1. Créer le compte de connexion du membre
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email,
+    password: motDePasseTemp,
+  });
+  if (authError) throw authError;
+  if (!authData.user) throw new Error("Impossible de créer le compte de ce membre.");
+
+  // 2. Créer son profil
+  const { error: profileError } = await supabase
     .from("profiles")
-    .insert({ nom_complet: nom, telephone })
-    .select()
-    .single();
+    .insert({ id: authData.user.id, nom_complet: nom, telephone });
+  if (profileError && profileError.code !== "23505") throw profileError;
 
-  if (profileError) throw profileError;
-
-  // 2. Créer l'appartenance au groupe, statut "en attente"
+  // 3. Créer l'appartenance au groupe, statut "en attente"
   const { data: membre, error: membreError } = await supabase
     .from("group_members")
     .insert({
       group_id: groupId,
-      profile_id: profile.id,
+      profile_id: authData.user.id,
       type_membre: typeMembre,
       poste_id: posteId || null,
       caution: caution || 0,
@@ -72,7 +82,7 @@ export async function inviterMembre(groupId, { nom, telephone, typeMembre, poste
 
   if (membreError) throw membreError;
 
-  return membre;
+  return { membre, motDePasseTemp, email };
 }
 
 // Le Président valide l'invitation d'un membre
