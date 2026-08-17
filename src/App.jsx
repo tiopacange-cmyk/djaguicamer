@@ -611,9 +611,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [showInviteMember, setShowInviteMember] = useState(false);
   const [inviteNom, setInviteNom] = useState("");
   const [inviteTelephone, setInviteTelephone] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
   const [inviteCaution, setInviteCaution] = useState("");
   const [inviteError, setInviteError] = useState("");
   const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [inviteMotDePasseTemp, setInviteMotDePasseTemp] = useState("");
   const [showRapportJournalier, setShowRapportJournalier] = useState(false);
   const [showRapportMensuel, setShowRapportMensuel] = useState(false);
   const [showExportBilan, setShowExportBilan] = useState(false);
@@ -1057,7 +1059,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   </p>
                 )}
               </div>
-              <button style={btnPrimary} onClick={() => { setInviteNom(""); setInviteTelephone(""); setInviteCaution(""); setInviteError(""); setInviteSuccess(false); setShowInviteMember(true); }}><Plus size={15} /> Inviter un membre</button>
+              <button style={btnPrimary} onClick={() => { setInviteNom(""); setInviteTelephone(""); setInviteEmail(""); setInviteCaution(""); setInviteError(""); setInviteSuccess(false); setInviteMotDePasseTemp(""); setShowInviteMember(true); }}><Plus size={15} /> Inviter un membre</button>
             </div>
             <div style={{ marginTop: "22px" }} />
             <Table cols={["Nom", "Rôle", "Statut", ""]} widths="1.5fr 1.1fr 1fr 1.3fr"
@@ -1655,6 +1657,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <FormField label="Nom complet" placeholder="Ex. André Fotso" value={inviteNom} onChange={(e) => setInviteNom(e.target.value)} />
+          <FormField label="Email" placeholder="Ex. andre.fotso@exemple.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
           <FormField label="Téléphone" placeholder="Ex. 6XX XXX XXX" value={inviteTelephone} onChange={(e) => setInviteTelephone(e.target.value)} />
           <FormField label="Profession" placeholder="Ex. Enseignant, commerçant..." />
           <FormField label="Quartier / Milieu d'habitation" placeholder="Ex. Nkolbisson, Yaoundé" />
@@ -1793,22 +1796,28 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
           )}
           {inviteSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <CheckCircle2 size={14} /> Invitation envoyée — {inviteNom} apparaît maintenant "en attente" dans la liste des membres.
+            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                <CheckCircle2 size={14} /> Invitation envoyée — {inviteNom} apparaît maintenant "en attente".
+              </div>
+              {inviteMotDePasseTemp && (
+                <div>Mot de passe temporaire à lui communiquer : <b>{inviteMotDePasseTemp}</b></div>
+              )}
             </div>
           )}
 
           <button
             style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
             onClick={async () => {
-              if (!inviteNom.trim()) {
-                setInviteError("Le nom complet est obligatoire.");
+              if (!inviteNom.trim() || !inviteEmail.trim()) {
+                setInviteError("Le nom complet et l'email sont obligatoires.");
                 setInviteSuccess(false);
                 return;
               }
               try {
-                await inviterMembre(groupId, {
+                const resultat = await inviterMembre(groupId, {
                   nom: inviteNom.trim(),
+                  email: inviteEmail.trim(),
                   telephone: inviteTelephone.trim(),
                   typeMembre: roleType,
                   posteId: null, // ⚠️ à relier au vrai id du poste choisi (table postes_bureau) une fois les postes créés en base
@@ -1817,16 +1826,19 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 await rechargerMembres();
                 setInviteError("");
                 setInviteSuccess(true);
+                setInviteMotDePasseTemp(resultat.motDePasseTemp);
                 setInviteNom("");
                 setInviteTelephone("");
+                setInviteEmail("");
                 setInviteCaution("");
                 setTimeout(() => {
                   setShowInviteMember(false);
                   setInviteSuccess(false);
-                }, 1200);
+                  setInviteMotDePasseTemp("");
+                }, 3000);
               } catch (e) {
                 console.error("Erreur d'invitation", e);
-                setInviteError("Erreur lors de l'envoi de l'invitation — vérifie la console pour le détail.");
+                setInviteError(e.message || "Erreur lors de l'envoi de l'invitation.");
                 setInviteSuccess(false);
               }
             }}
