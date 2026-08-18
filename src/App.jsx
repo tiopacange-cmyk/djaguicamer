@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre } from "./lib/membres";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire } from "./lib/groups";
-import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine } from "./lib/tontine";
+import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle } from "./lib/tontine";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
@@ -792,6 +792,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [showCreateTontine, setShowCreateTontine] = useState(false);
   const [tontineNom, setTontineNom] = useState("");
   const [tontineMontant, setTontineMontant] = useState("");
+  const [tontineDateDebut, setTontineDateDebut] = useState("");
   const [tontineError, setTontineError] = useState("");
   const [tontineSuccess, setTontineSuccess] = useState(false);
   const [showPayout, setShowPayout] = useState(null);
@@ -1080,6 +1081,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [cotisationTontineDate, setCotisationTontineDate] = useState("");
   const [cotisationTontineMontants, setCotisationTontineMontants] = useState({});
   const [cotisationTontineError, setCotisationTontineError] = useState("");
+  const [showAjouterMembreCycle, setShowAjouterMembreCycle] = useState(false);
+  const [ajoutMembreId, setAjoutMembreId] = useState("");
+  const [ajoutMontantRappel, setAjoutMontantRappel] = useState("");
+  const [ajoutErreur, setAjoutErreur] = useState("");
+  const [ajoutSuccess, setAjoutSuccess] = useState(false);
   const setMontantTontineMembre = (nom, val) => {
     setCotisationTontineMontants((prev) => ({ ...prev, [nom]: val }));
   };
@@ -1189,7 +1195,15 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 {tontineActive && (
                   <button style={btnSecondary} onClick={() => setShowCotisationTontine(true)}><Plus size={15} /> Enregistrer une cotisation</button>
                 )}
-                <button style={btnPrimary} onClick={() => { setTontineNom(""); setTontineMontant(""); setTontineError(""); setTontineSuccess(false); setShowCreateTontine(true); }}><Plus size={15} /> Créer une tontine</button>
+                {tontineActive && (
+                  <button
+                    style={btnSecondary}
+                    onClick={() => { setAjoutMembreId(""); setAjoutMontantRappel(""); setAjoutErreur(""); setAjoutSuccess(false); setShowAjouterMembreCycle(true); }}
+                  >
+                    <Plus size={15} /> Ajouter un membre au cycle
+                  </button>
+                )}
+                <button style={btnPrimary} onClick={() => { setTontineNom(""); setTontineMontant(""); setTontineDateDebut(""); setTontineError(""); setTontineSuccess(false); setShowCreateTontine(true); }}><Plus size={15} /> Créer une tontine</button>
               </div>
             </div>
 
@@ -2636,20 +2650,86 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         </Modal>
       )}
 
+      {showAjouterMembreCycle && tontineActive && (
+        <Modal onClose={() => setShowAjouterMembreCycle(false)} title="Ajouter un membre au cycle">
+          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+            Le mode de distribution des tours déjà planifiés ne change pas. Si des tours sont déjà clôturés, le nouveau membre rattrape les cotisations passées avec un montant de rappel.
+          </div>
+
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Membre à ajouter</label>
+            <select
+              value={ajoutMembreId}
+              onChange={(e) => setAjoutMembreId(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+            >
+              <option value="">Sélectionner un membre</option>
+              {membres.filter((m) => m.statut === "actif").map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
+            </select>
+          </div>
+
+          {tours.filter((t) => t.statut === "clôturé").length > 0 ? (
+            <>
+              <FormField label={`Montant de rappel (${tours.filter((t) => t.statut === "clôturé").length} tour(s) déjà clôturé(s))`} placeholder="Ex. 150 000 FCFA" value={ajoutMontantRappel} onChange={(e) => setAjoutMontantRappel(e.target.value)} />
+              <div style={{ fontSize: "11px", color: C.sub, marginTop: "-6px" }}>
+                Ce montant sera réparti automatiquement sur les {tours.filter((t) => t.statut === "clôturé").length} tour(s) déjà clôturé(s).
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              Aucun tour clôturé pour l'instant — le membre rejoint directement, sans rappel à verser.
+            </div>
+          )}
+
+          {ajoutErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {ajoutErreur}
+            </div>
+          )}
+          {ajoutSuccess && (
+            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <CheckCircle2 size={14} /> Membre ajouté au cycle.
+            </div>
+          )}
+
+          <button
+            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            onClick={async () => {
+              if (!ajoutMembreId) { setAjoutErreur("Sélectionne un membre."); setAjoutSuccess(false); return; }
+              const toursClotures = tours.filter((t) => t.statut === "clôturé");
+              const montantNum = parseFloat(ajoutMontantRappel.replace(/[^\d.]/g, "")) || 0;
+              if (toursClotures.length > 0 && montantNum <= 0) {
+                setAjoutErreur("Un montant de rappel est requis puisque des tours sont déjà clôturés.");
+                setAjoutSuccess(false);
+                return;
+              }
+              try {
+                await ajouterMembreAuCycle(tontineActive.id, ajoutMembreId, montantNum, toursClotures.map((t) => ({ id: t.id })));
+                await rechargerTontine();
+                setAjoutSuccess(true);
+                setAjoutErreur("");
+                setTimeout(() => {
+                  setShowAjouterMembreCycle(false);
+                  setAjoutSuccess(false);
+                }, 1400);
+              } catch (e) {
+                console.error("Erreur d'ajout du membre au cycle", e);
+                setAjoutErreur(e.message || "Erreur lors de l'ajout.");
+                setAjoutSuccess(false);
+              }
+            }}
+          >
+            Ajouter au cycle
+          </button>
+        </Modal>
+      )}
+
       {showCreateTontine && (
         <Modal onClose={() => setShowCreateTontine(false)} title="Créer une tontine">
           <FormField label="Nom de la tontine" placeholder="Ex. Tontine des Bâtisseurs — Cycle 2" value={tontineNom} onChange={(e) => setTontineNom(e.target.value)} />
           <FormField label="Montant cotisé par tour" placeholder="Ex. 75 000 FCFA" value={tontineMontant} onChange={(e) => setTontineMontant(e.target.value)} />
-          <FormField label="Nombre de membres participants" placeholder="Ex. 12" />
-          <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Mode de distribution par défaut</label>
-            <div style={{ display: "flex", gap: "8px" }}>
-              {["Ordre fixe", "Désignation", "Enchères"].map((m, idx) => (
-                <div key={m} style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${idx === 0 ? C.accent2 : C.border}`, background: idx === 0 ? C.ok : "#FBFAF6", fontSize: "11.5px", fontWeight: 600, color: idx === 0 ? C.accent2 : C.sub, cursor: "pointer" }}>
-                  {m}
-                </div>
-              ))}
-            </div>
+          <div style={{ fontSize: "11px", color: C.sub, marginTop: "-4px" }}>
+            Les {membres.filter((m) => m.statut === "actif").length} membre(s) actif(s) du groupe participent automatiquement, désignés par rotation.
           </div>
           <div>
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>
@@ -2693,7 +2773,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               </button>
             </div>
           </div>
-          <FormField label="Date de début" placeholder="jj/mm/aaaa" />
+          <FormField label="Date de début" placeholder="jj/mm/aaaa" value={tontineDateDebut} onChange={(e) => setTontineDateDebut(e.target.value)} />
 
           {tontineError && (
             <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
@@ -2721,6 +2801,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   montantParTour: montantNum,
                   seances,
                   membresActifs,
+                  dateDebut: tontineDateDebut.trim() || null,
                 });
                 await rechargerTontine();
                 setTontineError("");
@@ -2728,7 +2809,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 setTimeout(() => {
                   setShowCreateTontine(false);
                   setTontineSuccess(false);
-                  setTontineNom(""); setTontineMontant("");
+                  setTontineNom(""); setTontineMontant(""); setTontineDateDebut("");
                 }, 1400);
               } catch (e) {
                 console.error("Erreur de création de la tontine", e);
