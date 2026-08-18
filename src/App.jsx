@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre } from "./lib/membres";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange } from "./lib/auth";
-import { fetchGroupes, creerGroupeAvecAdmin } from "./lib/groups";
+import { fetchGroupes, creerGroupeAvecAdmin, reinitialiserMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire } from "./lib/groups";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
@@ -264,6 +264,29 @@ function SuperAdminScreen() {
   const [creationErreur, setCreationErreur] = useState("");
   const [resultatCreation, setResultatCreation] = useState(null);
 
+  // Accès d'urgence
+  const [showResetAccess, setShowResetAccess] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetGroupId, setResetGroupId] = useState("");
+  const [resetEnCours, setResetEnCours] = useState(false);
+  const [resetErreur, setResetErreur] = useState("");
+  const [resetSuccess, setResetSuccess] = useState(false);
+
+  // Journal d'audit
+  const [auditLog, setAuditLog] = useState([]);
+  const [chargementAudit, setChargementAudit] = useState(true);
+  const [erreurAudit, setErreurAudit] = useState("");
+
+  // Tarifs
+  const [plans, setPlans] = useState([]);
+  const [chargementPlans, setChargementPlans] = useState(true);
+  const [editPlanId, setEditPlanId] = useState(null);
+  const [editPrixMensuel, setEditPrixMensuel] = useState("");
+  const [editPrixAnnuel, setEditPrixAnnuel] = useState("");
+  const [editLimiteMembres, setEditLimiteMembres] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [savingPlan, setSavingPlan] = useState(false);
+
   const chargerGroupes = async () => {
     setChargement(true);
     try {
@@ -278,12 +301,41 @@ function SuperAdminScreen() {
     }
   };
 
+  const chargerAudit = async () => {
+    setChargementAudit(true);
+    try {
+      const data = await fetchAuditLog();
+      setAuditLog(data);
+      setErreurAudit("");
+    } catch (e) {
+      console.error("Erreur de chargement du journal d'audit", e);
+      setErreurAudit("Impossible de charger le journal d'audit.");
+    } finally {
+      setChargementAudit(false);
+    }
+  };
+
+  const chargerPlans = async () => {
+    setChargementPlans(true);
+    try {
+      const data = await fetchPlansTarifaires();
+      setPlans(data);
+    } catch (e) {
+      console.error("Erreur de chargement des tarifs", e);
+    } finally {
+      setChargementPlans(false);
+    }
+  };
+
   useEffect(() => {
     chargerGroupes();
+    chargerAudit();
+    chargerPlans();
   }, []);
 
   const planColor = { Basic: C.sub, Standard: C.accent2, Pro: C.accent, Essai: C.purple };
   const statusStyle = { actif: { bg: C.ok, fg: C.accent2 }, "en retard": { bg: C.warnBg, fg: C.warn }, essai: { bg: "#EBE6F5", fg: C.purple } };
+  const typeStyle = { urgence: { bg: "#FBF1DC", fg: C.accent }, "création": { bg: C.ok, fg: C.accent2 }, abonnement: { bg: "#EBE6F5", fg: C.purple } };
 
   return (
     <div style={{ minHeight: "680px", background: C.bg, display: "flex", color: C.ink }}>
@@ -291,6 +343,7 @@ function SuperAdminScreen() {
         role="Super Admin" sub="Plateforme"
         items={[
           { icon: <Building2 size={16} />, label: "Groupes", key: "groupes" },
+          { icon: <CreditCard size={16} />, label: "Tarifs", key: "tarifs" },
           { icon: <ScrollText size={16} />, label: "Journal d'audit", key: "audit" },
         ]}
         active={view} onSelect={setView}
@@ -305,16 +358,27 @@ function SuperAdminScreen() {
                   {chargement ? "Chargement..." : `${groupes.length} groupe(s).`} Création + abonnement uniquement — aucune visibilité sur les données internes.
                 </p>
               </div>
-              <button
-                style={btnPrimary}
-                onClick={() => {
-                  setNomGroupe(""); setAdminNom(""); setAdminEmail("");
-                  setCreationErreur(""); setResultatCreation(null);
-                  setShowCreateGroupe(true);
-                }}
-              >
-                <Plus size={15} /> Nouveau groupe
-              </button>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  style={btnSecondary}
+                  onClick={() => {
+                    setResetEmail(""); setResetGroupId(""); setResetErreur(""); setResetSuccess(false);
+                    setShowResetAccess(true);
+                  }}
+                >
+                  <KeyRound size={15} /> Accès d'urgence
+                </button>
+                <button
+                  style={btnPrimary}
+                  onClick={() => {
+                    setNomGroupe(""); setAdminNom(""); setAdminEmail("");
+                    setCreationErreur(""); setResultatCreation(null);
+                    setShowCreateGroupe(true);
+                  }}
+                >
+                  <Plus size={15} /> Nouveau groupe
+                </button>
+              </div>
             </div>
 
             {erreur && (
@@ -342,12 +406,132 @@ function SuperAdminScreen() {
           </>
         )}
 
+        {view === "tarifs" && (
+          <>
+            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Politique tarifaire</h1>
+            <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>
+              {chargementPlans ? "Chargement..." : "Modifie les prix et limites de chaque formule — appliqué immédiatement aux nouvelles souscriptions."}
+            </p>
+
+            <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
+              {plans.map((p) => (
+                <div key={p.id} style={{ flex: "1 1 220px", background: C.panel, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "18px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                    <span style={{ fontWeight: 700, fontSize: "15px", color: planColor[p.formule] || C.ink }}>{p.formule}</span>
+                    {editPlanId !== p.id && (
+                      <button
+                        onClick={() => {
+                          setEditPlanId(p.id);
+                          setEditPrixMensuel(String(p.prix_mensuel ?? ""));
+                          setEditPrixAnnuel(String(p.prix_annuel ?? ""));
+                          setEditLimiteMembres(p.limite_membres != null ? String(p.limite_membres) : "");
+                          setEditDescription(p.description || "");
+                        }}
+                        style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, color: C.accent2, cursor: "pointer" }}
+                      >
+                        Modifier
+                      </button>
+                    )}
+                  </div>
+
+                  {editPlanId === p.id ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <div>
+                        <label style={{ fontSize: "10.5px", color: C.sub, display: "block", marginBottom: "3px" }}>Prix mensuel (FCFA)</label>
+                        <input value={editPrixMensuel} onChange={(e) => setEditPrixMensuel(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.border}`, fontSize: "12px", outline: "none" }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "10.5px", color: C.sub, display: "block", marginBottom: "3px" }}>Prix annuel (FCFA)</label>
+                        <input value={editPrixAnnuel} onChange={(e) => setEditPrixAnnuel(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.border}`, fontSize: "12px", outline: "none" }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "10.5px", color: C.sub, display: "block", marginBottom: "3px" }}>Limite de membres (vide = illimité)</label>
+                        <input value={editLimiteMembres} onChange={(e) => setEditLimiteMembres(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.border}`, fontSize: "12px", outline: "none" }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "10.5px", color: C.sub, display: "block", marginBottom: "3px" }}>Description</label>
+                        <input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.border}`, fontSize: "12px", outline: "none" }} />
+                      </div>
+                      <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+                        <button
+                          disabled={savingPlan}
+                          onClick={async () => {
+                            setSavingPlan(true);
+                            try {
+                              await modifierPlanTarifaire(p.id, {
+                                prixMensuel: parseFloat(editPrixMensuel) || 0,
+                                prixAnnuel: parseFloat(editPrixAnnuel) || 0,
+                                limiteMembres: editLimiteMembres.trim() === "" ? null : parseInt(editLimiteMembres, 10),
+                                description: editDescription,
+                              });
+                              await chargerPlans();
+                              setEditPlanId(null);
+                            } catch (e) {
+                              console.error("Erreur de modification du tarif", e);
+                            } finally {
+                              setSavingPlan(false);
+                            }
+                          }}
+                          style={{ flex: 1, background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "7px", padding: "8px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                        >
+                          {savingPlan ? "..." : "Enregistrer"}
+                        </button>
+                        <button
+                          onClick={() => setEditPlanId(null)}
+                          style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "7px", padding: "8px 10px", fontSize: "12px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: "20px", fontWeight: 700 }}>
+                        {Number(p.prix_mensuel).toLocaleString("fr-FR")} <span style={{ fontSize: "12px", fontWeight: 500, color: C.sub }}>FCFA / mois</span>
+                      </div>
+                      <div style={{ fontSize: "11.5px", color: C.sub, marginTop: "2px" }}>
+                        ou {Number(p.prix_annuel).toLocaleString("fr-FR")} FCFA / an
+                      </div>
+                      <div style={{ fontSize: "11.5px", color: C.sub, marginTop: "10px" }}>
+                        {p.limite_membres ? `Jusqu'à ${p.limite_membres} membres` : "Membres illimités"}
+                      </div>
+                      <div style={{ fontSize: "11.5px", color: C.sub, marginTop: "4px" }}>{p.description}</div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
         {view === "audit" && (
           <>
             <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Journal d'audit</h1>
             <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>
-              Historique en lecture seule des actions Super Admin (branchement des entrées à venir).
+              Historique en lecture seule des actions Super Admin.
             </p>
+            {erreurAudit && (
+              <div style={{ fontSize: "12.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px", marginBottom: "16px" }}>
+                {erreurAudit}
+              </div>
+            )}
+            <Table
+              cols={["Date", "Action", "Détail", "Type"]}
+              widths="1.2fr 1.4fr 1.8fr 1fr"
+              rows={
+                chargementAudit
+                  ? []
+                  : auditLog.map((e) => [
+                      <span style={{ color: C.sub, fontSize: 12 }}>{new Date(e.created_at).toLocaleString("fr-FR")}</span>,
+                      <b>{e.action}</b>,
+                      <span style={{ color: C.sub, fontSize: 12 }}>{e.detail}</span>,
+                      e.type ? <Badge bg={(typeStyle[e.type] || typeStyle["création"]).bg} fg={(typeStyle[e.type] || typeStyle["création"]).fg}>{e.type}</Badge> : "—",
+                    ])
+              }
+            />
+            {!chargementAudit && auditLog.length === 0 && (
+              <div style={{ fontSize: "12.5px", color: C.sub, marginTop: "12px" }}>Aucune action enregistrée pour l'instant.</div>
+            )}
           </>
         )}
       </div>
@@ -384,6 +568,7 @@ function SuperAdminScreen() {
                     });
                     setResultatCreation(resultat);
                     await chargerGroupes();
+                    await chargerAudit();
                   } catch (e) {
                     console.error("Erreur de création du groupe", e);
                     setCreationErreur(e.message || "Erreur lors de la création du groupe.");
@@ -408,9 +593,6 @@ function SuperAdminScreen() {
                 <div><b>Identifiant de connexion :</b> {resultatCreation.identifiant}</div>
                 <div><b>Mot de passe temporaire :</b> {resultatCreation.motDePasseTemp}</div>
                 <div style={{ color: C.sub, fontSize: "11px", marginTop: "4px" }}>(Email associé : {resultatCreation.adminEmail})</div>
-                <div style={{ color: C.sub, marginTop: "6px", fontSize: "11px" }}>
-                  L'admin devra changer ce mot de passe dès sa première connexion (à mettre en place).
-                </div>
               </div>
               <button
                 style={{ marginTop: "8px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
@@ -422,9 +604,74 @@ function SuperAdminScreen() {
           )}
         </Modal>
       )}
+
+      {showResetAccess && (
+        <Modal onClose={() => setShowResetAccess(false)} title="Accès d'urgence — réinitialiser un mot de passe">
+          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+            Un email de réinitialisation sera envoyé à l'utilisateur. Cette action est réservée aux cas d'urgence (compte bloqué, admin/président injoignable) et reste tracée dans le journal d'audit.
+          </div>
+          <FormField label="Email de l'utilisateur" placeholder="Ex. jean.mballa@exemple.com" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} />
+
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Groupe concerné (optionnel)</label>
+            <select
+              value={resetGroupId}
+              onChange={(e) => setResetGroupId(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+            >
+              <option value="">— Non précisé —</option>
+              {groupes.map((g) => <option key={g.id} value={g.id}>{g.nom}</option>)}
+            </select>
+          </div>
+
+          {resetErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {resetErreur}
+            </div>
+          )}
+          {resetSuccess && (
+            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <CheckCircle2 size={14} /> Email de réinitialisation envoyé, et action tracée dans le journal d'audit.
+            </div>
+          )}
+
+          <button
+            disabled={resetEnCours}
+            style={{ marginTop: "6px", background: C.warn, color: "#FFF6EE", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: resetEnCours ? "default" : "pointer", opacity: resetEnCours ? 0.7 : 1 }}
+            onClick={async () => {
+              if (!resetEmail.trim()) {
+                setResetErreur("L'email est obligatoire.");
+                setResetSuccess(false);
+                return;
+              }
+              setResetEnCours(true);
+              setResetErreur("");
+              try {
+                const groupeNom = groupes.find((g) => g.id === resetGroupId)?.nom;
+                await reinitialiserMotDePasse(resetEmail.trim(), resetGroupId || null, groupeNom);
+                setResetSuccess(true);
+                await chargerAudit();
+                setTimeout(() => {
+                  setShowResetAccess(false);
+                  setResetSuccess(false);
+                }, 2000);
+              } catch (e) {
+                console.error("Erreur de réinitialisation", e);
+                setResetErreur(e.message || "Erreur lors de l'envoi de la réinitialisation.");
+                setResetSuccess(false);
+              } finally {
+                setResetEnCours(false);
+              }
+            }}
+          >
+            {resetEnCours ? "Envoi..." : "Envoyer la réinitialisation"}
+          </button>
+        </Modal>
+      )}
     </div>
   );
 }
+
 
 // ============================================================
 // ÉCRAN 3 — ADMIN DE GROUPE (modules Tontine / Banque / Assurance / Bilan / Membres)
