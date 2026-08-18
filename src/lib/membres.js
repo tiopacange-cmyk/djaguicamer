@@ -13,7 +13,6 @@ function genererMotDePasseTemp() {
 // MEMBRES DU GROUPE
 // ============================================================
 
-// Récupère tous les membres d'un groupe, avec leur nom depuis "profiles"
 export async function fetchMembres(groupId) {
   const { data, error } = await supabase
     .from("group_members")
@@ -44,10 +43,6 @@ export async function fetchMembres(groupId) {
   }));
 }
 
-// Invite un nouveau membre : crée directement son compte de connexion
-// (identifiant + mot de passe temporaire, comme pour un admin), en
-// protégeant la session de la personne qui invite (l'admin reste
-// connecté à son propre compte pendant et après l'opération).
 export async function inviterMembre(groupId, { nom, email, telephone, typeMembre, posteId, caution }) {
   const identifiantBase = genererIdentifiant(nom);
   const identifiant = `${identifiantBase}${Math.floor(10 + Math.random() * 90)}`;
@@ -94,8 +89,6 @@ export async function inviterMembre(groupId, { nom, email, telephone, typeMembre
   return { membre, email, identifiant, motDePasseTemp };
 }
 
-// Modifie les informations d'un membre déjà inscrit (jamais son
-// mot de passe, qui reste géré uniquement par lui-même)
 export async function modifierMembre(profileId, { nom, email, telephone, profession, quartier }) {
   const champs = {};
   if (nom !== undefined) champs.nom_complet = nom;
@@ -115,7 +108,6 @@ export async function modifierMembre(profileId, { nom, email, telephone, profess
   return data;
 }
 
-// Le Président valide l'invitation d'un membre
 export async function validerMembre(groupMemberId, validateurId) {
   const { data, error } = await supabase
     .from("group_members")
@@ -128,8 +120,6 @@ export async function validerMembre(groupMemberId, validateurId) {
   return data;
 }
 
-// Rend un membre actif ou inactif (suspend/réactive son accès au
-// groupe, sans le supprimer — ses données/historique restent intacts)
 export async function toggleActifMembre(groupMemberId, nouveauStatut) {
   const { data, error } = await supabase
     .from("group_members")
@@ -140,4 +130,53 @@ export async function toggleActifMembre(groupMemberId, nouveauStatut) {
 
   if (error) throw error;
   return data;
+}
+
+export async function fetchMonCompteMembre(groupId, profileId) {
+  const { data, error } = await supabase
+    .from("group_members")
+    .select(`
+      id, type_membre, statut, caution, created_at,
+      poste:postes_bureau ( nom )
+    `)
+    .eq("group_id", groupId)
+    .eq("profile_id", profileId)
+    .single();
+
+  if (error) throw error;
+  return {
+    id: data.id,
+    role: data.type_membre === "Membre du bureau" ? (data.poste?.nom || "Bureau") : "Membre",
+    statut: data.statut,
+    caution: data.caution,
+    depuisLe: data.created_at,
+  };
+}
+
+export async function supprimerMembre(groupMemberId) {
+  const { data: cotisationsTontine, error: errTontine } = await supabase
+    .from("tontine_cotisations")
+    .select("id")
+    .eq("membre_id", groupMemberId)
+    .limit(1);
+  if (errTontine) throw errTontine;
+
+  const { data: mouvementsBanque, error: errBanque } = await supabase
+    .from("epargne_mouvements")
+    .select("id")
+    .eq("membre_id", groupMemberId)
+    .eq("type", "Versement")
+    .limit(1);
+  if (errBanque) throw errBanque;
+
+  if ((cotisationsTontine && cotisationsTontine.length > 0) || (mouvementsBanque && mouvementsBanque.length > 0)) {
+    throw new Error("Ce membre a déjà effectué au moins une cotisation — suppression impossible.");
+  }
+
+  const { error } = await supabase
+    .from("group_members")
+    .delete()
+    .eq("id", groupMemberId);
+
+  if (error) throw error;
 }
