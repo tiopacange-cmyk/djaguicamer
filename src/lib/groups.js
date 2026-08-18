@@ -26,8 +26,6 @@ export async function fetchGroupes() {
 }
 
 // Crée un nouveau groupe + un compte admin pour ce groupe.
-// L'admin reçoit tout de suite un vrai compte de connexion, avec
-// un identifiant court (dérivé de son nom) pour se connecter facilement.
 export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, formule = "Essai" }) {
   const motDePasseTemp = genererMotDePasseTemp();
   const identifiantBase = genererIdentifiant(adminNom);
@@ -84,19 +82,62 @@ export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, fo
 }
 
 // ============================================================
-// ACCÈS D'URGENCE — réinitialisation de mot de passe
+// ACCÈS D'URGENCE — réinitialisation directe du mot de passe
+// (sans email, pour un accès immédiat)
 // ============================================================
-export async function reinitialiserMotDePasse(email, groupId, groupNom) {
-  const { error } = await supabase.auth.resetPasswordForEmail(email);
+
+export async function fetchAdminsDesGroupes() {
+  const { data, error } = await supabase
+    .from("group_members")
+    .select(`
+      is_admin, is_president,
+      profile:profiles ( email, nom_complet ),
+      group:groups ( id, nom )
+    `)
+    .or("is_admin.eq.true,is_president.eq.true")
+    .eq("statut", "actif");
+
+  if (error) throw error;
+
+  return data
+    .filter((m) => m.profile?.email)
+    .map((m) => ({
+      email: m.profile.email,
+      nom: m.profile.nom_complet,
+      groupId: m.group?.id,
+      groupNom: m.group?.nom,
+      role: m.is_president ? "Président" : "Admin",
+    }));
+}
+
+export async function reinitialiserMotDePasseDirect(email, groupId, groupNom) {
+  const motDePasseTemp = genererMotDePasseTemp();
+
+  const { error } = await supabase.rpc("reset_password_super_admin", {
+    p_email: email,
+    p_nouveau_mdp: motDePasseTemp,
+  });
   if (error) throw error;
 
   const { error: logError } = await supabase.from("audit_log").insert({
     group_id: groupId || null,
     action: "Réinitialisation mot de passe",
-    detail: `Email de réinitialisation envoyé à ${email}${groupNom ? ` (groupe : ${groupNom})` : ""}`,
+    detail: `Mot de passe réinitialisé pour ${email}${groupNom ? ` (groupe : ${groupNom})` : ""}`,
     type: "urgence",
   });
   if (logError) console.error("Erreur d'écriture dans le journal d'audit", logError);
+
+  return motDePasseTemp;
+}
+
+export async function changerMotDePasse(nouveauMotDePasse) {
+  const { error } = await supabase.auth.updateUser({ password: nouveauMotDePasse });
+  if (error) throw error;
+
+  const { data: userData } = await supabase.auth.getUser();
+  if (userData.user) {
+    await supabase.from("profiles").update({ doit_changer_mdp: false }).eq("auth_user_id", userData.user.id);
+  }
 }
 
 // ============================================================
