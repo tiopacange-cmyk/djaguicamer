@@ -788,6 +788,18 @@ function SuperAdminScreen() {
 // ============================================================
 function AdminGroupeScreen({ groupId, nomGroupe }) {
   const fmtFCFA = (n) => `${Math.round(n).toLocaleString("fr-FR")} FCFA`;
+
+  // Convertit une date saisie au format jj/mm/aaaa (celui utilisé
+  // dans toute l'interface) vers le format aaaa-mm-jj attendu par
+  // la base de données. Retourne null si le format est invalide.
+  const versDateISO = (str) => {
+    if (!str || !str.trim()) return null;
+    const parts = str.trim().split("/");
+    if (parts.length !== 3) return null;
+    const [j, m, a] = parts;
+    if (!j || !m || !a) return null;
+    return `${a.padStart(4, "0")}-${m.padStart(2, "0")}-${j.padStart(2, "0")}`;
+  };
   const [view, setView] = useState("tontine");
   const [showCreateTontine, setShowCreateTontine] = useState(false);
   const [tontineNom, setTontineNom] = useState("");
@@ -1676,7 +1688,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               try {
                 const cotisations = membres
                   .filter((m) => cotisationTontineMontants[m.nom])
-                  .map((m) => ({ membreId: m.id, montant: cotisationTontineMontants[m.nom], date: cotisationTontineDate.trim() }));
+                  .map((m) => ({ membreId: m.id, montant: cotisationTontineMontants[m.nom], date: versDateISO(cotisationTontineDate) }));
                 await enregistrerCotisationsTontine(tourEnCours.id, cotisations);
                 await rechargerTontine();
                 setCotisationTontineError("");
@@ -2904,7 +2916,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
             )}
           </div>
-          <FormField label="Date de début" placeholder="jj/mm/aaaa" value={tontineDateDebut} onChange={(e) => setTontineDateDebut(e.target.value)} />
+          {seances.length > 0 && (
+            <div style={{ fontSize: "11px", color: C.sub, marginTop: "-4px" }}>
+              La tontine débutera le <b>{seances.slice().sort((a, b) => versDateISO(a.date).localeCompare(versDateISO(b.date)))[0].date}</b> (date de la première séance).
+            </div>
+          )}
 
           {tontineError && (
             <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
@@ -2927,12 +2943,16 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               if (!montantNum || montantNum <= 0) { setTontineError("Montant invalide."); setTontineSuccess(false); return; }
               try {
                 const membresActifs = membres.filter((m) => m.statut === "actif");
+                const seancesISO = seances.map((s) => ({ ...s, date: versDateISO(s.date) }));
+                const dateDebutAuto = seancesISO.length
+                  ? seancesISO.slice().sort((a, b) => a.date.localeCompare(b.date))[0].date
+                  : null;
                 await creerTontine(groupId, {
                   nom: tontineNom.trim(),
                   montantParTour: montantNum,
-                  seances,
+                  seances: seancesISO,
                   membresActifs,
-                  dateDebut: tontineDateDebut.trim() || null,
+                  dateDebut: dateDebutAuto,
                 });
                 await rechargerTontine();
                 setTontineError("");
