@@ -1,4 +1,3 @@
-
 import { supabase } from "./supabaseClient";
 
 // ============================================================
@@ -52,10 +51,10 @@ export async function fetchTontineActive(groupId) {
 // et un tour par séance, en désignant le bénéficiaire par
 // rotation simple sur la liste des membres actifs (sauf mode
 // "Enchères", où le bénéficiaire reste à désigner).
-export async function creerTontine(groupId, { nom, montantParTour, seances, membresActifs }) {
+export async function creerTontine(groupId, { nom, montantParTour, seances, membresActifs, dateDebut }) {
   const { data: tontine, error: errTontine } = await supabase
     .from("tontines")
-    .insert({ group_id: groupId, nom, montant_par_tour: montantParTour, statut: "en cours" })
+    .insert({ group_id: groupId, nom, montant_par_tour: montantParTour, statut: "en cours", date_debut: dateDebut || null })
     .select()
     .single();
   if (errTontine) throw errTontine;
@@ -128,6 +127,24 @@ export async function enregistrerCotisationsTontine(tourId, cotisations) {
 
   const { error } = await supabase.from("tontine_cotisations").insert(lignes);
   if (error) throw error;
+}
+
+// Ajoute un membre à une tontine déjà en cours. S'il y a des tours
+// déjà clôturés, il doit verser un "rappel" pour rattraper les tours
+// passés — ce montant est réparti en cotisations sur chaque tour
+// déjà clôturé, pour rester cohérent avec le suivi des cotisations.
+export async function ajouterMembreAuCycle(tontineId, membreId, montantRappel, toursClotures) {
+  if (toursClotures.length > 0 && montantRappel > 0) {
+    const parTour = montantRappel / toursClotures.length;
+    const lignes = toursClotures.map((t) => ({
+      tour_id: t.id,
+      membre_id: membreId,
+      montant: parTour,
+      date_paiement: new Date().toISOString().slice(0, 10),
+    }));
+    const { error } = await supabase.from("tontine_cotisations").insert(lignes);
+    if (error) throw error;
+  }
 }
 
 // Récupère la liste des membres ayant déjà cotisé pour un tour donné
