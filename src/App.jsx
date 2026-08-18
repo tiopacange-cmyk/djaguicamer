@@ -801,6 +801,73 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
     { date: "05/10/2026", mode: "Enchères" },
   ]);
   const [newDate, setNewDate] = useState("");
+  const [modeSaisie, setModeSaisie] = useState("manuel"); // "manuel" | "auto"
+  const [autoDateDebut, setAutoDateDebut] = useState("");
+  const [autoDateFin, setAutoDateFin] = useState("");
+  const [autoJourSemaine, setAutoJourSemaine] = useState("0");
+  const [autoFrequence, setAutoFrequence] = useState("chaque_semaine");
+  const [autoOccurrences, setAutoOccurrences] = useState([]);
+  const [autoErreur, setAutoErreur] = useState("");
+
+  const JOURS_SEMAINE = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+
+  const parseJJMMAAAA = (str) => {
+    const [j, m, a] = str.split("/").map((n) => parseInt(n, 10));
+    if (!j || !m || !a) return null;
+    return new Date(a, m - 1, j);
+  };
+  const formatJJMMAAAA = (d) => {
+    const j = String(d.getDate()).padStart(2, "0");
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    return `${j}/${m}/${d.getFullYear()}`;
+  };
+
+  const toggleOccurrence = (val) => {
+    setAutoOccurrences((prev) => (prev.includes(val) ? prev.filter((o) => o !== val) : [...prev, val]));
+  };
+
+  const genererDatesAuto = () => {
+    setAutoErreur("");
+    const debut = parseJJMMAAAA(autoDateDebut);
+    const fin = parseJJMMAAAA(autoDateFin);
+    if (!debut || !fin) { setAutoErreur("Renseigne une date de début et de fin valides (jj/mm/aaaa)."); return; }
+    if (fin < debut) { setAutoErreur("La date de fin doit être après la date de début."); return; }
+    const jourCible = parseInt(autoJourSemaine, 10);
+    const dates = [];
+
+    if (autoFrequence === "mensuel_occurrences") {
+      if (autoOccurrences.length === 0) { setAutoErreur("Sélectionne au moins une occurrence (ex. 2e, 4e, dernier)."); return; }
+      let d = new Date(debut.getFullYear(), debut.getMonth(), 1);
+      while (d <= fin) {
+        const annee = d.getFullYear(), mois = d.getMonth();
+        const joursDuMois = new Date(annee, mois + 1, 0).getDate();
+        const joursCorrespondants = [];
+        for (let j = 1; j <= joursDuMois; j++) {
+          const dt = new Date(annee, mois, j);
+          if (dt.getDay() === jourCible) joursCorrespondants.push(dt);
+        }
+        autoOccurrences.forEach((occ) => {
+          const choisi = occ === "dernier" ? joursCorrespondants[joursCorrespondants.length - 1] : joursCorrespondants[parseInt(occ, 10) - 1];
+          if (choisi && choisi >= debut && choisi <= fin) dates.push(new Date(choisi));
+        });
+        d = new Date(annee, mois + 1, 1);
+      }
+    } else {
+      let d = new Date(debut);
+      while (d.getDay() !== jourCible) d.setDate(d.getDate() + 1);
+      const pas = autoFrequence === "toutes_2_semaines" ? 14 : 7;
+      while (d <= fin) {
+        dates.push(new Date(d));
+        d.setDate(d.getDate() + pas);
+      }
+    }
+
+    if (dates.length === 0) { setAutoErreur("Aucune date trouvée dans cette période avec ces critères."); return; }
+    dates.sort((a, b) => a - b);
+    const nouvellesSeances = dates.map((d) => ({ date: formatJJMMAAAA(d), mode: newMode }));
+    setSeances([...seances, ...nouvellesSeances]);
+  };
+
   const [newMode, setNewMode] = useState("Ordre fixe");
 
   const addSeance = () => {
@@ -2752,6 +2819,64 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               Dates de séance
             </label>
 
+            <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+              {[{ key: "manuel", label: "Ajout manuel" }, { key: "auto", label: "Génération automatique" }].map((o) => (
+                <div
+                  key={o.key}
+                  onClick={() => setModeSaisie(o.key)}
+                  style={{ flex: 1, textAlign: "center", padding: "8px 4px", borderRadius: "8px", border: `1px solid ${modeSaisie === o.key ? C.accent2 : C.border}`, background: modeSaisie === o.key ? C.ok : "#FBFAF6", fontSize: "11.5px", fontWeight: 600, color: modeSaisie === o.key ? C.accent2 : C.sub, cursor: "pointer" }}
+                >
+                  {o.label}
+                </div>
+              ))}
+            </div>
+
+            {modeSaisie === "auto" && (
+              <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", marginBottom: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <input value={autoDateDebut} onChange={(e) => setAutoDateDebut(e.target.value)} placeholder="Début jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "12.5px", outline: "none" }} />
+                  <input value={autoDateFin} onChange={(e) => setAutoDateFin(e.target.value)} placeholder="Fin jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "12.5px", outline: "none" }} />
+                </div>
+
+                <select value={autoJourSemaine} onChange={(e) => setAutoJourSemaine(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "12.5px", outline: "none" }}>
+                  {JOURS_SEMAINE.map((j, idx) => <option key={idx} value={idx}>{j}</option>)}
+                </select>
+
+                <select value={autoFrequence} onChange={(e) => setAutoFrequence(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "12.5px", outline: "none" }}>
+                  <option value="chaque_semaine">Chaque semaine</option>
+                  <option value="toutes_2_semaines">Toutes les 2 semaines</option>
+                  <option value="mensuel_occurrences">Occurrences précises du mois</option>
+                </select>
+
+                {autoFrequence === "mensuel_occurrences" && (
+                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                    {[{ v: "1", l: "1re" }, { v: "2", l: "2e" }, { v: "3", l: "3e" }, { v: "4", l: "4e" }, { v: "dernier", l: "Dernier" }].map((o) => (
+                      <div
+                        key={o.v}
+                        onClick={() => toggleOccurrence(o.v)}
+                        style={{ padding: "6px 10px", borderRadius: "7px", border: `1px solid ${autoOccurrences.includes(o.v) ? C.accent2 : C.border}`, background: autoOccurrences.includes(o.v) ? C.ok : "#FFFFFF", fontSize: "11.5px", fontWeight: 600, color: autoOccurrences.includes(o.v) ? C.accent2 : C.sub, cursor: "pointer" }}
+                      >
+                        {o.l}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {autoErreur && (
+                  <div style={{ fontSize: "11px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "7px 9px" }}>
+                    {autoErreur}
+                  </div>
+                )}
+
+                <button
+                  onClick={genererDatesAuto}
+                  style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "9px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+                >
+                  Générer les dates avec le mode "{newMode}"
+                </button>
+              </div>
+            )}
+
             {seances.map((s, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", marginBottom: "6px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px" }}>
@@ -2762,6 +2887,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               </div>
             ))}
 
+            {modeSaisie === "manuel" && (
             <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
               <input
                 value={newDate}
@@ -2776,6 +2902,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 <Plus size={14} />
               </button>
             </div>
+            )}
           </div>
           <FormField label="Date de début" placeholder="jj/mm/aaaa" value={tontineDateDebut} onChange={(e) => setTontineDateDebut(e.target.value)} />
 
