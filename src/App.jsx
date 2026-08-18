@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre } from "./lib/membres";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange } from "./lib/auth";
-import { fetchGroupes, creerGroupeAvecAdmin, reinitialiserMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire } from "./lib/groups";
+import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire } from "./lib/groups";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
@@ -96,6 +96,14 @@ export default function AppPrototype() {
     return (
       <div style={{ fontFamily: "'Sora','Segoe UI',sans-serif" }}>
         <ConnexionScreen onLoggedIn={chargerSessionEtRole} />
+      </div>
+    );
+  }
+
+  if (monProfil?.doit_changer_mdp) {
+    return (
+      <div style={{ fontFamily: "'Sora','Segoe UI',sans-serif" }}>
+        <ChangerMotDePasseScreen onDone={chargerSessionEtRole} />
       </div>
     );
   }
@@ -248,6 +256,90 @@ function Field({ label, placeholder, border, dark, sub, ink }) {
 }
 
 // ============================================================
+// ÉCRAN — CHANGEMENT DE MOT DE PASSE OBLIGATOIRE
+// (après une réinitialisation d'urgence par le Super Admin)
+// ============================================================
+function ChangerMotDePasseScreen({ onDone }) {
+  const [motDePasse, setMotDePasse] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [erreur, setErreur] = useState("");
+  const [chargement, setChargement] = useState(false);
+
+  const handleValider = async () => {
+    if (!motDePasse.trim() || motDePasse.length < 6) {
+      setErreur("Le mot de passe doit contenir au moins 6 caractères.");
+      return;
+    }
+    if (motDePasse !== confirmation) {
+      setErreur("Les deux mots de passe ne correspondent pas.");
+      return;
+    }
+    setChargement(true);
+    setErreur("");
+    try {
+      await changerMotDePasse(motDePasse);
+      await onDone();
+    } catch (e) {
+      console.error("Erreur de changement de mot de passe", e);
+      setErreur("Erreur lors du changement de mot de passe.");
+    } finally {
+      setChargement(false);
+    }
+  };
+
+  return (
+    <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+      <div style={{ width: "100%", maxWidth: "380px", background: C.panel, borderRadius: "18px", border: `1px solid ${C.border}`, padding: "40px 32px", boxShadow: "0 20px 50px rgba(27,67,50,0.08)" }}>
+        <div style={{ textAlign: "center", marginBottom: "24px" }}>
+          <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", borderRadius: "14px", background: `linear-gradient(135deg, ${C.accent2}, ${C.accent})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <KeyRound size={26} color="#FAF6ED" />
+          </div>
+          <h1 style={{ fontSize: "19px", fontWeight: 700, color: C.ink, margin: 0 }}>Choisis ton nouveau mot de passe</h1>
+          <p style={{ fontSize: "12.5px", color: C.sub, marginTop: "8px" }}>
+            Ton mot de passe a été réinitialisé. Choisis-en un nouveau pour continuer.
+          </p>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Nouveau mot de passe</label>
+            <input
+              type="password"
+              value={motDePasse}
+              onChange={(e) => setMotDePasse(e.target.value)}
+              placeholder="Au moins 6 caractères"
+              style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "14px", outline: "none" }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Confirme le mot de passe</label>
+            <input
+              type="password"
+              value={confirmation}
+              onChange={(e) => setConfirmation(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleValider()}
+              placeholder="Retape le même mot de passe"
+              style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "14px", outline: "none" }}
+            />
+          </div>
+          {erreur && (
+            <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {erreur}
+            </div>
+          )}
+          <button
+            onClick={handleValider}
+            disabled={chargement}
+            style={{ marginTop: "8px", width: "100%", padding: "13px", borderRadius: "10px", border: "none", background: C.accent2, color: "#FAF6ED", fontSize: "14px", fontWeight: 600, cursor: chargement ? "default" : "pointer", opacity: chargement ? 0.7 : 1 }}
+          >
+            {chargement ? "Enregistrement..." : "Valider et continuer"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // ÉCRAN 2 — SUPER ADMIN
 // ============================================================
 function SuperAdminScreen() {
@@ -266,11 +358,12 @@ function SuperAdminScreen() {
 
   // Accès d'urgence
   const [showResetAccess, setShowResetAccess] = useState(false);
-  const [resetEmail, setResetEmail] = useState("");
-  const [resetGroupId, setResetGroupId] = useState("");
+  const [adminsList, setAdminsList] = useState([]);
+  const [chargementAdmins, setChargementAdmins] = useState(false);
+  const [resetSelection, setResetSelection] = useState("");
   const [resetEnCours, setResetEnCours] = useState(false);
   const [resetErreur, setResetErreur] = useState("");
-  const [resetSuccess, setResetSuccess] = useState(false);
+  const [resetMotDePasseTemp, setResetMotDePasseTemp] = useState("");
 
   // Journal d'audit
   const [auditLog, setAuditLog] = useState([]);
@@ -361,9 +454,18 @@ function SuperAdminScreen() {
               <div style={{ display: "flex", gap: "8px" }}>
                 <button
                   style={btnSecondary}
-                  onClick={() => {
-                    setResetEmail(""); setResetGroupId(""); setResetErreur(""); setResetSuccess(false);
+                  onClick={async () => {
+                    setResetSelection(""); setResetErreur(""); setResetMotDePasseTemp("");
                     setShowResetAccess(true);
+                    setChargementAdmins(true);
+                    try {
+                      const data = await fetchAdminsDesGroupes();
+                      setAdminsList(data);
+                    } catch (e) {
+                      console.error("Erreur de chargement des admins", e);
+                    } finally {
+                      setChargementAdmins(false);
+                    }
                   }}
                 >
                   <KeyRound size={15} /> Accès d'urgence
@@ -608,20 +710,25 @@ function SuperAdminScreen() {
       {showResetAccess && (
         <Modal onClose={() => setShowResetAccess(false)} title="Accès d'urgence — réinitialiser un mot de passe">
           <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
-            Un email de réinitialisation sera envoyé à l'utilisateur. Cette action est réservée aux cas d'urgence (compte bloqué, admin/président injoignable) et reste tracée dans le journal d'audit.
+            Réservé aux cas d'urgence (compte bloqué, admin/président injoignable). Un nouveau mot de passe temporaire est généré immédiatement, et la personne devra en choisir un nouveau à sa prochaine connexion. Action tracée dans le journal d'audit.
           </div>
-          <FormField label="Email de l'utilisateur" placeholder="Ex. jean.mballa@exemple.com" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} />
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Groupe concerné (optionnel)</label>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Admin / Président à réinitialiser</label>
             <select
-              value={resetGroupId}
-              onChange={(e) => setResetGroupId(e.target.value)}
+              value={resetSelection}
+              onChange={(e) => setResetSelection(e.target.value)}
+              disabled={chargementAdmins}
               style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
             >
-              <option value="">— Non précisé —</option>
-              {groupes.map((g) => <option key={g.id} value={g.id}>{g.nom}</option>)}
+              <option value="">{chargementAdmins ? "Chargement..." : "Sélectionner une personne"}</option>
+              {adminsList.map((a, i) => (
+                <option key={i} value={i}>{a.nom} — {a.role} — {a.groupNom}</option>
+              ))}
             </select>
+            {!chargementAdmins && adminsList.length === 0 && (
+              <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>Aucun admin/président trouvé.</div>
+            )}
           </div>
 
           {resetErreur && (
@@ -629,9 +736,15 @@ function SuperAdminScreen() {
               {resetErreur}
             </div>
           )}
-          {resetSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <CheckCircle2 size={14} /> Email de réinitialisation envoyé, et action tracée dans le journal d'audit.
+          {resetMotDePasseTemp && (
+            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                <CheckCircle2 size={14} /> Mot de passe réinitialisé.
+              </div>
+              <div>Nouveau mot de passe temporaire : <b>{resetMotDePasseTemp}</b></div>
+              <div style={{ color: C.sub, fontSize: "10.5px", marginTop: "4px" }}>
+                À sa prochaine connexion, la personne devra choisir un nouveau mot de passe définitif.
+              </div>
             </div>
           )}
 
@@ -639,32 +752,28 @@ function SuperAdminScreen() {
             disabled={resetEnCours}
             style={{ marginTop: "6px", background: C.warn, color: "#FFF6EE", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: resetEnCours ? "default" : "pointer", opacity: resetEnCours ? 0.7 : 1 }}
             onClick={async () => {
-              if (!resetEmail.trim()) {
-                setResetErreur("L'email est obligatoire.");
-                setResetSuccess(false);
+              if (resetSelection === "") {
+                setResetErreur("Sélectionne une personne à réinitialiser.");
+                setResetMotDePasseTemp("");
                 return;
               }
               setResetEnCours(true);
               setResetErreur("");
               try {
-                const groupeNom = groupes.find((g) => g.id === resetGroupId)?.nom;
-                await reinitialiserMotDePasse(resetEmail.trim(), resetGroupId || null, groupeNom);
-                setResetSuccess(true);
+                const admin = adminsList[parseInt(resetSelection, 10)];
+                const nouveauMdp = await reinitialiserMotDePasseDirect(admin.email, admin.groupId, admin.groupNom);
+                setResetMotDePasseTemp(nouveauMdp);
                 await chargerAudit();
-                setTimeout(() => {
-                  setShowResetAccess(false);
-                  setResetSuccess(false);
-                }, 2000);
               } catch (e) {
                 console.error("Erreur de réinitialisation", e);
-                setResetErreur(e.message || "Erreur lors de l'envoi de la réinitialisation.");
-                setResetSuccess(false);
+                setResetErreur(e.message || "Erreur lors de la réinitialisation.");
+                setResetMotDePasseTemp("");
               } finally {
                 setResetEnCours(false);
               }
             }}
           >
-            {resetEnCours ? "Envoi..." : "Envoyer la réinitialisation"}
+            {resetEnCours ? "Réinitialisation..." : "Réinitialiser le mot de passe"}
           </button>
         </Modal>
       )}
