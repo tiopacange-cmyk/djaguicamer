@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre } from "./lib/membres";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire } from "./lib/groups";
+import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine } from "./lib/tontine";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
@@ -786,6 +787,7 @@ function SuperAdminScreen() {
 // ÉCRAN 3 — ADMIN DE GROUPE (modules Tontine / Banque / Assurance / Bilan / Membres)
 // ============================================================
 function AdminGroupeScreen({ groupId, nomGroupe }) {
+  const fmtFCFA = (n) => `${Math.round(n).toLocaleString("fr-FR")} FCFA`;
   const [view, setView] = useState("tontine");
   const [showCreateTontine, setShowCreateTontine] = useState(false);
   const [tontineNom, setTontineNom] = useState("");
@@ -837,33 +839,53 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
     if (groupId) rechargerMembres();
   }, [groupId]);
 
-  const DEFAULT_TOURS = [
-    { tour: 1, beneficiaire: "Jean Mballa", montant: "300 000 FCFA", mode: "Ordre fixe", statut: "clôturé" },
-    { tour: 2, beneficiaire: "Sylvie Etoundi", montant: "285 000 FCFA", mode: "Enchères", statut: "clôturé" },
-    { tour: 3, beneficiaire: "Rachel Biya", montant: "300 000 FCFA", mode: "Ordre fixe", statut: "en cours" },
-    { tour: 4, beneficiaire: "À désigner", montant: "—", mode: "—", statut: "à venir" },
-  ];
-  const [tours, setTours] = useState(DEFAULT_TOURS);
+  const [tontineActive, setTontineActive] = useState(null);
+  const [chargementTontine, setChargementTontine] = useState(true);
+  const [erreurTontine, setErreurTontine] = useState("");
+  const [cotisationsTourEnCours, setCotisationsTourEnCours] = useState([]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await window.storage.get("groupe-batisseurs:tours", false);
-        if (res && res.value) setTours(JSON.parse(res.value));
-      } catch (e) {
-        // Pas encore de données sauvegardées
-      }
-    })();
-  }, []);
-
-  const persistTours = async (next) => {
-    setTours(next);
+  const rechargerTontine = async () => {
+    if (!groupId) return;
+    setChargementTontine(true);
     try {
-      await window.storage.set("groupe-batisseurs:tours", JSON.stringify(next), false);
+      const data = await fetchTontineActive(groupId);
+      setTontineActive(data);
+      setErreurTontine("");
+
+      const tourEnCours = data?.tours.find((t) => t.statut === "en cours");
+      if (tourEnCours) {
+        const ids = await fetchCotisationsTour(tourEnCours.id);
+        setCotisationsTourEnCours(ids);
+      } else {
+        setCotisationsTourEnCours([]);
+      }
     } catch (e) {
-      console.error("Erreur de sauvegarde des tours", e);
+      console.error("Erreur de chargement de la tontine", e);
+      setErreurTontine("Impossible de charger la tontine.");
+    } finally {
+      setChargementTontine(false);
     }
   };
+
+  useEffect(() => {
+    rechargerTontine();
+  }, [groupId]);
+
+  // Vue simplifiée compatible avec l'affichage existant
+  const tours = tontineActive
+    ? tontineActive.tours.map((t) => ({
+        id: t.id,
+        tour: t.numero,
+        beneficiaire: t.beneficiaireNom,
+        beneficiaireId: t.beneficiaireId,
+        montant: t.montant ? fmtFCFA(t.montant) : "—",
+        mode: t.mode,
+        statut: t.statut,
+        commissionEncheres: t.commissionEncheres,
+      }))
+    : [];
+
+  const tourEnCours = tontineActive?.tours.find((t) => t.statut === "en cours") || null;
 
   const DEFAULT_PRETS = [
     { membre: "Paul Ngono", montant: "150 000 FCFA", avaliste: "Rachel Biya", statut: "en cours", echeance: "15 Sept 2026" },
@@ -893,10 +915,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
   const tourStatus = { "clôturé": { bg: C.ok, fg: C.accent2 }, "en cours": { bg: "#FBF1DC", fg: C.accent }, "à venir": { bg: "#EEE", fg: C.sub } };
 
-  const retards = [
-    { membre: "Paul Ngono", tour: 3, jours: 5, montantDu: "75 000 FCFA" },
-  ];
   const [showAmende, setShowAmende] = useState(null);
+  const [amendeMontant, setAmendeMontant] = useState("");
+  const [amendeMotif, setAmendeMotif] = useState("");
+  const [amendeError, setAmendeError] = useState("");
   const [showNouveauDepot, setShowNouveauDepot] = useState(false);
   const [depotDate, setDepotDate] = useState("");
   const [depotMontant, setDepotMontant] = useState("");
@@ -912,7 +934,6 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const toggleSignataire = (nom) => {
     setSignatairesChoisis((prev) => (prev.includes(nom) ? prev.filter((n) => n !== nom) : [...prev, nom]));
   };
-  const fmtFCFA = (n) => `${Math.round(n).toLocaleString("fr-FR")} FCFA`;
 
   const DEFAULT_DEPOTS = [
     { date: "20 Juil 2026", type: "Dépôt", montantNum: 2150000, signataire: "Rachel Biya", banque: "Afriland First Bank — Agence Nkolbisson", motif: "—", statut: "reçu joint" },
@@ -1058,6 +1079,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [showCotisationTontine, setShowCotisationTontine] = useState(false);
   const [cotisationTontineDate, setCotisationTontineDate] = useState("");
   const [cotisationTontineMontants, setCotisationTontineMontants] = useState({});
+  const [cotisationTontineError, setCotisationTontineError] = useState("");
   const setMontantTontineMembre = (nom, val) => {
     setCotisationTontineMontants((prev) => ({ ...prev, [nom]: val }));
   };
@@ -1152,53 +1174,74 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
-                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Cycle de tontine — Août 2026</h1>
-                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>4 membres · cotisation 75 000 FCFA/tour · mode mixte (ordre + enchères)</p>
+                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
+                  {tontineActive ? tontineActive.nom : "Aucune tontine active"}
+                </h1>
+                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
+                  {chargementTontine
+                    ? "Chargement..."
+                    : tontineActive
+                    ? `Cotisation ${fmtFCFA(tontineActive.montantParTour)}/tour · ${tontineActive.tours.length} tour(s)`
+                    : "Crée une tontine pour démarrer un cycle."}
+                </p>
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
-                <button style={btnSecondary} onClick={() => setShowCotisationTontine(true)}><Plus size={15} /> Enregistrer une cotisation</button>
+                {tontineActive && (
+                  <button style={btnSecondary} onClick={() => setShowCotisationTontine(true)}><Plus size={15} /> Enregistrer une cotisation</button>
+                )}
                 <button style={btnPrimary} onClick={() => { setTontineNom(""); setTontineMontant(""); setTontineError(""); setTontineSuccess(false); setShowCreateTontine(true); }}><Plus size={15} /> Créer une tontine</button>
               </div>
             </div>
-            <div style={{ marginTop: "26px" }} />
-            <Table cols={["Tour", "Bénéficiaire", "Montant", "Mode", "Statut", ""]} widths="0.5fr 1.4fr 1.1fr 1fr 0.9fr 1.1fr"
-              rows={tours.map((t) => [
-                t.tour, t.beneficiaire, t.montant, t.mode,
-                <Badge bg={tourStatus[t.statut].bg} fg={tourStatus[t.statut].fg}>{t.statut}</Badge>,
-                t.statut === "en cours" ? (
-                  <button
-                    onClick={() => setShowPayout(t)}
-                    style={{ background: "#2E7D46", color: "#FAF6ED", border: "none", borderRadius: "7px", padding: "6px 12px", fontSize: "11.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}
-                  >
-                    <Banknote size={13} /> Bénéficiaire
-                  </button>
-                ) : null,
-              ])} />
-            <div style={{ marginTop: "18px", background: "#EBE6F5", border: `1px solid ${C.purple}44`, borderRadius: "12px", padding: "14px 18px", fontSize: "12.5px", color: C.purple, display: "flex", gap: "8px", alignItems: "center" }}>
-              <Gavel size={16} /> Commission d'enchères cumulée ce cycle : <b>22 500 FCFA</b> — redistribuée aux membres à la clôture.
-            </div>
 
-            {retards.length > 0 && (
-              <div style={{ marginTop: "22px" }}>
-                <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px" }}>Cotisations en retard</h2>
-                {retards.map((r, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "10px", padding: "12px 16px", marginBottom: "8px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <Clock size={16} color={C.warn} />
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: "13px" }}>{r.membre} — Tour {r.tour}</div>
-                        <div style={{ fontSize: "11.5px", color: C.warn }}>{r.jours} jours de retard · {r.montantDu} dû</div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setShowAmende(r)}
-                      style={{ background: C.warn, color: "#FFF6EE", border: "none", borderRadius: "7px", padding: "7px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
-                    >
-                      Appliquer une amende
-                    </button>
-                  </div>
-                ))}
+            {erreurTontine && (
+              <div style={{ marginTop: "16px", fontSize: "12.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>
+                {erreurTontine}
               </div>
+            )}
+
+            {tontineActive && (
+              <>
+                <div style={{ marginTop: "26px" }} />
+                <Table cols={["Tour", "Bénéficiaire", "Montant", "Mode", "Statut", ""]} widths="0.5fr 1.4fr 1.1fr 1fr 0.9fr 1.1fr"
+                  rows={tours.map((t) => [
+                    t.tour, t.beneficiaire, t.montant, t.mode,
+                    <Badge bg={tourStatus[t.statut].bg} fg={tourStatus[t.statut].fg}>{t.statut}</Badge>,
+                    t.statut === "en cours" ? (
+                      <button
+                        onClick={() => setShowPayout(t)}
+                        style={{ background: "#2E7D46", color: "#FAF6ED", border: "none", borderRadius: "7px", padding: "6px 12px", fontSize: "11.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}
+                      >
+                        <Banknote size={13} /> Bénéficiaire
+                      </button>
+                    ) : null,
+                  ])} />
+
+                {tourEnCours && tourEnCours.mode === "Enchères" && (
+                  <div style={{ marginTop: "18px", background: "#EBE6F5", border: `1px solid ${C.purple}44`, borderRadius: "12px", padding: "14px 18px", fontSize: "12.5px", color: C.purple, display: "flex", gap: "8px", alignItems: "center" }}>
+                    <Gavel size={16} /> Commission d'enchères de ce tour : <b>{fmtFCFA(tourEnCours.commissionEncheres || 0)}</b> — redistribuée aux membres à la clôture.
+                  </div>
+                )}
+
+                {tourEnCours && membres.filter((m) => m.statut === "actif" && !cotisationsTourEnCours.includes(m.id)).length > 0 && (
+                  <div style={{ marginTop: "22px" }}>
+                    <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px" }}>Cotisations non encore reçues — Tour {tourEnCours.numero}</h2>
+                    {membres.filter((m) => m.statut === "actif" && !cotisationsTourEnCours.includes(m.id)).map((m, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "10px", padding: "12px 16px", marginBottom: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <Clock size={16} color={C.warn} />
+                          <div style={{ fontWeight: 600, fontSize: "13px" }}>{m.nom}</div>
+                        </div>
+                        <button
+                          onClick={() => setShowAmende({ membre: m.nom, membreId: m.id, tour: tourEnCours.numero, tourId: tourEnCours.id })}
+                          style={{ background: C.warn, color: "#FFF6EE", border: "none", borderRadius: "7px", padding: "7px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                        >
+                          Appliquer une amende
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -1537,9 +1580,34 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
-            Laissez vide un membre qui n'a pas cotisé — il apparaîtra automatiquement dans les retards.
+            Laissez vide un membre qui n'a pas cotisé — il apparaîtra automatiquement dans les cotisations en attente.
           </div>
-          <button style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }} onClick={() => setShowCotisationTontine(false)}>
+          {cotisationTontineError && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {cotisationTontineError}
+            </div>
+          )}
+          <button
+            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            onClick={async () => {
+              if (!cotisationTontineDate.trim()) { setCotisationTontineError("La date de séance est obligatoire."); return; }
+              if (!tourEnCours) { setCotisationTontineError("Aucun tour en cours."); return; }
+              try {
+                const cotisations = membres
+                  .filter((m) => cotisationTontineMontants[m.nom])
+                  .map((m) => ({ membreId: m.id, montant: cotisationTontineMontants[m.nom], date: cotisationTontineDate.trim() }));
+                await enregistrerCotisationsTontine(tourEnCours.id, cotisations);
+                await rechargerTontine();
+                setCotisationTontineError("");
+                setCotisationTontineDate("");
+                setCotisationTontineMontants({});
+                setShowCotisationTontine(false);
+              } catch (e) {
+                console.error("Erreur d'enregistrement des cotisations", e);
+                setCotisationTontineError(e.message || "Erreur lors de l'enregistrement.");
+              }
+            }}
+          >
             Enregistrer les cotisations
           </button>
         </Modal>
@@ -2509,12 +2577,28 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         <Modal onClose={() => setShowAmende(null)} title="Appliquer une amende de retard">
           <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px", fontSize: "12.5px" }}>
             <b>{showAmende.membre}</b> — Tour {showAmende.tour}<br />
-            <span style={{ color: C.warn }}>{showAmende.jours} jours de retard</span>
+            <span style={{ color: C.warn }}>Cotisation pas encore reçue</span>
           </div>
-          <FormField label="Montant de l'amende" placeholder="Ex. 5 000 FCFA" />
-          <FormField label="Motif (optionnel)" placeholder="Ex. Cotisation non versée à la séance" />
+          <FormField label="Montant de l'amende" placeholder="Ex. 5 000 FCFA" value={amendeMontant} onChange={(e) => setAmendeMontant(e.target.value)} />
+          <FormField label="Motif (optionnel)" placeholder="Ex. Cotisation non versée à la séance" value={amendeMotif} onChange={(e) => setAmendeMotif(e.target.value)} />
+          {amendeError && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {amendeError}
+            </div>
+          )}
           <button
-            onClick={() => setShowAmende(null)}
+            onClick={async () => {
+              const montantNum = parseInt(amendeMontant.replace(/[^\d]/g, ""), 10);
+              if (!montantNum || montantNum <= 0) { setAmendeError("Montant invalide."); return; }
+              try {
+                await appliquerAmendeTontine(showAmende.tourId, showAmende.membreId, { montant: montantNum, motif: amendeMotif.trim() });
+                setAmendeMontant(""); setAmendeMotif(""); setAmendeError("");
+                setShowAmende(null);
+              } catch (e) {
+                console.error("Erreur d'application de l'amende", e);
+                setAmendeError(e.message || "Erreur lors de l'application de l'amende.");
+              }
+            }}
             style={{ marginTop: "6px", background: C.warn, color: "#FFF6EE", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
           >
             Appliquer l'amende
@@ -2536,15 +2620,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             Mode de ce tour : <b>{showPayout.mode}</b>. Confirmez que la cagnotte a bien été remise au bénéficiaire (espèces ou Mobile Money) pour clôturer ce tour.
           </div>
           <button
-            onClick={() => {
-              const idx = tours.findIndex((t) => t.tour === showPayout.tour);
-              const next = tours.map((t, i) => {
-                if (i === idx) return { ...t, statut: "clôturé" };
-                if (i === idx + 1) return { ...t, statut: "en cours" };
-                return t;
-              });
-              persistTours(next);
-              setShowPayout(null);
+            onClick={async () => {
+              try {
+                await verserTour(tontineActive.id, showPayout.id, showPayout.tour);
+                await rechargerTontine();
+                setShowPayout(null);
+              } catch (e) {
+                console.error("Erreur lors du versement", e);
+              }
             }}
             style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
           >
@@ -2625,25 +2708,33 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <button
             style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
-            onClick={() => {
+            onClick={async () => {
               if (!tontineNom.trim()) { setTontineError("Le nom de la tontine est obligatoire."); setTontineSuccess(false); return; }
               if (!tontineMontant.trim()) { setTontineError("Le montant cotisé par tour est obligatoire."); setTontineSuccess(false); return; }
               if (seances.length === 0) { setTontineError("Ajoutez au moins une date de séance."); setTontineSuccess(false); return; }
-              const nouveauxTours = seances.map((s, i) => ({
-                tour: i + 1,
-                beneficiaire: s.mode === "Enchères" ? "À désigner (enchères)" : (membres[i % membres.length] ? membres[i % membres.length].nom : "À désigner"),
-                montant: i === 0 ? tontineMontant.trim() : "—",
-                mode: s.mode,
-                statut: i === 0 ? "en cours" : "à venir",
-              }));
-              persistTours(nouveauxTours);
-              setTontineError("");
-              setTontineSuccess(true);
-              setTimeout(() => {
-                setShowCreateTontine(false);
+              const montantNum = parseInt(tontineMontant.replace(/[^\d]/g, ""), 10);
+              if (!montantNum || montantNum <= 0) { setTontineError("Montant invalide."); setTontineSuccess(false); return; }
+              try {
+                const membresActifs = membres.filter((m) => m.statut === "actif");
+                await creerTontine(groupId, {
+                  nom: tontineNom.trim(),
+                  montantParTour: montantNum,
+                  seances,
+                  membresActifs,
+                });
+                await rechargerTontine();
+                setTontineError("");
+                setTontineSuccess(true);
+                setTimeout(() => {
+                  setShowCreateTontine(false);
+                  setTontineSuccess(false);
+                  setTontineNom(""); setTontineMontant("");
+                }, 1400);
+              } catch (e) {
+                console.error("Erreur de création de la tontine", e);
+                setTontineError(e.message || "Erreur lors de la création de la tontine.");
                 setTontineSuccess(false);
-                setTontineNom(""); setTontineMontant("");
-              }, 1400);
+              }
             }}
           >
             Créer la tontine
