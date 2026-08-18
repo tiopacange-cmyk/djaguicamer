@@ -31,7 +31,6 @@ export async function fetchGroupes() {
 export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, formule = "Essai" }) {
   const motDePasseTemp = genererMotDePasseTemp();
   const identifiantBase = genererIdentifiant(adminNom);
-  // Ajoute un petit suffixe aléatoire pour limiter les risques de collision
   const identifiant = `${identifiantBase}${Math.floor(10 + Math.random() * 90)}`;
 
   const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -74,5 +73,83 @@ export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, fo
   });
   if (memberError) throw memberError;
 
+  await supabase.from("audit_log").insert({
+    group_id: groupe.id,
+    action: "Groupe créé",
+    detail: `Formule ${formule} — admin désigné : ${adminNom}`,
+    type: "création",
+  });
+
   return { groupe, motDePasseTemp, adminEmail, identifiant };
+}
+
+// ============================================================
+// ACCÈS D'URGENCE — réinitialisation de mot de passe
+// ============================================================
+export async function reinitialiserMotDePasse(email, groupId, groupNom) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  if (error) throw error;
+
+  const { error: logError } = await supabase.from("audit_log").insert({
+    group_id: groupId || null,
+    action: "Réinitialisation mot de passe",
+    detail: `Email de réinitialisation envoyé à ${email}${groupNom ? ` (groupe : ${groupNom})` : ""}`,
+    type: "urgence",
+  });
+  if (logError) console.error("Erreur d'écriture dans le journal d'audit", logError);
+}
+
+// ============================================================
+// JOURNAL D'AUDIT
+// ============================================================
+export async function fetchAuditLog() {
+  const { data, error } = await supabase
+    .from("audit_log")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) throw error;
+  return data;
+}
+
+export async function logAudit({ groupId, action, detail, type }) {
+  const { error } = await supabase.from("audit_log").insert({
+    group_id: groupId || null,
+    action,
+    detail,
+    type,
+  });
+  if (error) console.error("Erreur d'écriture dans le journal d'audit", error);
+}
+
+// ============================================================
+// TARIFS / FORMULES D'ABONNEMENT
+// ============================================================
+export async function fetchPlansTarifaires() {
+  const { data, error } = await supabase
+    .from("plans_tarifaires")
+    .select("*")
+    .order("prix_mensuel", { ascending: true });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function modifierPlanTarifaire(planId, { prixMensuel, prixAnnuel, limiteMembres, description }) {
+  const champs = { updated_at: new Date().toISOString() };
+  if (prixMensuel !== undefined) champs.prix_mensuel = prixMensuel;
+  if (prixAnnuel !== undefined) champs.prix_annuel = prixAnnuel;
+  if (limiteMembres !== undefined) champs.limite_membres = limiteMembres;
+  if (description !== undefined) champs.description = description;
+
+  const { data, error } = await supabase
+    .from("plans_tarifaires")
+    .update(champs)
+    .eq("id", planId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 }
