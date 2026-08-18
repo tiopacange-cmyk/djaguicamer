@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre } from "./lib/membres";
+import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre } from "./lib/membres";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire } from "./lib/groups";
 
@@ -134,7 +134,7 @@ export default function AppPrototype() {
         ) : groupeAdmin ? (
           <AdminGroupeScreen groupId={groupeAdmin.group?.id} nomGroupe={groupeAdmin.group?.nom} />
         ) : groupeMembreSimple ? (
-          <MembreScreen groupId={groupeMembreSimple.group?.id} nomGroupe={groupeMembreSimple.group?.nom} />
+          <MembreScreen groupId={groupeMembreSimple.group?.id} nomGroupe={groupeMembreSimple.group?.nom} profileId={monProfil?.id} nomComplet={monProfil?.nom_complet} />
         ) : (
           <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", color: C.sub, padding: "20px", textAlign: "center" }}>
             Ton compte est connecté, mais tu n'as pas encore de rôle actif dans un groupe.
@@ -974,6 +974,9 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [inviteSuccess, setInviteSuccess] = useState(false);
 
   const [showEditMembre, setShowEditMembre] = useState(false);
+  const [showDeleteMembre, setShowDeleteMembre] = useState(null);
+  const [deleteEnCours, setDeleteEnCours] = useState(false);
+  const [deleteErreur, setDeleteErreur] = useState("");
   const [editMembre, setEditMembre] = useState(null);
   const [editNom, setEditNom] = useState("");
   const [editEmail, setEditEmail] = useState("");
@@ -1485,6 +1488,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     style={{ background: "transparent", color: C.accent2, border: `1px solid ${C.border}`, borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
                   >
                     Modifier
+                  </button>
+                  <button
+                    onClick={() => { setShowDeleteMembre(m); setDeleteErreur(""); }}
+                    style={{ background: "transparent", color: C.warn, border: `1px solid ${C.warn}55`, borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                  >
+                    Supprimer
                   </button>
                 </div>,
               ])} />
@@ -2310,6 +2319,49 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         </Modal>
       )}
 
+      {showDeleteMembre && (
+        <Modal onClose={() => setShowDeleteMembre(null)} title="Supprimer ce membre">
+          <div style={{ fontSize: "12.5px", color: C.sub }}>
+            Es-tu sûr de vouloir supprimer <b>{showDeleteMembre.nom}</b> du groupe ? Cette action est impossible s'il a déjà effectué une cotisation (tontine ou banque), pour préserver l'historique financier.
+          </div>
+
+          {deleteErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {deleteErreur}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
+            <button
+              onClick={() => setShowDeleteMembre(null)}
+              style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+            >
+              Annuler
+            </button>
+            <button
+              disabled={deleteEnCours}
+              onClick={async () => {
+                setDeleteEnCours(true);
+                setDeleteErreur("");
+                try {
+                  await supprimerMembre(showDeleteMembre.id);
+                  await rechargerMembres();
+                  setShowDeleteMembre(null);
+                } catch (e) {
+                  console.error("Erreur de suppression du membre", e);
+                  setDeleteErreur(e.message || "Erreur lors de la suppression.");
+                } finally {
+                  setDeleteEnCours(false);
+                }
+              }}
+              style={{ flex: 1, background: C.warn, color: "#FFF6EE", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: deleteEnCours ? "default" : "pointer", opacity: deleteEnCours ? 0.7 : 1 }}
+            >
+              {deleteEnCours ? "Suppression..." : "Supprimer définitivement"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
       {showNouveauDepot && (
         <Modal onClose={() => setShowNouveauDepot(false)} title="Enregistrer un mouvement bancaire">
           <div>
@@ -2601,38 +2653,72 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
     </div>
   );
 }
-function MembreScreen() {
+function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
+  const [monCompte, setMonCompte] = useState(null);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState("");
+
+  useEffect(() => {
+    if (!groupId || !profileId) return;
+    (async () => {
+      try {
+        const data = await fetchMonCompteMembre(groupId, profileId);
+        setMonCompte(data);
+        setErreur("");
+      } catch (e) {
+        console.error("Erreur de chargement du compte membre", e);
+        setErreur("Impossible de charger tes informations.");
+      } finally {
+        setChargement(false);
+      }
+    })();
+  }, [groupId, profileId]);
+
   return (
     <div style={{ minHeight: "680px", background: C.bg, display: "flex", justifyContent: "center", padding: "30px 0" }}>
       <div style={{ width: "360px", background: C.panel, borderRadius: "26px", border: `1px solid ${C.border}`, overflow: "hidden", boxShadow: "0 20px 50px rgba(27,67,50,0.1)" }}>
         <div style={{ background: C.accent2, padding: "22px 20px", color: "#FAF6ED" }}>
           <div style={{ fontSize: "12px", color: "#B7CCBD" }}>Bonjour,</div>
-          <div style={{ fontSize: "18px", fontWeight: 700 }}>Paul Ngono</div>
-          <div style={{ fontSize: "11px", color: "#9DB3A6", marginTop: "2px" }}>Tontine Les Bâtisseurs</div>
+          <div style={{ fontSize: "18px", fontWeight: 700 }}>{nomComplet || "—"}</div>
+          <div style={{ fontSize: "11px", color: "#9DB3A6", marginTop: "2px" }}>{nomGroupe || "—"}</div>
         </div>
 
-        <div style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: "12px" }}>
-          <MiniCard icon={<Banknote size={16} color={C.accent2} />} label="Cotisation tontine" value="75 000 FCFA" note="Tour 3 — payé le 08 Août" ok />
-          <MiniCard icon={<PiggyBank size={16} color={C.accent2} />} label="Banque scolaire" value="120 000 FCFA" note="Cotisé au 12 Août 2026" ok />
-          <MiniCard icon={<HeartHandshake size={16} color={C.warn} />} label="Assurance" value="62 000 / 80 000 FCFA" note="18 jours pour reconstituer" warn />
-          <MiniCard icon={<Wallet size={16} color={C.accent2} />} label="Prêt en cours" value="150 000 FCFA" note="Échéance 15 Sept 2026" />
+        <div style={{ padding: "18px 20px" }}>
+          {chargement ? (
+            <div style={{ fontSize: "13px", color: C.sub, textAlign: "center", padding: "20px 0" }}>Chargement...</div>
+          ) : erreur ? (
+            <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>{erreur}</div>
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: "10px", marginBottom: "14px" }}>
+                <div style={{ flex: 1, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px" }}>
+                  <div style={{ fontSize: "10.5px", color: C.sub }}>Rôle</div>
+                  <div style={{ fontSize: "13px", fontWeight: 700 }}>{monCompte?.role}</div>
+                </div>
+                <div style={{ flex: 1, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px" }}>
+                  <div style={{ fontSize: "10.5px", color: C.sub }}>Statut</div>
+                  <Badge bg={monCompte?.statut === "actif" ? C.ok : C.warnBg} fg={monCompte?.statut === "actif" ? C.accent2 : C.warn}>{monCompte?.statut}</Badge>
+                </div>
+              </div>
+
+              <MiniCard icon={<Wallet size={16} color={C.accent2} />} label="Caution versée" value={`${Number(monCompte?.caution || 0).toLocaleString("fr-FR")} FCFA`} note="Garantie de base pour les prêts" />
+
+              {monCompte?.statut === "en attente" && (
+                <div style={{ marginTop: "12px", fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>
+                  Ton inscription est en attente de validation par le Président du groupe.
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         <div style={{ padding: "0 20px 20px" }}>
-          <div style={{ fontSize: "12px", fontWeight: 700, color: C.sub, margin: "6px 0 10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Historique récent</div>
-          {[
-            { label: "Cotisation tontine — Tour 3", date: "08 Août 2026", montant: "-75 000" },
-            { label: "Dépôt banque scolaire", date: "12 Août 2026", montant: "+40 000" },
-            { label: "Prélèvement assurance — Aide décès", date: "01 Août 2026", montant: "-18 000" },
-          ].map((h, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: i < 2 ? `1px solid ${C.border}` : "none", fontSize: "12.5px" }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>{h.label}</div>
-                <div style={{ color: C.sub, fontSize: "11px" }}>{h.date}</div>
-              </div>
-              <div style={{ fontWeight: 700, color: h.montant.startsWith("+") ? C.accent2 : C.warn }}>{h.montant} FCFA</div>
-            </div>
-          ))}
+          <div style={{ fontSize: "12px", fontWeight: 700, color: C.sub, margin: "6px 0 10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Tontine, Banque, Assurance
+          </div>
+          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px" }}>
+            Le détail de tes cotisations, prêts et solde d'assurance sera disponible ici une fois ces modules connectés à la base de données.
+          </div>
         </div>
       </div>
     </div>
