@@ -2732,12 +2732,25 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             Les {membres.filter((m) => m.statut === "actif").length} membre(s) actif(s) du groupe participent automatiquement, désignés par rotation.
           </div>
           <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Mode de distribution actuel</label>
+            <select
+              value={newMode}
+              onChange={(e) => setNewMode(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: "8px", border: `1px solid ${C.accent2}55`, background: C.ok, fontSize: "13px", outline: "none", color: C.accent2, fontWeight: 600 }}
+            >
+              <option>Ordre fixe</option>
+              <option>Désignation</option>
+              <option>Enchères</option>
+            </select>
+            <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>
+              S'applique automatiquement à chaque date ajoutée ci-dessous, jusqu'à ce que tu le changes.
+            </div>
+          </div>
+
+          <div>
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>
-              Dates de séance et mode de distribution
+              Dates de séance
             </label>
-            <p style={{ fontSize: "11px", color: C.sub, margin: "0 0 8px" }}>
-              Ajoutez chaque date de réunion et choisissez son mode pour ce tour-là.
-            </p>
 
             {seances.map((s, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", marginBottom: "6px" }}>
@@ -2756,15 +2769,6 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 placeholder="jj/mm/aaaa"
                 style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
               />
-              <select
-                value={newMode}
-                onChange={(e) => setNewMode(e.target.value)}
-                style={{ padding: "9px 8px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
-              >
-                <option>Ordre fixe</option>
-                <option>Désignation</option>
-                <option>Enchères</option>
-              </select>
               <button
                 onClick={addSeance}
                 style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "0 12px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
