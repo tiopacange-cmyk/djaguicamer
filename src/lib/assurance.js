@@ -15,8 +15,38 @@ export async function fetchConfigAssurance(groupId) {
     .maybeSingle();
 
   if (error) throw error;
-  if (!data) return { soldeMinimum: SOLDE_MIN_DEFAUT, delaiJours: DELAI_JOURS_DEFAUT };
-  return { soldeMinimum: data.solde_minimum, delaiJours: data.delai_reconstitution_jours };
+  if (!data) return { soldeMinimum: SOLDE_MIN_DEFAUT, delaiJours: DELAI_JOURS_DEFAUT, montantPrelevementDefaut: 10000 };
+  return {
+    soldeMinimum: data.solde_minimum,
+    delaiJours: data.delai_reconstitution_jours,
+    montantPrelevementDefaut: data.montant_prelevement_defaut || 10000,
+  };
+}
+
+// Enregistre (crée ou met à jour) la configuration de l'assurance
+// pour un groupe donné — chaque groupe fixe son propre montant
+// minimum, son propre délai de reconstitution, et le montant
+// standard prélevé par membre à chaque événement.
+export async function sauvegarderConfigAssurance(groupId, { soldeMinimum, delaiJours, montantPrelevementDefaut }) {
+  const { data: existant, error: errLecture } = await supabase
+    .from("assurance_config")
+    .select("group_id")
+    .eq("group_id", groupId)
+    .maybeSingle();
+  if (errLecture) throw errLecture;
+
+  if (existant) {
+    const { error } = await supabase
+      .from("assurance_config")
+      .update({ solde_minimum: soldeMinimum, delai_reconstitution_jours: delaiJours, montant_prelevement_defaut: montantPrelevementDefaut })
+      .eq("group_id", groupId);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("assurance_config")
+      .insert({ group_id: groupId, solde_minimum: soldeMinimum, delai_reconstitution_jours: delaiJours, montant_prelevement_defaut: montantPrelevementDefaut });
+    if (error) throw error;
+  }
 }
 
 // ============================================================
@@ -73,7 +103,40 @@ export async function enregistrerCotisationsAssurance(groupId, cotisations, sold
       })
       .eq("id", actuel.id);
     if (errMaj) throw errMaj;
+
+    const { error: errHisto } = await supabase.from("assurance_mouvements").insert({
+      group_id: groupId,
+      membre_id: c.membreId,
+      type: "Cotisation",
+      montant: parseFloat(c.montant),
+      date_mouvement: c.date || new Date().toISOString().slice(0, 10),
+      solde_apres: nouveauSolde,
+    });
+    if (errHisto) throw errHisto;
   }
+}
+
+// Récupère l'historique complet des mouvements d'assurance
+// (cotisations et prélèvements), du plus récent au plus ancien.
+export async function fetchHistoriqueAssurance(groupId) {
+  const { data, error } = await supabase
+    .from("assurance_mouvements")
+    .select(`
+      id, type, montant, date_mouvement, solde_apres,
+      membre:group_members ( id, profile:profiles ( nom_complet ) )
+    `)
+    .eq("group_id", groupId)
+    .order("date_mouvement", { ascending: false });
+
+  if (error) throw error;
+  return data.map((m) => ({
+    id: m.id,
+    date: m.date_mouvement,
+    membre: m.membre?.profile?.nom_complet || "—",
+    type: m.type,
+    montant: m.montant,
+    solde: m.solde_apres,
+  }));
 }
 
 // ============================================================
@@ -196,6 +259,17 @@ export async function declarerEvenement(groupId, {
       solde_apres: soldeApres,
     });
     if (errPrelevement) throw errPrelevement;
+
+    const { error: errHisto } = await supabase.from("assurance_mouvements").insert({
+      group_id: groupId,
+      membre_id: m.id,
+      type: "Prélèvement",
+      montant: part,
+      date_mouvement: new Date().toISOString().slice(0, 10),
+      solde_apres: soldeApres,
+      evenement_id: evenement.id,
+    });
+    if (errHisto) throw errHisto;
   }
 
   return evenement;
