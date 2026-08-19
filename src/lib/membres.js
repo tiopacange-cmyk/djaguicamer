@@ -173,6 +173,23 @@ export async function fetchMonCompteMembre(groupId, profileId) {
 
 // Supprime un membre du groupe, uniquement s'il n'a JAMAIS effectué
 // de cotisation (tontine ou épargne/banque) — vérifié avant suppression.
+// Réinitialise directement le mot de passe d'un membre de son
+// propre groupe (accès d'urgence), sans passer par un email.
+// Génère un nouveau mot de passe temporaire, et marque que le
+// membre devra en choisir un nouveau à sa prochaine connexion.
+export async function reinitialiserMotDePasseMembre(email) {
+  const nombre = Math.floor(1000 + Math.random() * 9000);
+  const motDePasseTemp = `Tontine-${nombre}`;
+
+  const { error } = await supabase.rpc("reset_password_admin_groupe", {
+    p_email: email,
+    p_nouveau_mdp: motDePasseTemp,
+  });
+  if (error) throw error;
+
+  return motDePasseTemp;
+}
+
 export async function supprimerMembre(groupMemberId) {
   const { data: cotisationsTontine, error: errTontine } = await supabase
     .from("tontine_cotisations")
