@@ -147,7 +147,24 @@ export async function ajouterMembreAuCycle(tontineId, membreId, montantRappel, t
   }
 }
 
-// Récupère la liste des membres ayant déjà cotisé pour un tour donné
+// Enregistre le résultat d'une enchère sur un tour : désigne le
+// bénéficiaire, fixe le montant de l'enchère (= la commission qui
+// sera redistribuée en fin de cycle), et calcule le montant net
+// réellement versé au bénéficiaire (cagnotte totale − commission).
+export async function enregistrerEnchere(tourId, beneficiaireId, montantEnchere, cagnotteTotale) {
+  const montantNet = cagnotteTotale - montantEnchere;
+  const { error } = await supabase
+    .from("tontine_tours")
+    .update({
+      beneficiaire_id: beneficiaireId,
+      montant_enchere: montantEnchere,
+      commission_enchere: montantEnchere,
+      montant: montantNet,
+    })
+    .eq("id", tourId);
+  if (error) throw error;
+}
+
 export async function fetchCotisationsTour(tourId) {
   const { data, error } = await supabase
     .from("tontine_cotisations")
