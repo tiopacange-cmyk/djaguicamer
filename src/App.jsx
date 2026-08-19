@@ -5,6 +5,7 @@ import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialise
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit } from "./lib/banque";
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
+import { fetchSignataires, ajouterSignataire, fetchMouvementsExternes, creerMouvementExterne } from "./lib/depots";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
@@ -1053,52 +1054,35 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [depotSuccess, setDepotSuccess] = useState(false);
   const [recuJoint, setRecuJoint] = useState(false);
   const [typeMouvementBanque, setTypeMouvementBanque] = useState("Dépôt");
-  const signataires = ["Jean Mballa — Président", "Rachel Biya — Trésorière", "Sylvie Etoundi — Secrétaire générale"];
+  const [signataires, setSignataires] = useState([]);
   const [signatairesChoisis, setSignatairesChoisis] = useState([]);
-  const toggleSignataire = (nom) => {
-    setSignatairesChoisis((prev) => (prev.includes(nom) ? prev.filter((n) => n !== nom) : [...prev, nom]));
+  const toggleSignataire = (id) => {
+    setSignatairesChoisis((prev) => (prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id]));
   };
 
-  const DEFAULT_DEPOTS = [
-    { date: "20 Juil 2026", type: "Dépôt", montantNum: 2150000, signataire: "Rachel Biya", banque: "Afriland First Bank — Agence Nkolbisson", motif: "—", statut: "reçu joint" },
-    { date: "20 Juil 2026", type: "Retrait", montantNum: 150000, signataire: "Rachel Biya", banque: "Afriland First Bank — Agence Nkolbisson", motif: "Décaissement prêt — Paul Ngono", statut: "en attente du reçu" },
-    { date: "29 Juil 2026", type: "Dépôt", montantNum: 600000, signataire: "Sylvie Etoundi", banque: "Afriland First Bank — Agence Nkolbisson", motif: "—", statut: "en attente du reçu" },
-    { date: "05 Août 2026", type: "Dépôt", montantNum: 800000, signataire: "Jean Mballa", banque: "Afriland First Bank — Agence Nkolbisson", motif: "—", statut: "reçu joint" },
-    { date: "08 Août 2026", type: "Retrait", montantNum: 300000, signataire: "Jean Mballa", banque: "Afriland First Bank — Agence Nkolbisson", motif: "Versement cagnotte tour 3", statut: "reçu joint" },
-    { date: "12 Août 2026", type: "Dépôt", montantNum: 1500000, signataire: "Rachel Biya", banque: "Afriland First Bank — Agence Nkolbisson", motif: "—", statut: "reçu joint" },
-  ];
+  const [depots, setDepots] = useState([]);
+  const [chargementDepots, setChargementDepots] = useState(true);
 
-  const [depotsBruts, setDepotsBruts] = useState(DEFAULT_DEPOTS);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await window.storage.get("groupe-batisseurs:depots", false);
-        if (res && res.value) setDepotsBruts(JSON.parse(res.value));
-      } catch (e) {
-        // Pas encore de données sauvegardées, on garde les valeurs par défaut
-      }
-    })();
-  }, []);
-
-  const persistDepots = async (next) => {
-    setDepotsBruts(next);
+  const rechargerDepots = async () => {
+    if (!groupId) return;
     try {
-      await window.storage.set("groupe-batisseurs:depots", JSON.stringify(next), false);
+      const sigs = await fetchSignataires(groupId);
+      setSignataires(sigs);
+      const mvts = await fetchMouvementsExternes(groupId);
+      setDepots(mvts.map((d) => ({
+        ...d,
+        montant: fmtFCFA(d.montant),
+        solde: fmtFCFA(d.solde),
+      })));
     } catch (e) {
-      console.error("Erreur de sauvegarde des dépôts", e);
+      console.error("Erreur de chargement des dépôts", e);
+    } finally {
+      setChargementDepots(false);
     }
   };
 
-  // Recalcule le solde chronologiquement, puis affiche du plus récent au plus ancien
-  let running = 0;
-  const depotsChrono = depotsBruts.map((d) => {
-    running += d.type === "Dépôt" ? d.montantNum : -d.montantNum;
-    return { ...d, soldeNum: running };
-  });
-  const depots = [...depotsChrono].reverse().map((d) => ({
-    ...d, montant: fmtFCFA(d.montantNum), solde: fmtFCFA(d.soldeNum),
-  }));
+  useEffect(() => { rechargerDepots(); }, [groupId]);
+
   const soldeCompteActuel = depots.length ? depots[0].solde : fmtFCFA(0);
   const [filtreDateDebut, setFiltreDateDebut] = useState("");
   const [filtreDateFin, setFiltreDateFin] = useState("");
@@ -2856,7 +2840,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
               >
                 <option value="">Sélectionner un membre</option>
-                {membres.map((m) => <option key={m.nom} value={m.nom}>{m.nom}</option>)}
+                {membres.filter((m) => m.statut === "actif").map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
               </select>
               <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>
                 Pour un versement, n'importe quel membre du groupe peut être désigné.
@@ -2865,14 +2849,20 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           ) : (
             <div>
               <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Signataires (2 à 3 requis)</label>
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                {signataires.map((s) => (
-                  <label key={s} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", cursor: "pointer" }}>
-                    <input type="checkbox" checked={signatairesChoisis.includes(s)} onChange={() => toggleSignataire(s)} />
-                    {s}
-                  </label>
-                ))}
-              </div>
+              {signataires.length === 0 ? (
+                <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                  Aucun signataire enregistré pour ce groupe — ajoutes-en depuis les paramètres avant de faire un retrait.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {signataires.map((s) => (
+                    <label key={s.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", cursor: "pointer" }}>
+                      <input type="checkbox" checked={signatairesChoisis.includes(s.id)} onChange={() => toggleSignataire(s.id)} />
+                      {s.nom}{s.fonction ? ` — ${s.fonction}` : ""}
+                    </label>
+                  ))}
+                </div>
+              )}
               <div style={{ fontSize: "11px", color: signatairesChoisis.length >= 2 && signatairesChoisis.length <= 3 ? C.sub : C.warn, marginTop: "6px" }}>
                 {signatairesChoisis.length < 2
                   ? "Sélectionnez au moins 2 signataires officiels du compte."
@@ -2904,7 +2894,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               </div>
             ) : (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: "8px", border: `1px solid ${C.accent2}44`, background: C.ok, fontSize: "12.5px" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: "6px", color: C.accent2, fontWeight: 600 }}><CheckCircle2 size={14} /> Reçu_120826.jpg</span>
+                <span style={{ display: "flex", alignItems: "center", gap: "6px", color: C.accent2, fontWeight: 600 }}><CheckCircle2 size={14} /> Reçu joint</span>
                 <X size={13} color={C.sub} style={{ cursor: "pointer" }} onClick={() => setRecuJoint(false)} />
               </div>
             )}
@@ -2926,39 +2916,48 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <button
             style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
-            onClick={() => {
+            onClick={async () => {
               const montantNum = parseInt(depotMontant.replace(/[^\d]/g, ""), 10);
               if (!depotDate.trim()) { setDepotError("La date de la séance est obligatoire."); setDepotSuccess(false); return; }
               if (!montantNum || montantNum <= 0) { setDepotError("Saisissez un montant valide."); setDepotSuccess(false); return; }
               if (typeMouvementBanque === "Retrait" && !depotMotif.trim()) { setDepotError("Le motif est obligatoire pour un retrait."); setDepotSuccess(false); return; }
+              if (typeMouvementBanque === "Dépôt" && !depotMembreSimple) { setDepotError("Sélectionnez le membre effectuant le versement."); setDepotSuccess(false); return; }
               if (typeMouvementBanque === "Retrait" && (signatairesChoisis.length < 2 || signatairesChoisis.length > 3)) {
                 setDepotError("Sélectionnez entre 2 et 3 signataires pour un retrait.");
                 setDepotSuccess(false);
                 return;
               }
-              if (typeMouvementBanque === "Retrait" && montantNum > (depotsChrono.length ? depotsChrono[depotsChrono.length - 1].soldeNum : 0)) {
+              const soldeActuelNum = depots.length ? parseInt(depots[0].solde.replace(/[^\d]/g, ""), 10) : 0;
+              if (typeMouvementBanque === "Retrait" && montantNum > soldeActuelNum) {
                 setDepotError("Le montant du retrait dépasse le solde actuel du compte.");
                 setDepotSuccess(false);
                 return;
               }
-              const nouveauMouvement = {
-                date: depotDate.trim(),
-                type: typeMouvementBanque,
-                montantNum,
-                signataire: typeMouvementBanque === "Dépôt" ? (depotMembreSimple || "—") : signatairesChoisis.join(", "),
-                banque: depotBanque.trim() || "—",
-                motif: typeMouvementBanque === "Retrait" ? depotMotif.trim() : "—",
-                statut: recuJoint ? "reçu joint" : "en attente du reçu",
-              };
-              persistDepots([...depotsBruts, nouveauMouvement]);
-              setDepotError("");
-              setDepotSuccess(true);
-              setTimeout(() => {
-                setShowNouveauDepot(false);
+              try {
+                await creerMouvementExterne(groupId, {
+                  type: typeMouvementBanque,
+                  montant: montantNum,
+                  dateMouvement: versDateISO(depotDate),
+                  banqueAgence: depotBanque.trim(),
+                  motif: depotMotif.trim(),
+                  membreId: depotMembreSimple || null,
+                  signatairesIds: signatairesChoisis,
+                  recuJoint,
+                });
+                await rechargerDepots();
+                setDepotError("");
+                setDepotSuccess(true);
+                setTimeout(() => {
+                  setShowNouveauDepot(false);
+                  setDepotSuccess(false);
+                  setDepotDate(""); setDepotMontant(""); setDepotMotif(""); setDepotMembreSimple("");
+                  setSignatairesChoisis([]); setRecuJoint(false);
+                }, 1200);
+              } catch (e) {
+                console.error("Erreur d'enregistrement du mouvement", e);
+                setDepotError(e.message || "Erreur lors de l'enregistrement.");
                 setDepotSuccess(false);
-                setDepotDate(""); setDepotMontant(""); setDepotMotif(""); setDepotMembreSimple("");
-                setSignatairesChoisis([]); setRecuJoint(false);
-              }, 1200);
+              }
             }}
           >
             Enregistrer le mouvement
