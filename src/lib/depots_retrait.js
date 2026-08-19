@@ -1,4 +1,3 @@
-
 import { supabase } from "./supabaseClient";
 
 // ============================================================
@@ -76,6 +75,49 @@ export async function ajouterSignataire(groupId, membreId, fonction) {
 }
 
 // ============================================================
+// CATÉGORIES DE FRAIS (gérables par le groupe)
+// ============================================================
+
+export async function fetchCategoriesFrais(groupId) {
+  const { data, error } = await supabase
+    .from("categories_frais")
+    .select("*")
+    .eq("group_id", groupId)
+    .order("nom", { ascending: true });
+  if (error) throw error;
+  return data;
+}
+
+export async function creerCategorieFrais(groupId, nom) {
+  const { data, error } = await supabase
+    .from("categories_frais")
+    .insert({ group_id: groupId, nom })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function supprimerCategorieFrais(categorieId) {
+  const { error } = await supabase.from("categories_frais").delete().eq("id", categorieId);
+  if (error) throw error;
+}
+
+// ============================================================
+// JOINDRE UN REÇU APRÈS COUP
+// ============================================================
+// Le signataire revient de la banque après la séance et joint le
+// reçu à un mouvement déjà enregistré, SANS modifier aucune autre
+// donnée de ce mouvement (montant, type, date, etc. restent intacts).
+export async function joindreRecu(mouvementId) {
+  const { error } = await supabase
+    .from("mouvements_bancaires_externes")
+    .update({ statut: "reçu joint" })
+    .eq("id", mouvementId);
+  if (error) throw error;
+}
+
+// ============================================================
 // MOUVEMENTS BANCAIRES EXTERNES
 // (Dépôt, Retrait, Frais, Intérêt) — tous rattachés à un compte
 // ============================================================
@@ -97,6 +139,7 @@ export async function fetchMouvementsCompte(compteId) {
 
   const idsMouvements = data.map((m) => m.id);
   let signatairesLies = [];
+  let responsablesFraisLies = [];
   if (idsMouvements.length > 0) {
     const { data: sigData, error: errSig } = await supabase
       .from("mouvement_signataires")
@@ -107,6 +150,16 @@ export async function fetchMouvementsCompte(compteId) {
       .in("mouvement_id", idsMouvements);
     if (errSig) throw errSig;
     signatairesLies = sigData;
+
+    const { data: respData, error: errResp } = await supabase
+      .from("mouvement_responsables_frais")
+      .select(`
+        mouvement_id,
+        membre:group_members ( profile:profiles ( nom_complet ) )
+      `)
+      .in("mouvement_id", idsMouvements);
+    if (errResp) throw errResp;
+    responsablesFraisLies = respData;
   }
 
   const signatairesParMouvement = {};
@@ -115,10 +168,20 @@ export async function fetchMouvementsCompte(compteId) {
     signatairesParMouvement[s.mouvement_id].push(s.signataire?.membre?.profile?.nom_complet || "—");
   });
 
+  const responsablesFraisParMouvement = {};
+  responsablesFraisLies.forEach((r) => {
+    if (!responsablesFraisParMouvement[r.mouvement_id]) responsablesFraisParMouvement[r.mouvement_id] = [];
+    responsablesFraisParMouvement[r.mouvement_id].push(r.membre?.profile?.nom_complet || "—");
+  });
+
   // Dépôt et Intérêt augmentent le solde ; Retrait et Frais le diminuent
   let solde = 0;
   const avecSolde = data.map((m) => {
     solde += (m.type === "Dépôt" || m.type === "Intérêt") ? m.montant : -m.montant;
+    let signataire = "—";
+    if (m.type === "Dépôt" || m.type === "Intérêt") signataire = m.membre?.profile?.nom_complet || "—";
+    else if (m.type === "Frais") signataire = (responsablesFraisParMouvement[m.id] || []).join(", ") || "—";
+    else signataire = (signatairesParMouvement[m.id] || []).join(", ") || "—";
     return {
       id: m.id,
       date: m.date_mouvement,
@@ -127,9 +190,7 @@ export async function fetchMouvementsCompte(compteId) {
       motif: m.motif || "—",
       categorie: m.categorie_frais || "—",
       statut: m.statut,
-      signataire: (m.type === "Dépôt" || m.type === "Intérêt")
-        ? (m.membre?.profile?.nom_complet || "—")
-        : (signatairesParMouvement[m.id] || []).join(", ") || "—",
+      signataire,
       solde,
     };
   });
@@ -173,6 +234,12 @@ export async function creerMouvementExterne(groupId, {
     const lignes = signatairesIds.map((id) => ({ mouvement_id: mouvement.id, signataire_id: id }));
     const { error: errSig } = await supabase.from("mouvement_signataires").insert(lignes);
     if (errSig) throw errSig;
+  }
+
+  if (type === "Frais" && signatairesIds && signatairesIds.length > 0) {
+    const lignes = signatairesIds.map((id) => ({ mouvement_id: mouvement.id, membre_id: id }));
+    const { error: errResp } = await supabase.from("mouvement_responsables_frais").insert(lignes);
+    if (errResp) throw errResp;
   }
 
   const nouveauSolde = compte.solde + ((type === "Dépôt" || type === "Intérêt") ? montant : -montant);
