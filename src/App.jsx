@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre } from "./lib/membres";
-import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange } from "./lib/auth";
+import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit } from "./lib/banque";
@@ -52,6 +52,7 @@ export default function AppPrototype() {
   const [connecte, setConnecte] = useState(false);
   const [monProfil, setMonProfil] = useState(null);
   const [mesGroupes, setMesGroupes] = useState([]);
+  const [modeRecuperation, setModeRecuperation] = useState(false);
 
   const chargerSessionEtRole = async () => {
     setChargementSession(true);
@@ -77,7 +78,12 @@ export default function AppPrototype() {
 
   useEffect(() => {
     chargerSessionEtRole();
-    const sub = onAuthStateChange(() => {
+    const sub = onAuthStateChange((_session, event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setModeRecuperation(true);
+        setChargementSession(false);
+        return;
+      }
       chargerSessionEtRole();
     });
     return () => sub?.unsubscribe?.();
@@ -94,6 +100,14 @@ export default function AppPrototype() {
     return (
       <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", color: C.sub, fontFamily: "'Sora','Segoe UI',sans-serif" }}>
         Chargement...
+      </div>
+    );
+  }
+
+  if (modeRecuperation) {
+    return (
+      <div style={{ fontFamily: "'Sora','Segoe UI',sans-serif" }}>
+        <ChangerMotDePasseScreen onDone={async () => { setModeRecuperation(false); await chargerSessionEtRole(); }} />
       </div>
     );
   }
@@ -161,6 +175,11 @@ function ConnexionScreen({ onLoggedIn }) {
   const [password, setPassword] = useState("");
   const [erreur, setErreur] = useState("");
   const [chargement, setChargement] = useState(false);
+  const [modeOubli, setModeOubli] = useState(false);
+  const [identifiantOubli, setIdentifiantOubli] = useState("");
+  const [oubliErreur, setOubliErreur] = useState("");
+  const [oubliSuccess, setOubliSuccess] = useState(false);
+  const [oubliChargement, setOubliChargement] = useState(false);
   const bg = dark ? "#14181A" : C.bg;
   const panelBg = dark ? "#1E2427" : C.panel;
   const ink = dark ? "#F2EEE3" : C.ink;
@@ -185,6 +204,24 @@ function ConnexionScreen({ onLoggedIn }) {
     }
   };
 
+  const handleDemandeReinitialisation = async () => {
+    if (!identifiantOubli.trim()) {
+      setOubliErreur("Renseigne ton identifiant.");
+      return;
+    }
+    setOubliChargement(true);
+    setOubliErreur("");
+    try {
+      await demanderReinitialisationMotDePasse(identifiantOubli.trim());
+      setOubliSuccess(true);
+    } catch (e) {
+      console.error("Erreur de demande de réinitialisation", e);
+      setOubliErreur("Identifiant introuvable, ou erreur lors de l'envoi.");
+    } finally {
+      setOubliChargement(false);
+    }
+  };
+
   return (
     <div style={{ minHeight: "680px", background: bg, display: "flex", flexDirection: "column", position: "relative" }}>
       <div style={{ height: "6px", background: `repeating-linear-gradient(90deg, ${C.accent} 0px, ${C.accent} 24px, ${C.accent2} 24px, ${C.accent2} 48px)` }} />
@@ -193,56 +230,116 @@ function ConnexionScreen({ onLoggedIn }) {
       </button>
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
         <div style={{ width: "100%", maxWidth: "380px", background: panelBg, borderRadius: "18px", border: `1px solid ${border}`, padding: "40px 32px", boxShadow: dark ? "0 20px 60px rgba(0,0,0,0.4)" : "0 20px 50px rgba(27,67,50,0.08)" }}>
-          <div style={{ textAlign: "center", marginBottom: "28px" }}>
-            <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", borderRadius: "14px", background: `linear-gradient(135deg, ${C.accent2}, ${C.accent})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Users size={26} color="#FAF6ED" />
-            </div>
-            <div style={{ fontSize: "11px", letterSpacing: "0.12em", textTransform: "uppercase", color: C.accent, fontWeight: 600, marginBottom: "6px" }}>Connexion</div>
-            <h1 style={{ fontSize: "22px", fontWeight: 700, color: ink, margin: 0 }}>Plateforme Tontine</h1>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-            <div>
-              <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>Identifiant</label>
-              <input
-                type="text"
-                value={identifiant}
-                onChange={(e) => setIdentifiant(e.target.value)}
-                placeholder="Ex. jeanmballa42"
-                style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>Mot de passe</label>
-              <div style={{ position: "relative" }}>
-                <Lock size={15} color={sub} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                  placeholder="••••••••"
-                  style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px 12px 38px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
-                />
+          {!modeOubli ? (
+            <>
+              <div style={{ textAlign: "center", marginBottom: "28px" }}>
+                <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", borderRadius: "14px", background: `linear-gradient(135deg, ${C.accent2}, ${C.accent})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Users size={26} color="#FAF6ED" />
+                </div>
+                <div style={{ fontSize: "11px", letterSpacing: "0.12em", textTransform: "uppercase", color: C.accent, fontWeight: 600, marginBottom: "6px" }}>Connexion</div>
+                <h1 style={{ fontSize: "22px", fontWeight: 700, color: ink, margin: 0 }}>Plateforme Tontine</h1>
               </div>
-              <div style={{ textAlign: "right", marginTop: "6px" }}>
-                <span style={{ fontSize: "12px", color: C.accent, cursor: "pointer", fontWeight: 600 }}>Mot de passe oublié ?</span>
-              </div>
-            </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div>
+                  <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>Identifiant</label>
+                  <input
+                    type="text"
+                    value={identifiant}
+                    onChange={(e) => setIdentifiant(e.target.value)}
+                    placeholder="Ex. jeanmballa42"
+                    style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>Mot de passe</label>
+                  <div style={{ position: "relative" }}>
+                    <Lock size={15} color={sub} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                      placeholder="••••••••"
+                      style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px 12px 38px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
+                    />
+                  </div>
+                  <div style={{ textAlign: "right", marginTop: "6px" }}>
+                    <span
+                      onClick={() => { setModeOubli(true); setIdentifiantOubli(identifiant); setOubliErreur(""); setOubliSuccess(false); }}
+                      style={{ fontSize: "12px", color: C.accent, cursor: "pointer", fontWeight: 600 }}
+                    >
+                      Mot de passe oublié ?
+                    </span>
+                  </div>
+                </div>
 
-            {erreur && (
-              <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
-                {erreur}
-              </div>
-            )}
+                {erreur && (
+                  <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                    {erreur}
+                  </div>
+                )}
 
-            <button
-              onClick={handleLogin}
-              disabled={chargement}
-              style={{ marginTop: "10px", width: "100%", padding: "13px", borderRadius: "10px", border: "none", background: C.accent2, color: "#FAF6ED", fontSize: "14px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", cursor: chargement ? "default" : "pointer", opacity: chargement ? 0.7 : 1 }}
-            >
-              {chargement ? "Connexion..." : "Se connecter"} <ChevronRight size={16} />
-            </button>
-          </div>
+                <button
+                  onClick={handleLogin}
+                  disabled={chargement}
+                  style={{ marginTop: "10px", width: "100%", padding: "13px", borderRadius: "10px", border: "none", background: C.accent2, color: "#FAF6ED", fontSize: "14px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", cursor: chargement ? "default" : "pointer", opacity: chargement ? 0.7 : 1 }}
+                >
+                  {chargement ? "Connexion..." : "Se connecter"} <ChevronRight size={16} />
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ textAlign: "center", marginBottom: "24px" }}>
+                <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", borderRadius: "14px", background: `linear-gradient(135deg, ${C.accent2}, ${C.accent})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <KeyRound size={26} color="#FAF6ED" />
+                </div>
+                <h1 style={{ fontSize: "19px", fontWeight: 700, color: ink, margin: 0 }}>Mot de passe oublié</h1>
+                <p style={{ fontSize: "12.5px", color: sub, marginTop: "8px" }}>
+                  Indique ton identifiant, on t'envoie un lien par email pour choisir un nouveau mot de passe.
+                </p>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div>
+                  <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>Identifiant</label>
+                  <input
+                    type="text"
+                    value={identifiantOubli}
+                    onChange={(e) => setIdentifiantOubli(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleDemandeReinitialisation()}
+                    placeholder="Ex. jeanmballa42"
+                    style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
+                  />
+                </div>
+
+                {oubliErreur && (
+                  <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                    {oubliErreur}
+                  </div>
+                )}
+                {oubliSuccess && (
+                  <div style={{ fontSize: "12px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                    Email envoyé ! Vérifie ta boîte mail et clique sur le lien reçu pour choisir un nouveau mot de passe.
+                  </div>
+                )}
+
+                <button
+                  onClick={handleDemandeReinitialisation}
+                  disabled={oubliChargement || oubliSuccess}
+                  style={{ marginTop: "6px", width: "100%", padding: "13px", borderRadius: "10px", border: "none", background: C.accent2, color: "#FAF6ED", fontSize: "14px", fontWeight: 600, cursor: (oubliChargement || oubliSuccess) ? "default" : "pointer", opacity: (oubliChargement || oubliSuccess) ? 0.7 : 1 }}
+                >
+                  {oubliChargement ? "Envoi..." : "Envoyer le lien de réinitialisation"}
+                </button>
+
+                <button
+                  onClick={() => { setModeOubli(false); setOubliErreur(""); setOubliSuccess(false); }}
+                  style={{ background: "transparent", border: "none", color: sub, fontSize: "12.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "5px" }}
+                >
+                  <ChevronLeft size={14} /> Retour à la connexion
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
       <div style={{ textAlign: "center", padding: "18px", fontSize: "12px", color: sub }}>
@@ -1054,6 +1151,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [newCategorieFraisNom, setNewCategorieFraisNom] = useState("");
   const [responsablesFrais, setResponsablesFrais] = useState([]);
   const [joindreRecuEnCours, setJoindreRecuEnCours] = useState(null);
+  const inputsFichierRecu = useRef({});
   const [depotBanque, setDepotBanque] = useState("");
   const [depotMembreSimple, setDepotMembreSimple] = useState("");
   const [depotError, setDepotError] = useState("");
@@ -1641,25 +1739,43 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   <span style={{ color: C.sub, fontSize: 12 }}>{d.type === "Frais" ? d.categorie : d.motif}</span>,
                   <b style={{ fontSize: 12.5 }}>{d.solde}</b>,
                   d.statut === "reçu joint" ? (
-                    <Badge bg={C.ok} fg={C.accent2}>reçu joint</Badge>
+                    d.recuUrl ? (
+                      <a href={d.recuUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                        <Badge bg={C.ok} fg={C.accent2}>Voir le reçu</Badge>
+                      </a>
+                    ) : (
+                      <Badge bg={C.ok} fg={C.accent2}>reçu joint</Badge>
+                    )
                   ) : (
-                    <button
-                      disabled={joindreRecuEnCours === d.id}
-                      onClick={async () => {
-                        setJoindreRecuEnCours(d.id);
-                        try {
-                          await joindreRecu(d.id);
-                          await rechargerDepots();
-                        } catch (e) {
-                          console.error("Erreur lors de la jointure du reçu", e);
-                        } finally {
-                          setJoindreRecuEnCours(null);
-                        }
-                      }}
-                      style={{ background: C.warnBg, color: C.warn, border: `1px solid ${C.warn}44`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: joindreRecuEnCours === d.id ? "default" : "pointer" }}
-                    >
-                      {joindreRecuEnCours === d.id ? "..." : "Joindre le reçu"}
-                    </button>
+                    <>
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        ref={(el) => { inputsFichierRecu.current[d.id] = el; }}
+                        style={{ display: "none" }}
+                        onChange={async (e) => {
+                          const fichier = e.target.files[0];
+                          if (!fichier) return;
+                          setJoindreRecuEnCours(d.id);
+                          try {
+                            await joindreRecu(d.id, groupId, fichier);
+                            await rechargerDepots();
+                          } catch (err) {
+                            console.error("Erreur lors de la jointure du reçu", err);
+                          } finally {
+                            setJoindreRecuEnCours(null);
+                            e.target.value = "";
+                          }
+                        }}
+                      />
+                      <button
+                        disabled={joindreRecuEnCours === d.id}
+                        onClick={() => inputsFichierRecu.current[d.id]?.click()}
+                        style={{ background: C.warnBg, color: C.warn, border: `1px solid ${C.warn}44`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: joindreRecuEnCours === d.id ? "default" : "pointer" }}
+                      >
+                        {joindreRecuEnCours === d.id ? "Envoi..." : "Joindre le reçu"}
+                      </button>
+                    </>
                   ),
                 ];
               })} />
