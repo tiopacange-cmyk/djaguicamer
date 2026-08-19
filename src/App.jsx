@@ -5,7 +5,7 @@ import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialise
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit } from "./lib/banque";
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
-import { fetchSignataires, ajouterSignataire, fetchMouvementsExternes, creerMouvementExterne } from "./lib/depots";
+import { fetchComptesBancaires, creerCompteBancaire, fetchSignataires, ajouterSignataire, fetchMouvementsCompte, creerMouvementExterne } from "./lib/depots_retrait";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
@@ -1048,41 +1048,72 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [depotDate, setDepotDate] = useState("");
   const [depotMontant, setDepotMontant] = useState("");
   const [depotMotif, setDepotMotif] = useState("");
-  const [depotBanque, setDepotBanque] = useState("Afriland First Bank — Agence Nkolbisson");
+  const [depotCategorie, setDepotCategorie] = useState("");
+  const [depotBanque, setDepotBanque] = useState("");
   const [depotMembreSimple, setDepotMembreSimple] = useState("");
   const [depotError, setDepotError] = useState("");
   const [depotSuccess, setDepotSuccess] = useState(false);
   const [recuJoint, setRecuJoint] = useState(false);
   const [typeMouvementBanque, setTypeMouvementBanque] = useState("Dépôt");
+
+  const [showCreerCompte, setShowCreerCompte] = useState(false);
+  const [showAjouterSignataire, setShowAjouterSignataire] = useState(false);
+  const [sigMembreId, setSigMembreId] = useState("");
+  const [sigFonction, setSigFonction] = useState("");
+  const [sigError, setSigError] = useState("");
+  const [sigSuccess, setSigSuccess] = useState(false);
+  const [compteNom, setCompteNom] = useState("");
+  const [compteBanque, setCompteBanque] = useState("");
+  const [compteNumero, setCompteNumero] = useState("");
+  const [compteType, setCompteType] = useState("Courant");
+  const [compteTauxInteret, setCompteTauxInteret] = useState("");
+  const [compteError, setCompteError] = useState("");
+  const [compteSuccess, setCompteSuccess] = useState(false);
   const [signataires, setSignataires] = useState([]);
   const [signatairesChoisis, setSignatairesChoisis] = useState([]);
   const toggleSignataire = (id) => {
     setSignatairesChoisis((prev) => (prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id]));
   };
 
+  const [comptesBancaires, setComptesBancaires] = useState([]);
+  const [compteActifId, setCompteActifId] = useState("");
   const [depots, setDepots] = useState([]);
   const [chargementDepots, setChargementDepots] = useState(true);
 
-  const rechargerDepots = async () => {
+  const rechargerComptes = async () => {
     if (!groupId) return;
     try {
       const sigs = await fetchSignataires(groupId);
       setSignataires(sigs);
-      const mvts = await fetchMouvementsExternes(groupId);
+      const comptes = await fetchComptesBancaires(groupId);
+      setComptesBancaires(comptes);
+      if (comptes.length > 0 && !compteActifId) setCompteActifId(comptes[0].id);
+    } catch (e) {
+      console.error("Erreur de chargement des comptes bancaires", e);
+    } finally {
+      setChargementDepots(false);
+    }
+  };
+
+  useEffect(() => { rechargerComptes(); }, [groupId]);
+
+  const rechargerDepots = async () => {
+    if (!compteActifId) { setDepots([]); return; }
+    try {
+      const mvts = await fetchMouvementsCompte(compteActifId);
       setDepots(mvts.map((d) => ({
         ...d,
         montant: fmtFCFA(d.montant),
         solde: fmtFCFA(d.solde),
       })));
     } catch (e) {
-      console.error("Erreur de chargement des dépôts", e);
-    } finally {
-      setChargementDepots(false);
+      console.error("Erreur de chargement des mouvements", e);
     }
   };
 
-  useEffect(() => { rechargerDepots(); }, [groupId]);
+  useEffect(() => { rechargerDepots(); }, [compteActifId]);
 
+  const compteActif = comptesBancaires.find((c) => c.id === compteActifId) || null;
   const soldeCompteActuel = depots.length ? depots[0].solde : fmtFCFA(0);
   const [filtreDateDebut, setFiltreDateDebut] = useState("");
   const [filtreDateFin, setFiltreDateFin] = useState("");
@@ -1491,12 +1522,62 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   Versement des fonds du groupe dans une banque externe, après chaque séance, par un signataire du compte.
                 </p>
               </div>
-              <button style={btnPrimary} onClick={() => { setDepotDate(""); setDepotMontant(""); setDepotMotif(""); setDepotMembreSimple(""); setSignatairesChoisis([]); setRecuJoint(false); setDepotError(""); setDepotSuccess(false); setShowNouveauDepot(true); }}><Plus size={15} /> Enregistrer un mouvement</button>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  style={btnSecondary}
+                  onClick={() => { setCompteNom(""); setCompteBanque(""); setCompteNumero(""); setCompteType("Courant"); setCompteTauxInteret(""); setCompteError(""); setCompteSuccess(false); setShowCreerCompte(true); }}
+                >
+                  <Plus size={15} /> Créer un compte
+                </button>
+                <button
+                  style={btnSecondary}
+                  onClick={() => { setSigMembreId(""); setSigFonction(""); setSigError(""); setSigSuccess(false); setShowAjouterSignataire(true); }}
+                >
+                  <UserCog size={15} /> Ajouter un signataire
+                </button>
+                <button
+                  style={btnPrimary}
+                  disabled={!compteActifId}
+                  onClick={() => { setDepotDate(""); setDepotMontant(""); setDepotMotif(""); setDepotCategorie(""); setDepotMembreSimple(""); setSignatairesChoisis([]); setRecuJoint(false); setDepotError(""); setDepotSuccess(false); setTypeMouvementBanque("Dépôt"); setShowNouveauDepot(true); }}
+                >
+                  <Plus size={15} /> Enregistrer un mouvement
+                </button>
+              </div>
             </div>
 
-            <div style={{ marginTop: "22px" }}>
-              <StatCard label="Solde actuel du compte" value={soldeCompteActuel} sub="Afriland First Bank — Agence Nkolbisson" icon={<Building2 size={16} />} />
-            </div>
+            {comptesBancaires.length === 0 ? (
+              <div style={{ marginTop: "22px", fontSize: "12.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px" }}>
+                Aucun compte bancaire enregistré pour ce groupe. Clique "Créer un compte" pour ajouter ton premier compte (courant ou épargne).
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "flex", gap: "8px", marginTop: "18px", flexWrap: "wrap" }}>
+                  {comptesBancaires.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setCompteActifId(c.id)}
+                      style={{
+                        padding: "8px 14px", borderRadius: "8px", border: `1px solid ${compteActifId === c.id ? C.vifBleu : C.border}`,
+                        background: compteActifId === c.id ? `${C.vifBleu}14` : "transparent", color: compteActifId === c.id ? C.vifBleu : C.sub,
+                        fontSize: "12.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
+                      }}
+                    >
+                      {c.type === "Épargne" ? <PiggyBank size={13} /> : <Building2 size={13} />} {c.nom}
+                      <span style={{ fontSize: "10px", opacity: 0.7 }}>({c.type})</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ marginTop: "18px" }}>
+                  <StatCard
+                    label={`Solde actuel — ${compteActif?.nom || ""}`}
+                    value={soldeCompteActuel}
+                    sub={`${compteActif?.banque || "—"}${compteActif?.numeroCompte ? " · " + compteActif.numeroCompte : ""}${compteActif?.type === "Épargne" && compteActif?.tauxInteretAnnuel ? ` · Taux annuel ${compteActif.tauxInteretAnnuel}%` : ""}`}
+                    icon={compteActif?.type === "Épargne" ? <PiggyBank size={16} /> : <Building2 size={16} />}
+                  />
+                </div>
+              </>
+            )}
 
             <div style={{ display: "flex", alignItems: "flex-end", gap: "10px", marginTop: "22px", background: C.panel, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "14px 16px" }}>
               <div style={{ flex: 1 }}>
@@ -1536,16 +1617,25 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
 
             <div style={{ marginTop: "16px" }} />
-            <Table cols={["Date", "Type", "Montant", "Signataire", "Motif", "Solde du compte", "Statut"]} widths="0.8fr 0.7fr 0.9fr 1fr 1.3fr 1.1fr 1fr"
-              rows={depots.map((d) => [
-                <span style={{ color: C.sub, fontSize: 12 }}>{d.date}</span>,
-                <Badge bg={d.type === "Dépôt" ? C.ok : "#EBE6F5"} fg={d.type === "Dépôt" ? C.accent2 : C.purple}>{d.type}</Badge>,
-                <b>{d.montant}</b>,
-                d.signataire,
-                <span style={{ color: C.sub, fontSize: 12 }}>{d.motif}</span>,
-                <b style={{ fontSize: 12.5 }}>{d.solde}</b>,
-                <Badge bg={d.statut === "reçu joint" ? C.ok : C.warnBg} fg={d.statut === "reçu joint" ? C.accent2 : C.warn}>{d.statut}</Badge>,
-              ])} />
+            <Table cols={["Date", "Type", "Montant", "Signataire", "Motif / Catégorie", "Solde du compte", "Statut"]} widths="0.8fr 0.7fr 0.9fr 1fr 1.3fr 1.1fr 1fr"
+              rows={depots.map((d) => {
+                const typeStyle = {
+                  "Dépôt": { bg: C.ok, fg: C.accent2 },
+                  "Retrait": { bg: "#EBE6F5", fg: C.purple },
+                  "Frais": { bg: C.warnBg, fg: C.warn },
+                  "Intérêt": { bg: `${C.vifVert}1A`, fg: C.vifVert },
+                };
+                const style = typeStyle[d.type] || typeStyle["Dépôt"];
+                return [
+                  <span style={{ color: C.sub, fontSize: 12 }}>{d.date}</span>,
+                  <Badge bg={style.bg} fg={style.fg}>{d.type}</Badge>,
+                  <b>{d.montant}</b>,
+                  d.signataire,
+                  <span style={{ color: C.sub, fontSize: 12 }}>{d.type === "Frais" ? d.categorie : d.motif}</span>,
+                  <b style={{ fontSize: 12.5 }}>{d.solde}</b>,
+                  <Badge bg={d.statut === "reçu joint" ? C.ok : C.warnBg} fg={d.statut === "reçu joint" ? C.accent2 : C.warn}>{d.statut}</Badge>,
+                ];
+              })} />
             <div style={{ fontSize: "11px", color: C.sub, marginTop: "10px" }}>
               À chaque retour de séance, le signataire doit joindre le reçu à la ligne correspondante. Un retrait doit toujours préciser son motif (ex. décaissement de prêt, versement de cagnotte).
             </div>
@@ -2807,21 +2897,149 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         </Modal>
       )}
 
-      {showNouveauDepot && (
-        <Modal onClose={() => setShowNouveauDepot(false)} title="Enregistrer un mouvement bancaire">
+      {showAjouterSignataire && (
+        <Modal onClose={() => setShowAjouterSignataire(false)} title="Ajouter un signataire" icon={<UserCog />} accentColor={C.vifBleu}>
+          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+            Les signataires sont les personnes habilitées à valider un retrait (2 à 3 requis par opération).
+          </div>
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Type de mouvement</label>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Membre</label>
+            <select
+              value={sigMembreId}
+              onChange={(e) => setSigMembreId(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+            >
+              <option value="">Sélectionner un membre</option>
+              {membres.filter((m) => m.statut === "actif" && !signataires.some((s) => s.membreId === m.id)).map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
+            </select>
+          </div>
+          <FormField label="Fonction (optionnel)" placeholder="Ex. Président, Trésorière..." value={sigFonction} onChange={(e) => setSigFonction(e.target.value)} />
+
+          {sigError && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {sigError}
+            </div>
+          )}
+          {sigSuccess && (
+            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <CheckCircle2 size={14} /> Signataire ajouté.
+            </div>
+          )}
+
+          <button
+            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}
+            onClick={async () => {
+              if (!sigMembreId) { setSigError("Sélectionnez un membre."); return; }
+              try {
+                await ajouterSignataire(groupId, sigMembreId, sigFonction.trim());
+                await rechargerComptes();
+                setSigError("");
+                setSigSuccess(true);
+                setTimeout(() => {
+                  setShowAjouterSignataire(false);
+                  setSigSuccess(false);
+                }, 1200);
+              } catch (e) {
+                console.error("Erreur d'ajout du signataire", e);
+                setSigError(e.message || "Erreur lors de l'ajout.");
+              }
+            }}
+          >
+            Ajouter le signataire
+          </button>
+        </Modal>
+      )}
+
+      {showCreerCompte && (
+        <Modal onClose={() => setShowCreerCompte(false)} title="Créer un compte bancaire" icon={<Building2 />} accentColor={C.vifBleu}>
+          <FormField label="Nom du compte" placeholder="Ex. Compte principal, Épargne terrain..." value={compteNom} onChange={(e) => setCompteNom(e.target.value)} />
+          <FormField label="Banque" placeholder="Ex. Afriland First Bank" value={compteBanque} onChange={(e) => setCompteBanque(e.target.value)} />
+          <FormField label="Numéro de compte (optionnel)" placeholder="Ex. 0123456789" value={compteNumero} onChange={(e) => setCompteNumero(e.target.value)} />
+
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Type de compte</label>
             <div style={{ display: "flex", gap: "8px" }}>
-              {["Dépôt", "Retrait"].map((t) => (
+              {["Courant", "Épargne"].map((t) => (
                 <div
                   key={t}
-                  onClick={() => setTypeMouvementBanque(t)}
-                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${typeMouvementBanque === t ? C.accent2 : C.border}`, background: typeMouvementBanque === t ? C.ok : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: typeMouvementBanque === t ? C.accent2 : C.sub, cursor: "pointer" }}
+                  onClick={() => setCompteType(t)}
+                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${compteType === t ? C.vifBleu : C.border}`, background: compteType === t ? `${C.vifBleu}14` : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: compteType === t ? C.vifBleu : C.sub, cursor: "pointer" }}
                 >
                   {t}
                 </div>
               ))}
             </div>
+          </div>
+
+          {compteType === "Épargne" && (
+            <FormField label="Taux d'intérêt annuel (%)" placeholder="Ex. 3.5" value={compteTauxInteret} onChange={(e) => setCompteTauxInteret(e.target.value)} />
+          )}
+
+          {compteError && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {compteError}
+            </div>
+          )}
+          {compteSuccess && (
+            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <CheckCircle2 size={14} /> Compte créé.
+            </div>
+          )}
+
+          <button
+            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}
+            onClick={async () => {
+              if (!compteNom.trim()) { setCompteError("Le nom du compte est obligatoire."); return; }
+              try {
+                await creerCompteBancaire(groupId, {
+                  nom: compteNom.trim(),
+                  banque: compteBanque.trim(),
+                  numeroCompte: compteNumero.trim(),
+                  type: compteType,
+                  tauxInteretAnnuel: compteType === "Épargne" ? parseFloat(compteTauxInteret) || null : null,
+                });
+                await rechargerComptes();
+                setCompteError("");
+                setCompteSuccess(true);
+                setTimeout(() => {
+                  setShowCreerCompte(false);
+                  setCompteSuccess(false);
+                }, 1200);
+              } catch (e) {
+                console.error("Erreur de création du compte", e);
+                setCompteError(e.message || "Erreur lors de la création.");
+              }
+            }}
+          >
+            Créer le compte
+          </button>
+        </Modal>
+      )}
+
+      {showNouveauDepot && (
+        <Modal onClose={() => setShowNouveauDepot(false)} title="Enregistrer un mouvement bancaire" icon={<Building2 />} accentColor={C.vifBleu}>
+          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+            Compte concerné : <b>{compteActif?.nom || "—"}</b>
+          </div>
+
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Type de mouvement</label>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {["Dépôt", "Retrait", "Frais", ...(compteActif?.type === "Épargne" ? ["Intérêt"] : [])].map((t) => (
+                <div
+                  key={t}
+                  onClick={() => setTypeMouvementBanque(t)}
+                  style={{ flex: "1 1 auto", textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${typeMouvementBanque === t ? C.accent2 : C.border}`, background: typeMouvementBanque === t ? C.ok : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: typeMouvementBanque === t ? C.accent2 : C.sub, cursor: "pointer" }}
+                >
+                  {t}
+                </div>
+              ))}
+            </div>
+            {compteActif?.type !== "Épargne" && (
+              <div style={{ fontSize: "10.5px", color: C.sub, marginTop: "5px" }}>
+                "Intérêt" n'est disponible que pour un compte de type Épargne.
+              </div>
+            )}
           </div>
 
           <FormField label="Date de la séance" placeholder="jj/mm/aaaa" value={depotDate} onChange={(e) => setDepotDate(e.target.value)} />
@@ -2831,9 +3049,28 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             <FormField label="Motif du retrait" placeholder="Ex. Décaissement de prêt, versement de cagnotte..." value={depotMotif} onChange={(e) => setDepotMotif(e.target.value)} />
           )}
 
-          {typeMouvementBanque === "Dépôt" ? (
+          {typeMouvementBanque === "Frais" && (
             <div>
-              <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Membre effectuant le versement</label>
+              <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Catégorie de frais</label>
+              <select
+                value={depotCategorie}
+                onChange={(e) => setDepotCategorie(e.target.value)}
+                style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              >
+                <option value="">Sélectionner une catégorie</option>
+                <option>Frais SMS</option>
+                <option>Tenue de compte</option>
+                <option>Frais de virement</option>
+                <option>Autre</option>
+              </select>
+            </div>
+          )}
+
+          {(typeMouvementBanque === "Dépôt" || typeMouvementBanque === "Intérêt") ? (
+            <div>
+              <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>
+                {typeMouvementBanque === "Intérêt" ? "Enregistré par" : "Membre effectuant le versement"}
+              </label>
               <select
                 value={depotMembreSimple}
                 onChange={(e) => setDepotMembreSimple(e.target.value)}
@@ -2842,9 +3079,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 <option value="">Sélectionner un membre</option>
                 {membres.filter((m) => m.statut === "actif").map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
               </select>
-              <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>
-                Pour un versement, n'importe quel membre du groupe peut être désigné.
-              </div>
+              {typeMouvementBanque === "Dépôt" && (
+                <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>
+                  Pour un versement, n'importe quel membre du groupe peut être désigné.
+                </div>
+              )}
             </div>
           ) : (
             <div>
@@ -2871,16 +3110,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   : `${signatairesChoisis.length} signataire(s) sélectionné(s).`}
               </div>
               <div style={{ fontSize: "11px", color: C.sub, marginTop: "4px" }}>
-                Un retrait exige la validation de plusieurs signataires officiels, contrairement à un versement.
+                Retrait et Frais exigent la validation de plusieurs signataires officiels.
               </div>
             </div>
           )}
 
-          <FormField label="Banque / Agence" placeholder="Ex. Afriland First Bank — Agence Nkolbisson" value={depotBanque} onChange={(e) => setDepotBanque(e.target.value)} />
-
           <div>
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>
-              {typeMouvementBanque === "Retrait" ? "Reçu retrait" : "Reçu de dépôt"}
+              {typeMouvementBanque === "Retrait" ? "Reçu retrait" : "Reçu / justificatif"}
             </label>
             {!recuJoint ? (
               <div
@@ -2888,9 +3125,9 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 style={{ border: `1.5px dashed ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center", background: "#FBFAF6", cursor: "pointer" }}
               >
                 <div style={{ fontSize: "12px", fontWeight: 600, color: C.accent2 }}>
-                  + Joindre le {typeMouvementBanque === "Retrait" ? "reçu de retrait" : "reçu de dépôt"}
+                  + Joindre le justificatif
                 </div>
-                <div style={{ fontSize: "10.5px", color: C.sub, marginTop: "4px" }}>Photo ou scan remis par les signataires au retour de la séance</div>
+                <div style={{ fontSize: "10.5px", color: C.sub, marginTop: "4px" }}>Photo ou scan remis au retour de la séance</div>
               </div>
             ) : (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: "8px", border: `1px solid ${C.accent2}44`, background: C.ok, fontSize: "12.5px" }}>
@@ -2917,40 +3154,44 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <button
             style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
             onClick={async () => {
+              if (!compteActifId) { setDepotError("Sélectionnez d'abord un compte."); setDepotSuccess(false); return; }
               const montantNum = parseInt(depotMontant.replace(/[^\d]/g, ""), 10);
               if (!depotDate.trim()) { setDepotError("La date de la séance est obligatoire."); setDepotSuccess(false); return; }
               if (!montantNum || montantNum <= 0) { setDepotError("Saisissez un montant valide."); setDepotSuccess(false); return; }
               if (typeMouvementBanque === "Retrait" && !depotMotif.trim()) { setDepotError("Le motif est obligatoire pour un retrait."); setDepotSuccess(false); return; }
-              if (typeMouvementBanque === "Dépôt" && !depotMembreSimple) { setDepotError("Sélectionnez le membre effectuant le versement."); setDepotSuccess(false); return; }
-              if (typeMouvementBanque === "Retrait" && (signatairesChoisis.length < 2 || signatairesChoisis.length > 3)) {
-                setDepotError("Sélectionnez entre 2 et 3 signataires pour un retrait.");
+              if (typeMouvementBanque === "Frais" && !depotCategorie) { setDepotError("Sélectionnez une catégorie de frais."); setDepotSuccess(false); return; }
+              if ((typeMouvementBanque === "Dépôt" || typeMouvementBanque === "Intérêt") && !depotMembreSimple) { setDepotError("Sélectionnez un membre."); setDepotSuccess(false); return; }
+              if ((typeMouvementBanque === "Retrait" || typeMouvementBanque === "Frais") && (signatairesChoisis.length < 2 || signatairesChoisis.length > 3)) {
+                setDepotError("Sélectionnez entre 2 et 3 signataires.");
                 setDepotSuccess(false);
                 return;
               }
               const soldeActuelNum = depots.length ? parseInt(depots[0].solde.replace(/[^\d]/g, ""), 10) : 0;
-              if (typeMouvementBanque === "Retrait" && montantNum > soldeActuelNum) {
-                setDepotError("Le montant du retrait dépasse le solde actuel du compte.");
+              if ((typeMouvementBanque === "Retrait" || typeMouvementBanque === "Frais") && montantNum > soldeActuelNum) {
+                setDepotError("Ce montant dépasse le solde actuel du compte.");
                 setDepotSuccess(false);
                 return;
               }
               try {
                 await creerMouvementExterne(groupId, {
+                  compteId: compteActifId,
                   type: typeMouvementBanque,
                   montant: montantNum,
                   dateMouvement: versDateISO(depotDate),
-                  banqueAgence: depotBanque.trim(),
                   motif: depotMotif.trim(),
+                  categorie: depotCategorie,
                   membreId: depotMembreSimple || null,
                   signatairesIds: signatairesChoisis,
                   recuJoint,
                 });
                 await rechargerDepots();
+                await rechargerComptes();
                 setDepotError("");
                 setDepotSuccess(true);
                 setTimeout(() => {
                   setShowNouveauDepot(false);
                   setDepotSuccess(false);
-                  setDepotDate(""); setDepotMontant(""); setDepotMotif(""); setDepotMembreSimple("");
+                  setDepotDate(""); setDepotMontant(""); setDepotMotif(""); setDepotCategorie(""); setDepotMembreSimple("");
                   setSignatairesChoisis([]); setRecuJoint(false);
                 }, 1200);
               } catch (e) {
