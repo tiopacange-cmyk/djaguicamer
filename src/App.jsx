@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre } from "./lib/membres";
+import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre, reinitialiserMotDePasseMembre } from "./lib/membres";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere } from "./lib/tontine";
@@ -1257,6 +1257,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
   const [showEditMembre, setShowEditMembre] = useState(false);
   const [showDeleteMembre, setShowDeleteMembre] = useState(null);
+  const [showResetMembre, setShowResetMembre] = useState(null);
+  const [resetMembreEnCours, setResetMembreEnCours] = useState(false);
+  const [resetMembreErreur, setResetMembreErreur] = useState("");
+  const [resetMembreMotDePasse, setResetMembreMotDePasse] = useState("");
   const [deleteEnCours, setDeleteEnCours] = useState(false);
   const [deleteErreur, setDeleteErreur] = useState("");
   const [editMembre, setEditMembre] = useState(null);
@@ -2007,6 +2011,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   >
                     Supprimer
                   </button>
+                  {m.compteActive && (
+                    <button
+                      onClick={() => { setShowResetMembre(m); setResetMembreErreur(""); setResetMembreMotDePasse(""); }}
+                      style={{ background: "transparent", color: C.vifViolet, border: `1px solid ${C.vifViolet}55`, borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                    >
+                      Réinitialiser (urgence)
+                    </button>
+                  )}
                 </div>,
               ])} />
             <div style={{ fontSize: "11px", color: C.sub, marginTop: "10px" }}>
@@ -3107,6 +3119,53 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           >
             Enregistrer les modifications
           </button>
+        </Modal>
+      )}
+
+      {showResetMembre && (
+        <Modal onClose={() => setShowResetMembre(null)} title="Réinitialiser le mot de passe" icon={<KeyRound />} accentColor={C.vifViolet}>
+          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+            Réservé aux cas d'urgence (membre bloqué, mot de passe oublié sans accès email). Un nouveau mot de passe temporaire est généré immédiatement, et <b>{showResetMembre?.nom}</b> devra en choisir un nouveau à sa prochaine connexion.
+          </div>
+
+          {resetMembreErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {resetMembreErreur}
+            </div>
+          )}
+          {resetMembreMotDePasse && (
+            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                <CheckCircle2 size={14} /> Mot de passe réinitialisé.
+              </div>
+              <div>Nouveau mot de passe temporaire : <b>{resetMembreMotDePasse}</b></div>
+              <div style={{ color: C.sub, fontSize: "10.5px", marginTop: "4px" }}>
+                Communique-le à {showResetMembre?.nom} — il devra le changer dès sa prochaine connexion.
+              </div>
+            </div>
+          )}
+
+          {!resetMembreMotDePasse && (
+            <button
+              disabled={resetMembreEnCours}
+              style={{ marginTop: "6px", background: C.vifViolet, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: resetMembreEnCours ? "default" : "pointer" }}
+              onClick={async () => {
+                setResetMembreEnCours(true);
+                setResetMembreErreur("");
+                try {
+                  const nouveauMdp = await reinitialiserMotDePasseMembre(showResetMembre.email);
+                  setResetMembreMotDePasse(nouveauMdp);
+                } catch (e) {
+                  console.error("Erreur de réinitialisation", e);
+                  setResetMembreErreur(e.message || "Erreur lors de la réinitialisation.");
+                } finally {
+                  setResetMembreEnCours(false);
+                }
+              }}
+            >
+              {resetMembreEnCours ? "Réinitialisation..." : "Réinitialiser le mot de passe"}
+            </button>
+          )}
         </Modal>
       )}
 
