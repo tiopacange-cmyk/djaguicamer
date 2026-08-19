@@ -1257,7 +1257,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
   const [showEditMembre, setShowEditMembre] = useState(false);
   const [showDeleteMembre, setShowDeleteMembre] = useState(null);
-  const [showResetMembre, setShowResetMembre] = useState(null);
+  const [showResetMembre, setShowResetMembre] = useState(false);
+  const [resetMembreId, setResetMembreId] = useState("");
   const [resetMembreEnCours, setResetMembreEnCours] = useState(false);
   const [resetMembreErreur, setResetMembreErreur] = useState("");
   const [resetMembreMotDePasse, setResetMembreMotDePasse] = useState("");
@@ -1944,7 +1945,15 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   </p>
                 )}
               </div>
-              <button style={btnPrimary} onClick={() => { setInviteNom(""); setInviteTelephone(""); setInviteEmail(""); setInviteCaution(""); setInviteError(""); setInviteSuccess(false); setInviteIdentifiant(""); setInviteMotDePasseTemp(""); setShowInviteMember(true); }}><Plus size={15} /> Inviter un membre</button>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  style={btnSecondary}
+                  onClick={() => { setResetMembreId(""); setResetMembreErreur(""); setResetMembreMotDePasse(""); setShowResetMembre(true); }}
+                >
+                  <KeyRound size={15} /> Accès d'urgence
+                </button>
+                <button style={btnPrimary} onClick={() => { setInviteNom(""); setInviteTelephone(""); setInviteEmail(""); setInviteCaution(""); setInviteError(""); setInviteSuccess(false); setInviteIdentifiant(""); setInviteMotDePasseTemp(""); setShowInviteMember(true); }}><Plus size={15} /> Inviter un membre</button>
+              </div>
             </div>
             <div style={{ marginTop: "22px" }} />
             <Table cols={["Nom", "Identifiant", "Rôle", "Statut", ""]} widths="1.2fr 1.1fr 0.9fr 0.9fr 1.5fr"
@@ -2011,14 +2020,6 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   >
                     Supprimer
                   </button>
-                  {m.compteActive && (
-                    <button
-                      onClick={() => { setShowResetMembre(m); setResetMembreErreur(""); setResetMembreMotDePasse(""); }}
-                      style={{ background: "transparent", color: C.vifViolet, border: `1px solid ${C.vifViolet}55`, borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
-                    >
-                      Réinitialiser (urgence)
-                    </button>
-                  )}
                 </div>,
               ])} />
             <div style={{ fontSize: "11px", color: C.sub, marginTop: "10px" }}>
@@ -3123,9 +3124,24 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       )}
 
       {showResetMembre && (
-        <Modal onClose={() => setShowResetMembre(null)} title="Réinitialiser le mot de passe" icon={<KeyRound />} accentColor={C.vifViolet}>
+        <Modal onClose={() => setShowResetMembre(false)} title="Accès d'urgence — réinitialiser un mot de passe" icon={<KeyRound />} accentColor={C.vifViolet}>
           <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
-            Réservé aux cas d'urgence (membre bloqué, mot de passe oublié sans accès email). Un nouveau mot de passe temporaire est généré immédiatement, et <b>{showResetMembre?.nom}</b> devra en choisir un nouveau à sa prochaine connexion.
+            Réservé aux cas d'urgence (membre bloqué, mot de passe oublié sans accès email). Un nouveau mot de passe temporaire est généré immédiatement, et la personne devra en choisir un nouveau à sa prochaine connexion.
+          </div>
+
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Membre à réinitialiser</label>
+            <select
+              value={resetMembreId}
+              onChange={(e) => setResetMembreId(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+            >
+              <option value="">Sélectionner un membre</option>
+              {membres.filter((m) => m.compteActive).map((m) => <option key={m.id} value={m.id}>{m.nom} — {m.role}</option>)}
+            </select>
+            {membres.filter((m) => m.compteActive).length === 0 && (
+              <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>Aucun membre avec un compte activé pour l'instant.</div>
+            )}
           </div>
 
           {resetMembreErreur && (
@@ -3140,7 +3156,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               </div>
               <div>Nouveau mot de passe temporaire : <b>{resetMembreMotDePasse}</b></div>
               <div style={{ color: C.sub, fontSize: "10.5px", marginTop: "4px" }}>
-                Communique-le à {showResetMembre?.nom} — il devra le changer dès sa prochaine connexion.
+                À communiquer au membre — il devra le changer dès sa prochaine connexion.
               </div>
             </div>
           )}
@@ -3150,10 +3166,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               disabled={resetMembreEnCours}
               style={{ marginTop: "6px", background: C.vifViolet, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: resetMembreEnCours ? "default" : "pointer" }}
               onClick={async () => {
+                if (!resetMembreId) { setResetMembreErreur("Sélectionne un membre."); return; }
                 setResetMembreEnCours(true);
                 setResetMembreErreur("");
                 try {
-                  const nouveauMdp = await reinitialiserMotDePasseMembre(showResetMembre.email);
+                  const membreChoisi = membres.find((m) => m.id === resetMembreId);
+                  const nouveauMdp = await reinitialiserMotDePasseMembre(membreChoisi.email);
                   setResetMembreMotDePasse(nouveauMdp);
                 } catch (e) {
                   console.error("Erreur de réinitialisation", e);
