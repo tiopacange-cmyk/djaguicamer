@@ -2063,6 +2063,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               if (!evenementBeneficiaire) { setEvenementError("Sélectionnez un membre bénéficiaire à jour."); setEvenementSuccess(false); return; }
               if (!montantBrut || montantBrut <= 0) { setEvenementError("Saisissez un montant brut valide."); setEvenementSuccess(false); return; }
               if (!touteReunion && delegues.length === 0) { setEvenementError("Sélectionnez au moins un délégué, ou coche 'Toute la réunion'."); setEvenementSuccess(false); return; }
+              const dejaBeneficie = evenements.some((e) => e.beneficiaireId === evenementBeneficiaire && e.typeId === typeEvenementId);
+              if (dejaBeneficie) {
+                setEvenementError("Ce membre a déjà bénéficié d'une aide de cette catégorie — il n'est pas éligible une seconde fois.");
+                setEvenementSuccess(false);
+                return;
+              }
               try {
                 await declarerEvenement(groupId, {
                   typeId: typeEvenementId,
