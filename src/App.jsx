@@ -7,6 +7,7 @@ import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistor
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
 import { fetchComptesBancaires, creerCompteBancaire, fetchSignataires, ajouterSignataire, fetchMouvementsCompte, creerMouvementExterne, fetchCategoriesFrais, creerCategorieFrais, supprimerCategorieFrais, joindreRecu } from "./lib/depots_retrait";
 import { fetchRapportJournalier } from "./lib/rapports";
+import { envoyerSMS } from "./lib/sms";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
@@ -936,6 +937,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [tontineError, setTontineError] = useState("");
   const [tontineSuccess, setTontineSuccess] = useState(false);
   const [showPayout, setShowPayout] = useState(null);
+  const [rappelEnCours, setRappelEnCours] = useState(false);
+  const [rappelMessage, setRappelMessage] = useState("");
   const [showEnchere, setShowEnchere] = useState(false);
   const [enchereTour, setEnchereTour] = useState(null);
   const [enchereBeneficiaire, setEnchereBeneficiaire] = useState("");
@@ -1486,6 +1489,29 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 {tontineActive && (
                   <button style={btnSecondary} onClick={() => setShowCotisationTontine(true)}><Plus size={15} /> Enregistrer une cotisation</button>
                 )}
+                {tontineActive && tourEnCours && (
+                  <button
+                    style={btnSecondary}
+                    disabled={rappelEnCours}
+                    onClick={async () => {
+                      setRappelEnCours(true);
+                      try {
+                        const actifs = membres.filter((m) => m.statut === "actif" && m.telephone);
+                        const message = `Rappel : séance de tontine "${tontineActive.nom}" (Tour ${tourEnCours.numero}) prochainement. Merci de préparer votre cotisation.`;
+                        const numeros = actifs.map((m) => m.telephone);
+                        await envoyerSMS({ message, numeros });
+                        setRappelMessage(`Rappel envoyé à ${actifs.length} membre(s).`);
+                      } catch (e) {
+                        console.error("Erreur d'envoi du rappel", e);
+                      } finally {
+                        setRappelEnCours(false);
+                        setTimeout(() => setRappelMessage(""), 3000);
+                      }
+                    }}
+                  >
+                    <Bell size={15} /> {rappelEnCours ? "Envoi..." : "Envoyer un rappel"}
+                  </button>
+                )}
                 {tontineActive && (
                   <button
                     style={btnSecondary}
@@ -1497,6 +1523,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 <button style={btnPrimary} onClick={() => { setTontineNom(""); setTontineMontant(""); setTontineDateDebut(""); setTontineError(""); setTontineSuccess(false); setSeances([]); setModeSaisie("manuel"); setPartsParMembre({}); setShowPartsDetail(false); setShowCreateTontine(true); }}><Plus size={15} /> Créer une tontine</button>
               </div>
             </div>
+            {rappelMessage && (
+              <div style={{ marginTop: "10px", fontSize: "12px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                {rappelMessage}
+              </div>
+            )}
 
             {erreurTontine && (
               <div style={{ marginTop: "16px", fontSize: "12.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>
@@ -2080,6 +2111,18 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   .map((m) => ({ membreId: m.id, montant: cotisationTontineMontants[m.nom], date: versDateISO(cotisationTontineDate) }));
                 await enregistrerCotisationsTontine(tourEnCours.id, cotisations);
                 await rechargerTontine();
+
+                // Notifie chaque membre par SMS de sa cotisation enregistrée
+                cotisations.forEach((c) => {
+                  const membre = membres.find((m) => m.id === c.membreId);
+                  if (membre?.telephone) {
+                    envoyerSMS({
+                      message: `Bonjour ${membre.nom}, votre cotisation tontine de ${fmtFCFA(c.montant)} a bien été enregistrée. Merci !`,
+                      numeros: [membre.telephone],
+                    });
+                  }
+                });
+
                 setCotisationTontineError("");
                 setCotisationTontineDate("");
                 setCotisationTontineMontants({});
