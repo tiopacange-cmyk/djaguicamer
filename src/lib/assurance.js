@@ -64,7 +64,7 @@ export async function fetchSoldesAssurance(groupId, membres, soldeMinimum) {
   if (error) throw error;
 
   const soldesParMembre = Object.fromEntries(data.map((s) => [s.membre_id, s]));
-  const manquants = membres.filter((m) => !soldesParMembre[m.id]);
+  const manquants = membres.filter((m) => m && m.id && !soldesParMembre[m.id]);
 
   if (manquants.length > 0) {
     const lignes = manquants.map((m) => ({ group_id: groupId, membre_id: m.id, solde: soldeMinimum }));
@@ -123,7 +123,7 @@ export async function fetchHistoriqueAssurance(groupId) {
     .from("assurance_mouvements")
     .select(`
       id, type, montant, date_mouvement, solde_apres,
-      membre:group_members ( id, profile:profiles ( nom_complet ) )
+      membre:group_members!membre_id ( id, profile:profiles ( nom_complet ) )
     `)
     .eq("group_id", groupId)
     .order("date_mouvement", { ascending: false });
@@ -168,16 +168,18 @@ export async function fetchEvenements(groupId) {
     .from("assurance_evenements")
     .select(`
       id, lien_avec_membre, date_declaration, frais_declaration, date_evenement,
-      montant_brut, montant_net, toute_reunion, statut, created_at,
+      montant_brut, montant_net, toute_reunion, statut, created_at, type_id,
       type:assurance_types_evenement ( nom ),
-      beneficiaire:group_members ( id, profile:profiles ( nom_complet ) )
+      beneficiaire:group_members!assurance_evenements_membre_beneficiaire_id_fkey ( id, profile:profiles ( nom_complet ) )
     `)
     .eq("group_id", groupId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data.map((e) => ({
     id: e.id,
+    typeId: e.type_id,
     type: e.type?.nom || "—",
+    beneficiaireId: e.beneficiaire?.id || null,
     beneficiaire: e.beneficiaire?.profile?.nom_complet || "—",
     montantBrut: e.montant_brut,
     dateEvenement: e.date_evenement,
