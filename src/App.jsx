@@ -6,6 +6,7 @@ import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTon
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit } from "./lib/banque";
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
 import { fetchComptesBancaires, creerCompteBancaire, fetchSignataires, ajouterSignataire, fetchMouvementsCompte, creerMouvementExterne, fetchCategoriesFrais, creerCategorieFrais, supprimerCategorieFrais, joindreRecu } from "./lib/depots_retrait";
+import { fetchRapportJournalier } from "./lib/rapports";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
@@ -1267,6 +1268,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [inviteIdentifiant, setInviteIdentifiant] = useState("");
   const [inviteMotDePasseTemp, setInviteMotDePasseTemp] = useState("");
   const [showRapportJournalier, setShowRapportJournalier] = useState(false);
+  const [rapportJourDate, setRapportJourDate] = useState("");
+  const [rapportJour, setRapportJour] = useState(null);
+  const [rapportJourChargement, setRapportJourChargement] = useState(false);
+  const [rapportJourErreur, setRapportJourErreur] = useState("");
   const [showRapportMensuel, setShowRapportMensuel] = useState(false);
   const [showExportBilan, setShowExportBilan] = useState(false);
   const [logementType, setLogementType] = useState("Locataire");
@@ -1871,10 +1876,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>
               À présenter à l'assemblée générale. Calculé en direct à partir des données enregistrées dans l'application.
             </p>
-            <div style={{ display: "flex", gap: "14px", marginBottom: "22px" }}>
+            <div style={{ display: "flex", gap: "14px", marginBottom: "22px", flexWrap: "wrap" }}>
               <StatCard label="Total en épargnes" value={fmtFCFA(epargnes.reduce((s, ep) => s + ep.solde, 0))} icon={<Wallet size={16} />} />
+              <StatCard label="Total comptes bancaires" value={fmtFCFA(comptesBancaires.reduce((s, c) => s + (c.solde || 0), 0))} icon={<Building2 size={16} />} />
               <StatCard label="Solde assurance cumulé" value={fmtFCFA(Object.values(assuranceSoldes).reduce((s, a) => s + (a.solde || 0), 0))} icon={<HeartHandshake size={16} />} />
               <StatCard label="Tours effectués" value={`${tours.filter((t) => t.statut === "clôturé").length} / ${tours.length}`} icon={<CheckCircle2 size={16} />} />
+              <StatCard label="Membres" value={`${membres.filter((m) => m.statut === "actif").length} actif(s)`} icon={<Users size={16} />} />
             </div>
 
             <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px" }}>Répartition par module</h2>
@@ -1883,6 +1890,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 ...epargnes.map((ep) => [
                   ep.nom, fmtFCFA(ep.solde),
                   <span style={{ color: C.sub, fontSize: 12 }}>Clôture {ep.cloture} · taux {ep.tauxInteret}</span>,
+                ]),
+                ...comptesBancaires.map((c) => [
+                  c.nom, fmtFCFA(c.solde),
+                  <span style={{ color: C.sub, fontSize: 12 }}>{c.type} · {c.banque || "—"}</span>,
                 ]),
                 [
                   "Tontine",
@@ -1899,11 +1910,16 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   `${prets.filter((p) => p.statut === "en cours").length} prêt(s)`,
                   <span style={{ color: C.sub, fontSize: 12 }}>{prets.filter((p) => p.statut === "remboursé").length} remboursé(s)</span>,
                 ],
+                [
+                  "Membres",
+                  `${membres.filter((m) => m.statut === "actif").length} actif(s)`,
+                  <span style={{ color: C.sub, fontSize: 12 }}>{membres.filter((m) => m.statut === "en attente").length} en attente de validation</span>,
+                ],
               ]}
             />
 
             <div style={{ display: "flex", gap: "10px", marginTop: "22px" }}>
-              <button style={btnSecondary} onClick={() => setShowRapportJournalier(true)}>Rapport journalier</button>
+              <button style={btnSecondary} onClick={() => { setRapportJour(null); setRapportJourDate(""); setRapportJourErreur(""); setShowRapportJournalier(true); }}>Rapport journalier</button>
               <button style={btnSecondary} onClick={() => setShowRapportMensuel(true)}>Rapport mensuel</button>
               <button style={btnPrimary} onClick={() => setShowExportBilan(true)}>Exporter le bilan annuel</button>
             </div>
@@ -2680,14 +2696,111 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       )}
 
       {showRapportJournalier && (
-        <Modal onClose={() => setShowRapportJournalier(false)} title="Rapport journalier">
-          <FormField label="Date de la séance" placeholder="jj/mm/aaaa" />
-          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "9px 11px" }}>
-            Le rapport reprend toutes les cotisations, tours, prêts et aides enregistrés à cette date, prêt à être lu en séance.
-          </div>
-          <button style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }} onClick={() => setShowRapportJournalier(false)}>
-            Générer le rapport
-          </button>
+        <Modal onClose={() => setShowRapportJournalier(false)} title="Rapport journalier" icon={<FileBarChart />} accentColor={C.vifBleu}>
+          {!rapportJour ? (
+            <>
+              <FormField label="Date de la séance" placeholder="jj/mm/aaaa" value={rapportJourDate} onChange={(e) => setRapportJourDate(e.target.value)} />
+              <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "9px 11px" }}>
+                Le rapport reprend toutes les cotisations, versements, amendes, mouvements bancaires et événements d'assurance enregistrés à cette date, tous modules confondus.
+              </div>
+              {rapportJourErreur && (
+                <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                  {rapportJourErreur}
+                </div>
+              )}
+              <button
+                disabled={rapportJourChargement}
+                style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: rapportJourChargement ? "default" : "pointer" }}
+                onClick={async () => {
+                  const iso = versDateISO(rapportJourDate);
+                  if (!iso) { setRapportJourErreur("Saisis une date valide (jj/mm/aaaa)."); return; }
+                  setRapportJourChargement(true);
+                  setRapportJourErreur("");
+                  try {
+                    const data = await fetchRapportJournalier(groupId, iso);
+                    setRapportJour(data);
+                  } catch (e) {
+                    console.error("Erreur de génération du rapport journalier", e);
+                    setRapportJourErreur("Erreur lors de la génération du rapport.");
+                  } finally {
+                    setRapportJourChargement(false);
+                  }
+                }}
+              >
+                {rapportJourChargement ? "Génération..." : "Générer le rapport"}
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: "13px", fontWeight: 700 }}>{rapportJourDate}</div>
+
+              <div style={{ display: "flex", gap: "8px" }}>
+                <div style={{ flex: 1, background: C.ok, borderRadius: "10px", padding: "10px 12px" }}>
+                  <div style={{ fontSize: "10.5px", color: C.accent2 }}>Total encaissé</div>
+                  <div style={{ fontSize: "15px", fontWeight: 700, color: C.accent2 }}>{fmtFCFA(rapportJour.totalEncaisse)}</div>
+                </div>
+                <div style={{ flex: 1, background: C.warnBg, borderRadius: "10px", padding: "10px 12px" }}>
+                  <div style={{ fontSize: "10.5px", color: C.warn }}>Total décaissé</div>
+                  <div style={{ fontSize: "15px", fontWeight: 700, color: C.warn }}>{fmtFCFA(rapportJour.totalDecaisse)}</div>
+                </div>
+              </div>
+
+              {rapportJour.tontineCotisations.length === 0 && rapportJour.tontineVersements.length === 0 && rapportJour.tontineAmendes.length === 0 &&
+               rapportJour.mouvementsEpargne.length === 0 && rapportJour.assuranceMouvements.length === 0 && rapportJour.mouvementsExternes.length === 0 && (
+                <div style={{ fontSize: "12.5px", color: C.sub, textAlign: "center", padding: "10px 0" }}>Aucune activité enregistrée à cette date.</div>
+              )}
+
+              {rapportJour.tontineCotisations.length > 0 && (
+                <RapportSection titre="Tontine — Cotisations">
+                  {rapportJour.tontineCotisations.map((c, i) => (
+                    <RapportLigne key={i} gauche={`${c.membre} — Tour ${c.tourNumero} (${c.tontine})`} droite={fmtFCFA(c.montant)} positif />
+                  ))}
+                </RapportSection>
+              )}
+              {rapportJour.tontineVersements.length > 0 && (
+                <RapportSection titre="Tontine — Bénéficiaires versés">
+                  {rapportJour.tontineVersements.map((v, i) => (
+                    <RapportLigne key={i} gauche={`${v.beneficiaire} — Tour ${v.tourNumero} (${v.tontine})`} droite="Versé" />
+                  ))}
+                </RapportSection>
+              )}
+              {rapportJour.tontineAmendes.length > 0 && (
+                <RapportSection titre="Tontine — Amendes">
+                  {rapportJour.tontineAmendes.map((a, i) => (
+                    <RapportLigne key={i} gauche={`${a.membre}${a.motif ? ` — ${a.motif}` : ""}`} droite={fmtFCFA(a.montant)} />
+                  ))}
+                </RapportSection>
+              )}
+              {rapportJour.mouvementsEpargne.length > 0 && (
+                <RapportSection titre="Banque — Mouvements">
+                  {rapportJour.mouvementsEpargne.map((m, i) => (
+                    <RapportLigne key={i} gauche={`${m.membre} — ${m.epargne}`} droite={fmtFCFA(m.montant)} positif={m.type === "Versement"} />
+                  ))}
+                </RapportSection>
+              )}
+              {rapportJour.assuranceMouvements.length > 0 && (
+                <RapportSection titre="Assurance">
+                  {rapportJour.assuranceMouvements.map((m, i) => (
+                    <RapportLigne key={i} gauche={`${m.membre} — ${m.type}`} droite={fmtFCFA(m.montant)} positif={m.type === "Cotisation"} />
+                  ))}
+                </RapportSection>
+              )}
+              {rapportJour.mouvementsExternes.length > 0 && (
+                <RapportSection titre="Dépôts / Retraits externes">
+                  {rapportJour.mouvementsExternes.map((m, i) => (
+                    <RapportLigne key={i} gauche={`${m.compte} — ${m.type}${m.detail !== "—" ? ` (${m.detail})` : ""}`} droite={fmtFCFA(m.montant)} positif={m.type === "Dépôt" || m.type === "Intérêt"} />
+                  ))}
+                </RapportSection>
+              )}
+
+              <button
+                onClick={() => { setRapportJour(null); setRapportJourDate(""); }}
+                style={{ marginTop: "6px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+              >
+                Choisir une autre date
+              </button>
+            </>
+          )}
         </Modal>
       )}
 
@@ -3998,6 +4111,24 @@ function FormField({ label, placeholder, value, onChange }) {
         onChange={onChange}
         style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
       />
+    </div>
+  );
+}
+
+function RapportSection({ titre, children }) {
+  return (
+    <div>
+      <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", margin: "4px 0 6px" }}>{titre}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>{children}</div>
+    </div>
+  );
+}
+
+function RapportLigne({ gauche, droite, positif }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: "8px", padding: "6px 8px", background: "#FBFAF6", borderRadius: "7px", fontSize: "12px" }}>
+      <span>{gauche}</span>
+      <span style={{ fontWeight: 700, color: positif ? C.accent2 : C.ink, whiteSpace: "nowrap" }}>{droite}</span>
     </div>
   );
 }
