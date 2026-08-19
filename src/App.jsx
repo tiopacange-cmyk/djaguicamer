@@ -4,6 +4,7 @@ import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateCh
 import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit } from "./lib/banque";
+import { fetchConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement } from "./lib/assurance";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
@@ -1229,57 +1230,71 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [evenementMontant, setEvenementMontant] = useState("");
   const [evenementError, setEvenementError] = useState("");
   const [evenementSuccess, setEvenementSuccess] = useState(false);
-  const SOLDE_MIN_ASSURANCE = 80000;
-  const DEFAULT_ASSURANCE = {
-    "Jean Mballa": { solde: 80000, delaiRestant: null },
-    "Sylvie Etoundi": { solde: 80000, delaiRestant: null },
-    "Paul Ngono": { solde: 62000, delaiRestant: "18 jours" },
-    "Rachel Biya": { solde: 80000, delaiRestant: null },
-  };
-  const [assuranceSoldes, setAssuranceSoldes] = useState(DEFAULT_ASSURANCE);
+  const [soldeMinimum, setSoldeMinimum] = useState(80000);
+  const [delaiJoursAssurance, setDelaiJoursAssurance] = useState(60);
+  const [assuranceSoldes, setAssuranceSoldes] = useState({});
   const [evenements, setEvenements] = useState([]);
+  const [chargementAssurance, setChargementAssurance] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await window.storage.get("groupe-batisseurs:assurance", false);
-        if (res && res.value) {
-          const parsed = JSON.parse(res.value);
-          setAssuranceSoldes(parsed.soldes || DEFAULT_ASSURANCE);
-          setEvenements(parsed.evenements || []);
-        }
-      } catch (e) {
-        // Pas encore de données sauvegardées
-      }
-    })();
-  }, []);
-
-  const persistAssurance = async (soldes, evts) => {
-    setAssuranceSoldes(soldes);
-    setEvenements(evts);
+  const rechargerAssurance = async () => {
+    if (!groupId || membres.length === 0) return;
     try {
-      await window.storage.set("groupe-batisseurs:assurance", JSON.stringify({ soldes, evenements: evts }), false);
+      const config = await fetchConfigAssurance(groupId);
+      setSoldeMinimum(config.soldeMinimum);
+      setDelaiJoursAssurance(config.delaiJours);
+      const soldes = await fetchSoldesAssurance(groupId, membres, config.soldeMinimum);
+      setAssuranceSoldes(soldes);
+      const evts = await fetchEvenements(groupId);
+      setEvenements(evts);
     } catch (e) {
-      console.error("Erreur de sauvegarde de l'assurance", e);
+      console.error("Erreur de chargement de l'assurance", e);
+    } finally {
+      setChargementAssurance(false);
     }
   };
-  const [eventTypes, setEventTypes] = useState(["Décès", "Mariage", "Cérémonie", "Autre"]);
-  const [typeEvenement, setTypeEvenement] = useState("Décès");
+
+  useEffect(() => { rechargerAssurance(); }, [groupId, membres.length]);
+  const [eventTypes, setEventTypes] = useState([]);
+  const [typeEvenementId, setTypeEvenementId] = useState("");
   const [showNewType, setShowNewType] = useState(false);
   const [newTypeName, setNewTypeName] = useState("");
 
-  const addEventType = () => {
+  const rechargerTypesEvenement = async () => {
+    if (!groupId) return;
+    try {
+      let types = await fetchTypesEvenement(groupId);
+      if (types.length === 0) {
+        // Première utilisation : on crée les types classiques par défaut
+        for (const nom of ["Décès", "Mariage", "Cérémonie", "Autre"]) {
+          await creerTypeEvenement(groupId, nom);
+        }
+        types = await fetchTypesEvenement(groupId);
+      }
+      setEventTypes(types);
+      if (types.length > 0 && !typeEvenementId) setTypeEvenementId(types[0].id);
+    } catch (e) {
+      console.error("Erreur de chargement des types d'événement", e);
+    }
+  };
+  useEffect(() => { rechargerTypesEvenement(); }, [groupId]);
+
+  const addEventType = async () => {
     if (!newTypeName.trim()) return;
-    setEventTypes([...eventTypes, newTypeName.trim()]);
-    setTypeEvenement(newTypeName.trim());
-    setNewTypeName("");
-    setShowNewType(false);
+    try {
+      const nouveau = await creerTypeEvenement(groupId, newTypeName.trim());
+      setEventTypes([...eventTypes, nouveau]);
+      setTypeEvenementId(nouveau.id);
+      setNewTypeName("");
+      setShowNewType(false);
+    } catch (e) {
+      console.error("Erreur de création du type d'événement", e);
+    }
   };
 
   const [delegues, setDelegues] = useState([]);
   const [touteReunion, setTouteReunion] = useState(false);
-  const toggleDelegue = (nom) => {
-    setDelegues((prev) => (prev.includes(nom) ? prev.filter((n) => n !== nom) : [...prev, nom]));
+  const toggleDelegue = (id) => {
+    setDelegues((prev) => (prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id]));
   };
 
   const [deductions, setDeductions] = useState([{ label: "Transport des délégués", montant: "" }]);
@@ -1289,6 +1304,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   };
   const removeDeduction = (idx) => setDeductions((prev) => prev.filter((_, i) => i !== idx));
   const [cotisationAssuranceDate, setCotisationAssuranceDate] = useState("");
+  const [cotisationAssuranceErreur, setCotisationAssuranceErreur] = useState("");
   const [cotisationAssuranceMontants, setCotisationAssuranceMontants] = useState({});
   const setMontantAssuranceMembre = (nom, val) => {
     setCotisationAssuranceMontants((prev) => ({ ...prev, [nom]: val }));
@@ -1301,8 +1317,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         items={[
           { icon: <Banknote size={16} />, label: "Tontine", key: "tontine" },
           { icon: <PiggyBank size={16} />, label: "Banque", key: "banque" },
-          { icon: <Building2 size={16} />, label: "Dépôt / Retrait externe", key: "depots" },
           { icon: <HeartHandshake size={16} />, label: "Assurance", key: "assurance" },
+          { icon: <Building2 size={16} />, label: "Dépôt / Retrait externe", key: "depots" },
           { icon: <FileBarChart size={16} />, label: "Bilan", key: "bilan" },
           { icon: <UserCog size={16} />, label: "Membres", key: "membres" },
         ]}
@@ -1545,22 +1561,22 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Assurance mutuelle</h1>
-                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>Solde minimum requis : 80 000 FCFA par membre · délai de reconstitution : 60 jours.</p>
+                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>Solde minimum requis : {fmtFCFA(soldeMinimum)} par membre · délai de reconstitution : {delaiJoursAssurance} jours.</p>
               </div>
               <button style={btnSecondary} onClick={() => setShowCotisationAssurance(true)}><Plus size={15} /> Enregistrer une cotisation</button>
             </div>
             <div style={{ marginTop: "22px" }} />
             <Table cols={["Membre", "Solde assurance", "Statut", "Délai restant"]} widths="1.6fr 1.2fr 1fr 1.2fr"
               rows={membres.map((m) => {
-                const info = assuranceSoldes[m.nom] || { solde: 0, delaiRestant: null };
-                const aJour = info.solde >= SOLDE_MIN_ASSURANCE;
+                const info = assuranceSoldes[m.id] || { solde: 0, delai_expire_le: null };
+                const aJour = info.solde >= soldeMinimum;
                 return [
                   m.nom,
                   fmtFCFA(info.solde),
                   aJour
                     ? <Badge bg={C.ok} fg={C.accent2}>à jour</Badge>
                     : <Badge bg={C.warnBg} fg={C.warn}>en reconstitution</Badge>,
-                  aJour ? "—" : (info.delaiRestant || "à définir"),
+                  aJour ? "—" : (info.delai_expire_le || "à définir"),
                 ];
               })}
             />
@@ -1775,11 +1791,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Type d'événement</label>
             <div style={{ display: "flex", gap: "8px" }}>
               <select
-                value={typeEvenement}
-                onChange={(e) => setTypeEvenement(e.target.value)}
+                value={typeEvenementId}
+                onChange={(e) => setTypeEvenementId(e.target.value)}
                 style={{ flex: 1, boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
               >
-                {eventTypes.map((t) => <option key={t}>{t}</option>)}
+                {eventTypes.map((t) => <option key={t.id} value={t.id}>{t.nom}</option>)}
               </select>
               <button
                 onClick={() => setShowNewType(!showNewType)}
@@ -1814,11 +1830,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
             >
               <option value="">Sélectionner un membre</option>
-              {membres.map((m) => {
-                const info = assuranceSoldes[m.nom] || { solde: 0 };
-                const aJour = info.solde >= SOLDE_MIN_ASSURANCE;
+              {membres.filter((m) => m.statut === "actif").map((m) => {
+                const info = assuranceSoldes[m.id] || { solde: 0 };
+                const aJour = info.solde >= soldeMinimum;
                 return (
-                  <option key={m.nom} value={m.nom} disabled={!aJour}>
+                  <option key={m.id} value={m.id} disabled={!aJour}>
                     {m.nom} — {aJour ? "à jour" : "en reconstitution (non éligible)"}
                   </option>
                 );
@@ -1851,9 +1867,9 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </label>
             {!touteReunion && (
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                {membres.map((m) => (
-                  <label key={m.nom} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", cursor: "pointer" }}>
-                    <input type="checkbox" checked={delegues.includes(m.nom)} onChange={() => toggleDelegue(m.nom)} />
+                {membres.filter((m) => m.statut === "actif").map((m) => (
+                  <label key={m.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", cursor: "pointer" }}>
+                    <input type="checkbox" checked={delegues.includes(m.id)} onChange={() => toggleDelegue(m.id)} />
                     {m.nom}
                   </label>
                 ))}
@@ -1920,34 +1936,42 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <button
             style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
-            onClick={() => {
+            onClick={async () => {
               const montantBrut = parseInt(evenementMontant.replace(/[^\d]/g, ""), 10);
               if (!evenementBeneficiaire) { setEvenementError("Sélectionnez un membre bénéficiaire à jour."); setEvenementSuccess(false); return; }
               if (!montantBrut || montantBrut <= 0) { setEvenementError("Saisissez un montant brut valide."); setEvenementSuccess(false); return; }
-              const part = montantBrut / membres.length;
-              const nouveauxSoldes = { ...assuranceSoldes };
-              membres.forEach((m) => {
-                const actuel = nouveauxSoldes[m.nom] || { solde: SOLDE_MIN_ASSURANCE, delaiRestant: null };
-                const nouveauSolde = Math.max(0, actuel.solde - part);
-                nouveauxSoldes[m.nom] = {
-                  solde: nouveauSolde,
-                  delaiRestant: nouveauSolde < SOLDE_MIN_ASSURANCE ? (actuel.delaiRestant || "60 jours") : null,
-                };
-              });
-              const nouvelEvenement = {
-                type: typeEvenement, beneficiaire: evenementBeneficiaire, montant: montantBrut,
-                delegues: touteReunion ? "Toute la réunion" : delegues.join(", "),
-              };
-              persistAssurance(nouveauxSoldes, [...evenements, nouvelEvenement]);
-              setEvenementError("");
-              setEvenementSuccess(true);
-              setTimeout(() => {
-                setShowDeclarerEvenement(false);
+              if (!touteReunion && delegues.length === 0) { setEvenementError("Sélectionnez au moins un délégué, ou coche 'Toute la réunion'."); setEvenementSuccess(false); return; }
+              try {
+                await declarerEvenement(groupId, {
+                  typeId: typeEvenementId,
+                  beneficiaireId: evenementBeneficiaire,
+                  lienAvecMembre: null,
+                  dateDeclaration: null,
+                  fraisDeclaration: 0,
+                  dateEvenement: null,
+                  montantBrut,
+                  touteReunion,
+                  deleguesIds: delegues,
+                  deductions,
+                  membresGroupe: membres.filter((m) => m.statut === "actif"),
+                  soldeMinimum,
+                  delaiJours: delaiJoursAssurance,
+                });
+                await rechargerAssurance();
+                setEvenementError("");
+                setEvenementSuccess(true);
+                setTimeout(() => {
+                  setShowDeclarerEvenement(false);
+                  setEvenementSuccess(false);
+                  setEvenementBeneficiaire(""); setEvenementMontant("");
+                  setDelegues([]); setTouteReunion(false);
+                  setDeductions([{ label: "Transport des délégués", montant: "" }]);
+                }, 1400);
+              } catch (e) {
+                console.error("Erreur de déclaration de l'événement", e);
+                setEvenementError(e.message || "Erreur lors de la déclaration.");
                 setEvenementSuccess(false);
-                setEvenementBeneficiaire(""); setEvenementMontant("");
-                setDelegues([]); setTouteReunion(false);
-                setDeductions([{ label: "Transport des délégués", montant: "" }]);
-              }, 1400);
+              }
             }}
           >
             Déclarer l'événement et prélever l'aide
@@ -1987,7 +2011,30 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
             Ces montants viennent reconstituer le solde d'assurance de chaque membre vers le minimum requis.
           </div>
-          <button style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }} onClick={() => setShowCotisationAssurance(false)}>
+          {cotisationAssuranceErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {cotisationAssuranceErreur}
+            </div>
+          )}
+          <button
+            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            onClick={async () => {
+              try {
+                const cotisations = membres
+                  .filter((m) => cotisationAssuranceMontants[m.nom])
+                  .map((m) => ({ membreId: m.id, montant: cotisationAssuranceMontants[m.nom] }));
+                await enregistrerCotisationsAssurance(groupId, cotisations, soldeMinimum);
+                await rechargerAssurance();
+                setCotisationAssuranceErreur("");
+                setCotisationAssuranceDate("");
+                setCotisationAssuranceMontants({});
+                setShowCotisationAssurance(false);
+              } catch (e) {
+                console.error("Erreur d'enregistrement des cotisations assurance", e);
+                setCotisationAssuranceErreur(e.message || "Erreur lors de l'enregistrement.");
+              }
+            }}
+          >
             Enregistrer les cotisations
           </button>
         </Modal>
