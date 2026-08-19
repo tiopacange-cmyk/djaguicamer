@@ -26,9 +26,12 @@ export async function fetchGroupes() {
 }
 
 // Crée un nouveau groupe + un compte admin pour ce groupe.
+// L'admin reçoit tout de suite un vrai compte de connexion, avec
+// un identifiant court (dérivé de son nom) pour se connecter facilement.
 export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, formule = "Essai" }) {
   const motDePasseTemp = genererMotDePasseTemp();
   const identifiantBase = genererIdentifiant(adminNom);
+  // Ajoute un petit suffixe aléatoire pour limiter les risques de collision
   const identifiant = `${identifiantBase}${Math.floor(10 + Math.random() * 90)}`;
 
   const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -40,7 +43,7 @@ export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, fo
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .insert({ auth_user_id: authData.user.id, nom_complet: adminNom, email: adminEmail, identifiant })
+    .insert({ auth_user_id: authData.user.id, nom_complet: adminNom, email: adminEmail, identifiant, doit_changer_mdp: true })
     .select()
     .single();
   if (profileError) throw profileError;
@@ -86,6 +89,9 @@ export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, fo
 // (sans email, pour un accès immédiat)
 // ============================================================
 
+// Liste tous les admins/présidents de tous les groupes, pour que
+// le Super Admin les choisisse dans une liste plutôt que de taper
+// un email
 export async function fetchAdminsDesGroupes() {
   const { data, error } = await supabase
     .from("group_members")
@@ -110,6 +116,9 @@ export async function fetchAdminsDesGroupes() {
     }));
 }
 
+// Réinitialise directement le mot de passe (sans email), génère
+// un nouveau mot de passe temporaire, et marque que la personne
+// devra en choisir un nouveau à sa prochaine connexion.
 export async function reinitialiserMotDePasseDirect(email, groupId, groupNom) {
   const motDePasseTemp = genererMotDePasseTemp();
 
@@ -130,6 +139,8 @@ export async function reinitialiserMotDePasseDirect(email, groupId, groupNom) {
   return motDePasseTemp;
 }
 
+// Change son propre mot de passe (utilisé après une réinitialisation
+// d'urgence, à la prochaine connexion)
 export async function changerMotDePasse(nouveauMotDePasse) {
   const { error } = await supabase.auth.updateUser({ password: nouveauMotDePasse });
   if (error) throw error;
