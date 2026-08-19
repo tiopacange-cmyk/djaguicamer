@@ -5,7 +5,7 @@ import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialise
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit } from "./lib/banque";
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
-import { fetchComptesBancaires, creerCompteBancaire, fetchSignataires, ajouterSignataire, fetchMouvementsCompte, creerMouvementExterne } from "./lib/depots_retrait";
+import { fetchComptesBancaires, creerCompteBancaire, fetchSignataires, ajouterSignataire, fetchMouvementsCompte, creerMouvementExterne, fetchCategoriesFrais, creerCategorieFrais, supprimerCategorieFrais, joindreRecu } from "./lib/depots_retrait";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
@@ -1049,6 +1049,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [depotMontant, setDepotMontant] = useState("");
   const [depotMotif, setDepotMotif] = useState("");
   const [depotCategorie, setDepotCategorie] = useState("");
+  const [categoriesFrais, setCategoriesFrais] = useState([]);
+  const [showNewCategorieFrais, setShowNewCategorieFrais] = useState(false);
+  const [newCategorieFraisNom, setNewCategorieFraisNom] = useState("");
+  const [responsablesFrais, setResponsablesFrais] = useState([]);
+  const [joindreRecuEnCours, setJoindreRecuEnCours] = useState(null);
   const [depotBanque, setDepotBanque] = useState("");
   const [depotMembreSimple, setDepotMembreSimple] = useState("");
   const [depotError, setDepotError] = useState("");
@@ -1088,6 +1093,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       const comptes = await fetchComptesBancaires(groupId);
       setComptesBancaires(comptes);
       if (comptes.length > 0 && !compteActifId) setCompteActifId(comptes[0].id);
+      const cats = await fetchCategoriesFrais(groupId);
+      setCategoriesFrais(cats);
     } catch (e) {
       console.error("Erreur de chargement des comptes bancaires", e);
     } finally {
@@ -1617,7 +1624,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
 
             <div style={{ marginTop: "16px" }} />
-            <Table cols={["Date", "Type", "Montant", "Signataire", "Motif / Catégorie", "Solde du compte", "Statut"]} widths="0.8fr 0.7fr 0.9fr 1fr 1.3fr 1.1fr 1fr"
+            <Table cols={["Date", "Type", "Montant", "Signataire", "Motif / Catégorie", "Solde du compte", "Statut"]} widths="0.7fr 0.7fr 0.85fr 0.9fr 1.1fr 1fr 1.3fr"
               rows={depots.map((d) => {
                 const typeStyle = {
                   "Dépôt": { bg: C.ok, fg: C.accent2 },
@@ -1633,11 +1640,31 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   d.signataire,
                   <span style={{ color: C.sub, fontSize: 12 }}>{d.type === "Frais" ? d.categorie : d.motif}</span>,
                   <b style={{ fontSize: 12.5 }}>{d.solde}</b>,
-                  <Badge bg={d.statut === "reçu joint" ? C.ok : C.warnBg} fg={d.statut === "reçu joint" ? C.accent2 : C.warn}>{d.statut}</Badge>,
+                  d.statut === "reçu joint" ? (
+                    <Badge bg={C.ok} fg={C.accent2}>reçu joint</Badge>
+                  ) : (
+                    <button
+                      disabled={joindreRecuEnCours === d.id}
+                      onClick={async () => {
+                        setJoindreRecuEnCours(d.id);
+                        try {
+                          await joindreRecu(d.id);
+                          await rechargerDepots();
+                        } catch (e) {
+                          console.error("Erreur lors de la jointure du reçu", e);
+                        } finally {
+                          setJoindreRecuEnCours(null);
+                        }
+                      }}
+                      style={{ background: C.warnBg, color: C.warn, border: `1px solid ${C.warn}44`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: joindreRecuEnCours === d.id ? "default" : "pointer" }}
+                    >
+                      {joindreRecuEnCours === d.id ? "..." : "Joindre le reçu"}
+                    </button>
+                  ),
                 ];
               })} />
             <div style={{ fontSize: "11px", color: C.sub, marginTop: "10px" }}>
-              À chaque retour de séance, le signataire doit joindre le reçu à la ligne correspondante. Un retrait doit toujours préciser son motif (ex. décaissement de prêt, versement de cagnotte).
+              Le mouvement peut être enregistré tout de suite, et le reçu joint plus tard au retour de la banque — sans jamais modifier les autres données déjà enregistrées.
             </div>
           </>
         )}
@@ -3052,17 +3079,98 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           {typeMouvementBanque === "Frais" && (
             <div>
               <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Catégorie de frais</label>
-              <select
-                value={depotCategorie}
-                onChange={(e) => setDepotCategorie(e.target.value)}
-                style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
-              >
-                <option value="">Sélectionner une catégorie</option>
-                <option>Frais SMS</option>
-                <option>Tenue de compte</option>
-                <option>Frais de virement</option>
-                <option>Autre</option>
-              </select>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <select
+                  value={depotCategorie}
+                  onChange={(e) => setDepotCategorie(e.target.value)}
+                  style={{ flex: 1, boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+                >
+                  <option value="">Sélectionner une catégorie</option>
+                  {categoriesFrais.map((c) => <option key={c.id} value={c.nom}>{c.nom}</option>)}
+                </select>
+                <button
+                  onClick={() => setShowNewCategorieFrais(!showNewCategorieFrais)}
+                  style={{ background: C.ok, color: C.accent2, border: `1px solid ${C.accent2}33`, borderRadius: "9px", padding: "0 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+              {showNewCategorieFrais && (
+                <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+                  <input
+                    value={newCategorieFraisNom}
+                    onChange={(e) => setNewCategorieFraisNom(e.target.value)}
+                    placeholder="Ex. Frais de dossier"
+                    style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!newCategorieFraisNom.trim()) return;
+                      try {
+                        const nouvelle = await creerCategorieFrais(groupId, newCategorieFraisNom.trim());
+                        setCategoriesFrais([...categoriesFrais, nouvelle]);
+                        setDepotCategorie(nouvelle.nom);
+                        setNewCategorieFraisNom("");
+                        setShowNewCategorieFrais(false);
+                      } catch (e) {
+                        console.error("Erreur de création de la catégorie", e);
+                      }
+                    }}
+                    style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "0 12px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+                  >
+                    Ajouter
+                  </button>
+                </div>
+              )}
+              {categoriesFrais.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
+                  {categoriesFrais.map((c) => (
+                    <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "999px", padding: "3px 8px 3px 10px", fontSize: "11px", color: C.sub }}>
+                      {c.nom}
+                      <X
+                        size={11}
+                        style={{ cursor: "pointer" }}
+                        onClick={async () => {
+                          try {
+                            await supprimerCategorieFrais(c.id);
+                            setCategoriesFrais(categoriesFrais.filter((cat) => cat.id !== c.id));
+                            if (depotCategorie === c.nom) setDepotCategorie("");
+                          } catch (e) {
+                            console.error("Erreur de suppression de la catégorie", e);
+                          }
+                        }}
+                      />
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {typeMouvementBanque === "Frais" && (
+            <div>
+              <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Responsable(s) — 1 à 2 personnes</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {membres.filter((m) => m.statut === "actif").map((m) => (
+                  <label key={m.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={responsablesFrais.includes(m.id)}
+                      onChange={() => {
+                        setResponsablesFrais((prev) => {
+                          if (prev.includes(m.id)) return prev.filter((id) => id !== m.id);
+                          if (prev.length >= 2) return prev; // max 2
+                          return [...prev, m.id];
+                        });
+                      }}
+                    />
+                    {m.nom}
+                  </label>
+                ))}
+              </div>
+              <div style={{ fontSize: "11px", color: C.sub, marginTop: "6px" }}>
+                Pas besoin de plusieurs signataires officiels pour un frais — une ou deux personnes suffisent.
+              </div>
             </div>
           )}
 
@@ -3085,7 +3193,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 </div>
               )}
             </div>
-          ) : (
+          ) : typeMouvementBanque === "Retrait" ? (
             <div>
               <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Signataires (2 à 3 requis)</label>
               {signataires.length === 0 ? (
@@ -3110,10 +3218,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   : `${signatairesChoisis.length} signataire(s) sélectionné(s).`}
               </div>
               <div style={{ fontSize: "11px", color: C.sub, marginTop: "4px" }}>
-                Retrait et Frais exigent la validation de plusieurs signataires officiels.
+                Un retrait exige la validation de 2 à 3 signataires officiels.
               </div>
             </div>
-          )}
+          ) : null}
 
           <div>
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>
@@ -3160,8 +3268,9 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               if (!montantNum || montantNum <= 0) { setDepotError("Saisissez un montant valide."); setDepotSuccess(false); return; }
               if (typeMouvementBanque === "Retrait" && !depotMotif.trim()) { setDepotError("Le motif est obligatoire pour un retrait."); setDepotSuccess(false); return; }
               if (typeMouvementBanque === "Frais" && !depotCategorie) { setDepotError("Sélectionnez une catégorie de frais."); setDepotSuccess(false); return; }
+              if (typeMouvementBanque === "Frais" && responsablesFrais.length === 0) { setDepotError("Sélectionnez au moins un responsable pour ce frais."); setDepotSuccess(false); return; }
               if ((typeMouvementBanque === "Dépôt" || typeMouvementBanque === "Intérêt") && !depotMembreSimple) { setDepotError("Sélectionnez un membre."); setDepotSuccess(false); return; }
-              if ((typeMouvementBanque === "Retrait" || typeMouvementBanque === "Frais") && (signatairesChoisis.length < 2 || signatairesChoisis.length > 3)) {
+              if (typeMouvementBanque === "Retrait" && (signatairesChoisis.length < 2 || signatairesChoisis.length > 3)) {
                 setDepotError("Sélectionnez entre 2 et 3 signataires.");
                 setDepotSuccess(false);
                 return;
@@ -3181,7 +3290,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   motif: depotMotif.trim(),
                   categorie: depotCategorie,
                   membreId: depotMembreSimple || null,
-                  signatairesIds: signatairesChoisis,
+                  signatairesIds: typeMouvementBanque === "Frais" ? responsablesFrais : signatairesChoisis,
                   recuJoint,
                 });
                 await rechargerDepots();
@@ -3192,7 +3301,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   setShowNouveauDepot(false);
                   setDepotSuccess(false);
                   setDepotDate(""); setDepotMontant(""); setDepotMotif(""); setDepotCategorie(""); setDepotMembreSimple("");
-                  setSignatairesChoisis([]); setRecuJoint(false);
+                  setSignatairesChoisis([]); setResponsablesFrais([]); setRecuJoint(false);
                 }, 1200);
               } catch (e) {
                 console.error("Erreur d'enregistrement du mouvement", e);
