@@ -79,10 +79,28 @@ export async function getMesGroupes() {
   return data;
 }
 
+// Demande une réinitialisation de mot de passe par email, pour un
+// identifiant donné. Un lien est envoyé à l'email associé ; en
+// cliquant dessus, la personne revient sur l'application et peut
+// choisir un nouveau mot de passe.
+export async function demanderReinitialisationMotDePasse(identifiant) {
+  const { data: email, error: lookupError } = await supabase.rpc(
+    "get_email_pour_identifiant",
+    { p_identifiant: identifiant }
+  );
+  if (lookupError) throw lookupError;
+  if (!email) throw new Error("Identifiant introuvable.");
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin,
+  });
+  if (error) throw error;
+}
+
 // Écoute les changements de connexion/déconnexion en direct
 export function onAuthStateChange(callback) {
-  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-    callback(session);
+  const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    callback(session, event);
   });
   return data.subscription;
 }
