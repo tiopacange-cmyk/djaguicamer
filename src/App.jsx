@@ -3,6 +3,7 @@ import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActif
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere } from "./lib/tontine";
+import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit } from "./lib/banque";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
@@ -1011,31 +1012,29 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
   const tourEnCours = tontineActive?.tours.find((t) => t.statut === "en cours") || null;
 
-  const DEFAULT_PRETS = [
-    { membre: "Paul Ngono", montant: "150 000 FCFA", avaliste: "Rachel Biya", statut: "en cours", echeance: "15 Sept 2026" },
-    { membre: "Sylvie Etoundi", montant: "80 000 FCFA", avaliste: "—", statut: "remboursé", echeance: "02 Juin 2026" },
-  ];
-  const [prets, setPrets] = useState(DEFAULT_PRETS);
+  const [prets, setPrets] = useState([]);
+  const [chargementPrets, setChargementPrets] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await window.storage.get("groupe-batisseurs:prets", false);
-        if (res && res.value) setPrets(JSON.parse(res.value));
-      } catch (e) {
-        // Pas encore de données sauvegardées
-      }
-    })();
-  }, []);
-
-  const persistPrets = async (next) => {
-    setPrets(next);
+  const rechargerPrets = async () => {
+    if (!groupId) return;
     try {
-      await window.storage.set("groupe-batisseurs:prets", JSON.stringify(next), false);
+      const data = await fetchPrets(groupId);
+      setPrets(data.map((p) => ({
+        id: p.id,
+        membre: p.membre,
+        montant: fmtFCFA(p.montant),
+        avaliste: p.avaliste,
+        statut: p.statut,
+        echeance: p.dateFin,
+      })));
     } catch (e) {
-      console.error("Erreur de sauvegarde des prêts", e);
+      console.error("Erreur de chargement des prêts", e);
+    } finally {
+      setChargementPrets(false);
     }
   };
+
+  useEffect(() => { rechargerPrets(); }, [groupId]);
 
   const tourStatus = { "clôturé": { bg: C.ok, fg: C.accent2 }, "en cours": { bg: "#FBF1DC", fg: C.accent }, "à venir": { bg: "#EEE", fg: C.sub } };
 
@@ -1103,13 +1102,29 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [filtreDateDebut, setFiltreDateDebut] = useState("");
   const [filtreDateFin, setFiltreDateFin] = useState("");
   const [bankTab, setBankTab] = useState("apercu");
-  const historiqueBanque = [
-    { date: "12 Août 2026", membre: "Jean Mballa", epargne: "Banque scolaire", type: "Versement", montant: "+40 000 FCFA", solde: "1 240 000 FCFA" },
-    { date: "10 Août 2026", membre: "Paul Ngono", epargne: "Banque scolaire", type: "Retrait", montant: "-150 000 FCFA", solde: "1 200 000 FCFA" },
-    { date: "05 Août 2026", membre: "Rachel Biya", epargne: "Banque annuelle", type: "Versement", montant: "+60 000 FCFA", solde: "3 850 000 FCFA" },
-    { date: "28 Juil 2026", membre: "Sylvie Etoundi", epargne: "Épargne — Achat terrain", type: "Versement", montant: "+20 000 FCFA", solde: "620 000 FCFA" },
-    { date: "22 Juil 2026", membre: "Sylvie Etoundi", epargne: "Banque scolaire", type: "Retrait", montant: "-80 000 FCFA", solde: "1 350 000 FCFA" },
-  ];
+  const [historiqueBanque, setHistoriqueBanque] = useState([]);
+  const [chargementHistoriqueBanque, setChargementHistoriqueBanque] = useState(true);
+
+  const rechargerHistoriqueBanque = async () => {
+    if (!groupId) return;
+    try {
+      const data = await fetchHistoriqueEpargnes(groupId);
+      setHistoriqueBanque(data.map((m) => ({
+        date: m.date,
+        membre: m.membre,
+        epargne: m.epargne,
+        type: m.type,
+        montant: `${m.type === "Versement" ? "+" : "-"}${fmtFCFA(m.montant)}`,
+        solde: fmtFCFA(m.solde),
+      })));
+    } catch (e) {
+      console.error("Erreur de chargement de l'historique", e);
+    } finally {
+      setChargementHistoriqueBanque(false);
+    }
+  };
+
+  useEffect(() => { rechargerHistoriqueBanque(); }, [groupId]);
   const [showInviteMember, setShowInviteMember] = useState(false);
   const [inviteNom, setInviteNom] = useState("");
   const [inviteTelephone, setInviteTelephone] = useState("");
@@ -1155,44 +1170,39 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [epargneCloture, setEpargneCloture] = useState("");
   const [epargneError, setEpargneError] = useState("");
   const [epargneSuccess, setEpargneSuccess] = useState(false);
-  const DEFAULT_EPARGNES = [
-    { nom: "Banque scolaire", type: "Banque scolaire", solde: 1240000, cotisation: "Séance", tauxInteret: "5 %", cloture: "31 Août 2026" },
-    { nom: "Banque annuelle", type: "Banque annuelle", solde: 3850000, cotisation: "Séance", tauxInteret: "5 %", cloture: "31 Déc 2026" },
-    { nom: "Épargne — Achat terrain", type: "Personnalisée", solde: 620000, cotisation: "Séance", tauxInteret: "0 %", cloture: "Cycle personnalisé" },
-  ];
-  const [epargnes, setEpargnes] = useState(DEFAULT_EPARGNES);
+  const [epargnes, setEpargnes] = useState([]);
+  const [chargementEpargnes, setChargementEpargnes] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await window.storage.get("groupe-batisseurs:epargnes", false);
-        if (res && res.value) setEpargnes(JSON.parse(res.value));
-      } catch (e) {
-        // Pas encore de données sauvegardées, on garde les valeurs par défaut
-      }
-    })();
-  }, []);
-
-  const persistEpargnes = async (next) => {
-    setEpargnes(next);
+  const rechargerEpargnes = async () => {
+    if (!groupId) return;
     try {
-      await window.storage.set("groupe-batisseurs:epargnes", JSON.stringify(next), false);
+      const data = await fetchEpargnes(groupId);
+      setEpargnes(data);
     } catch (e) {
-      console.error("Erreur de sauvegarde des épargnes", e);
+      console.error("Erreur de chargement des épargnes", e);
+    } finally {
+      setChargementEpargnes(false);
     }
   };
+
+  useEffect(() => { rechargerEpargnes(); }, [groupId]);
   const [showCotisationBanque, setShowCotisationBanque] = useState(false);
   const [showCreditForm, setShowCreditForm] = useState(false);
   const CAUTION_DEFAUT = 100000;
-  const [creditMembre, setCreditMembre] = useState("");
+  const [creditEpargneId, setCreditEpargneId] = useState("");
+  const [creditMembreId, setCreditMembreId] = useState("");
   const [creditMontant, setCreditMontant] = useState("");
+  const [creditFraisDossier, setCreditFraisDossier] = useState("");
+  const [creditCommission, setCreditCommission] = useState("");
+  const [creditPenalite, setCreditPenalite] = useState("");
   const [creditDebut, setCreditDebut] = useState("");
   const [creditFin, setCreditFin] = useState("");
-  const [creditAvaliste, setCreditAvaliste] = useState("");
+  const [creditAvalisteId, setCreditAvalisteId] = useState("");
   const [creditError, setCreditError] = useState("");
   const [creditSuccess, setCreditSuccess] = useState(false);
   const [creditDepasseCaution, setCreditDepasseCaution] = useState(false);
-  const [cotisationEpargne, setCotisationEpargne] = useState("Banque scolaire");
+  const [cotisationEpargneId, setCotisationEpargneId] = useState("");
+  const [cotisationBanqueErreur, setCotisationBanqueErreur] = useState("");
   const [cotisationDate, setCotisationDate] = useState("");
   const [cotisationMontants, setCotisationMontants] = useState({});
 
@@ -1400,7 +1410,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>Banque scolaire, banque annuelle, et épargnes personnalisées.</p>
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
-                <button style={btnSecondary} onClick={() => setShowCotisationBanque(true)}><Plus size={15} /> Enregistrer une cotisation</button>
+                <button style={btnSecondary} onClick={() => { setCotisationEpargneId(""); setCotisationDate(""); setCotisationMontants({}); setCotisationBanqueErreur(""); setShowCotisationBanque(true); }}><Plus size={15} /> Enregistrer une cotisation</button>
                 <button style={btnPrimary} onClick={() => { setEpargneNom(""); setEpargneCotisation(""); setEpargneTaux(""); setEpargneCloture(""); setEpargneType("Personnalisée"); setEpargneError(""); setEpargneSuccess(false); setShowCreateEpargne(true); }}><Plus size={15} /> Créer une épargne</button>
               </div>
             </div>
@@ -1433,7 +1443,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "10px 0" }}>
                   <h2 style={{ fontSize: "15px", fontWeight: 700, margin: 0 }}>Prêts en cours — Banque scolaire</h2>
-                  <button style={btnSecondary} onClick={() => { setCreditMembre(""); setCreditMontant(""); setCreditDebut(""); setCreditFin(""); setCreditDepasseCaution(false); setCreditAvaliste(""); setCreditError(""); setCreditSuccess(false); setShowCreditForm(true); }}><Plus size={14} /> Mettre en place un crédit</button>
+                  <button style={btnSecondary} onClick={() => { setCreditEpargneId(""); setCreditMembreId(""); setCreditMontant(""); setCreditFraisDossier(""); setCreditCommission(""); setCreditPenalite(""); setCreditDebut(""); setCreditFin(""); setCreditDepasseCaution(false); setCreditAvalisteId(""); setCreditError(""); setCreditSuccess(false); setShowCreditForm(true); }}><Plus size={14} /> Mettre en place un crédit</button>
                 </div>
                 <Table cols={["Membre", "Montant", "Avaliste", "Statut", "Échéance"]} widths="1.4fr 1fr 1.2fr 1fr 1fr"
                   rows={prets.map((p) => [p.membre, p.montant, p.avaliste, <Badge bg={p.statut === "remboursé" ? C.ok : "#FBF1DC"} fg={p.statut === "remboursé" ? C.accent2 : C.accent}>{p.statut}</Badge>, p.echeance])} />
@@ -2017,29 +2027,34 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <button
             style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
-            onClick={() => {
+            onClick={async () => {
               if (!epargneNom.trim()) { setEpargneError("Le nom de l'épargne est obligatoire."); setEpargneSuccess(false); return; }
               if (epargnes.some((ep) => ep.nom.toLowerCase() === epargneNom.trim().toLowerCase())) {
                 setEpargneError("Une épargne porte déjà ce nom.");
                 setEpargneSuccess(false);
                 return;
               }
-              const nouvelle = {
-                nom: epargneNom.trim(),
-                type: epargneType,
-                solde: 0,
-                cotisation: epargneCotisation.trim() || "—",
-                tauxInteret: epargneTaux.trim() || "—",
-                cloture: epargneCloture.trim() || "—",
-              };
-              persistEpargnes([...epargnes, nouvelle]);
-              setEpargneError("");
-              setEpargneSuccess(true);
-              setTimeout(() => {
-                setShowCreateEpargne(false);
+              try {
+                await creerEpargne(groupId, {
+                  nom: epargneNom.trim(),
+                  type: epargneType,
+                  cotisationParSeance: epargneCotisation.trim() || null,
+                  tauxInteret: epargneTaux.trim() || null,
+                  dateCloture: versDateISO(epargneCloture),
+                });
+                await rechargerEpargnes();
+                setEpargneError("");
+                setEpargneSuccess(true);
+                setTimeout(() => {
+                  setShowCreateEpargne(false);
+                  setEpargneSuccess(false);
+                  setEpargneNom(""); setEpargneCotisation(""); setEpargneTaux(""); setEpargneCloture(""); setEpargneType("Personnalisée");
+                }, 1200);
+              } catch (e) {
+                console.error("Erreur de création de l'épargne", e);
+                setEpargneError(e.message || "Erreur lors de la création.");
                 setEpargneSuccess(false);
-                setEpargneNom(""); setEpargneCotisation(""); setEpargneTaux(""); setEpargneCloture(""); setEpargneType("Personnalisée");
-              }, 1200);
+              }
             }}
           >
             Créer l'épargne
@@ -2052,12 +2067,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <div>
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Épargne concernée</label>
             <select
-              value={cotisationEpargne}
-              onChange={(e) => setCotisationEpargne(e.target.value)}
+              value={cotisationEpargneId}
+              onChange={(e) => setCotisationEpargneId(e.target.value)}
               style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
             >
+              <option value="">Sélectionner une épargne</option>
               {epargnes.map((ep) => (
-                <option key={ep.nom}>{ep.nom}</option>
+                <option key={ep.id} value={ep.id}>{ep.nom}</option>
               ))}
             </select>
           </div>
@@ -2095,7 +2111,33 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
             La date du dépôt sert au calcul des intérêts au prorata à la clôture du cycle. Laissez vide un membre qui n'a pas cotisé.
           </div>
-          <button style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }} onClick={() => setShowCotisationBanque(false)}>
+          {cotisationBanqueErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {cotisationBanqueErreur}
+            </div>
+          )}
+          <button
+            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            onClick={async () => {
+              if (!cotisationEpargneId) { setCotisationBanqueErreur("Sélectionne une épargne."); return; }
+              if (!cotisationDate.trim()) { setCotisationBanqueErreur("La date du dépôt est obligatoire."); return; }
+              try {
+                const cotisations = membres
+                  .filter((m) => cotisationMontants[m.nom])
+                  .map((m) => ({ membreId: m.id, montant: cotisationMontants[m.nom], date: versDateISO(cotisationDate) }));
+                await enregistrerCotisationsEpargne(cotisationEpargneId, cotisations);
+                await rechargerEpargnes();
+                await rechargerHistoriqueBanque();
+                setCotisationBanqueErreur("");
+                setCotisationDate("");
+                setCotisationMontants({});
+                setShowCotisationBanque(false);
+              } catch (e) {
+                console.error("Erreur d'enregistrement des cotisations banque", e);
+                setCotisationBanqueErreur(e.message || "Erreur lors de l'enregistrement.");
+              }
+            }}
+          >
             Enregistrer les cotisations
           </button>
         </Modal>
@@ -2104,19 +2146,30 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showCreditForm && (
         <Modal onClose={() => setShowCreditForm(false)} title="Mettre en place un crédit">
           <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Épargne concernée</label>
+            <select
+              value={creditEpargneId}
+              onChange={(e) => setCreditEpargneId(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+            >
+              <option value="">Sélectionner une épargne</option>
+              {epargnes.map((ep) => <option key={ep.id} value={ep.id}>{ep.nom} ({fmtFCFA(ep.solde)} disponible)</option>)}
+            </select>
+          </div>
+          <div>
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Membre emprunteur</label>
             <select
-              value={creditMembre}
-              onChange={(e) => setCreditMembre(e.target.value)}
+              value={creditMembreId}
+              onChange={(e) => setCreditMembreId(e.target.value)}
               style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
             >
               <option value="">Sélectionner un membre</option>
-              {membres.map((m) => <option key={m.nom} value={m.nom}>{m.nom}</option>)}
+              {membres.filter((m) => m.statut === "actif").map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
             </select>
           </div>
           <FormField label="Montant du prêt" placeholder="Ex. 150 000 FCFA" value={creditMontant} onChange={(e) => setCreditMontant(e.target.value)} />
-          <FormField label="Frais de dossier" placeholder="Ex. 5 000 FCFA" />
-          <FormField label="Commission du prêt" placeholder="Ex. 2 %" />
+          <FormField label="Frais de dossier" placeholder="Ex. 5 000 FCFA" value={creditFraisDossier} onChange={(e) => setCreditFraisDossier(e.target.value)} />
+          <FormField label="Commission du prêt" placeholder="Ex. 2 %" value={creditCommission} onChange={(e) => setCreditCommission(e.target.value)} />
 
           <div style={{ display: "flex", gap: "10px" }}>
             <div style={{ flex: 1 }}>
@@ -2127,7 +2180,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
           </div>
 
-          <FormField label="Pénalité en cas de non-remboursement" placeholder="Ex. 3 % du solde dû par mois de retard" />
+          <FormField label="Pénalité en cas de non-remboursement" placeholder="Ex. 3 % du solde dû par mois de retard" value={creditPenalite} onChange={(e) => setCreditPenalite(e.target.value)} />
 
           <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
             Le taux ou montant de pénalité est fixé par l'admin du groupe et s'applique automatiquement dès l'échéance dépassée.
@@ -2150,13 +2203,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             <div>
               <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Avaliste (garant)</label>
               <select
-                value={creditAvaliste}
-                onChange={(e) => setCreditAvaliste(e.target.value)}
+                value={creditAvalisteId}
+                onChange={(e) => setCreditAvalisteId(e.target.value)}
                 style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
               >
                 <option value="">Sélectionner un avaliste</option>
-                <option>Rachel Biya — capacité restante 450 000 FCFA</option>
-                <option>Jean Mballa — capacité restante 200 000 FCFA</option>
+                {membres.filter((m) => m.statut === "actif" && m.id !== creditMembreId).map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
               </select>
               <div style={{ fontSize: "11px", color: C.sub, marginTop: "6px" }}>
                 Un avaliste peut garantir plusieurs membres tant que la somme des montants garantis ne dépasse pas ses avoirs.
@@ -2177,9 +2229,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <button
             style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
-            onClick={() => {
+            onClick={async () => {
               const montantNum = parseInt(creditMontant.replace(/[^\d]/g, ""), 10);
-              if (!creditMembre) { setCreditError("Sélectionnez le membre emprunteur."); setCreditSuccess(false); return; }
+              if (!creditEpargneId) { setCreditError("Sélectionnez l'épargne concernée."); setCreditSuccess(false); return; }
+              if (!creditMembreId) { setCreditError("Sélectionnez le membre emprunteur."); setCreditSuccess(false); return; }
               if (!montantNum || montantNum <= 0) { setCreditError("Saisissez un montant de prêt valide."); setCreditSuccess(false); return; }
               if (!creditDebut.trim() || !creditFin.trim()) { setCreditError("Les dates de début et de fin sont obligatoires."); setCreditSuccess(false); return; }
               if (montantNum > CAUTION_DEFAUT && !creditDepasseCaution) {
@@ -2187,27 +2240,46 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 setCreditSuccess(false);
                 return;
               }
-              if (creditDepasseCaution && !creditAvaliste) {
+              if (creditDepasseCaution && !creditAvalisteId) {
                 setCreditError("Sélectionnez un avaliste pour ce crédit.");
                 setCreditSuccess(false);
                 return;
               }
-              const nouveauPret = {
-                membre: creditMembre,
-                montant: fmtFCFA(montantNum),
-                avaliste: creditDepasseCaution ? creditAvaliste.split(" — ")[0] : "—",
-                statut: "en cours",
-                echeance: creditFin.trim(),
-              };
-              persistPrets([...prets, nouveauPret]);
-              setCreditError("");
-              setCreditSuccess(true);
-              setTimeout(() => {
-                setShowCreditForm(false);
+              const epargneChoisie = epargnes.find((ep) => ep.id === creditEpargneId);
+              if (epargneChoisie && montantNum > epargneChoisie.solde) {
+                setCreditError(`Le montant dépasse le solde disponible de cette épargne (${fmtFCFA(epargneChoisie.solde)}).`);
                 setCreditSuccess(false);
-                setCreditMembre(""); setCreditMontant(""); setCreditDebut(""); setCreditFin("");
-                setCreditDepasseCaution(false); setCreditAvaliste("");
-              }, 1400);
+                return;
+              }
+              try {
+                await mettreEnPlaceCredit(creditEpargneId, {
+                  membreId: creditMembreId,
+                  montant: montantNum,
+                  fraisDossier: parseInt(creditFraisDossier.replace(/[^\d]/g, ""), 10) || 0,
+                  commission: creditCommission.trim() || null,
+                  dateDebut: versDateISO(creditDebut),
+                  dateFin: versDateISO(creditFin),
+                  penaliteRetard: creditPenalite.trim() || null,
+                  avalisteId: creditDepasseCaution ? creditAvalisteId : null,
+                  montantGaranti: montantNum,
+                });
+                await rechargerPrets();
+                await rechargerEpargnes();
+                await rechargerHistoriqueBanque();
+                setCreditError("");
+                setCreditSuccess(true);
+                setTimeout(() => {
+                  setShowCreditForm(false);
+                  setCreditSuccess(false);
+                  setCreditEpargneId(""); setCreditMembreId(""); setCreditMontant(""); setCreditFraisDossier(""); setCreditCommission(""); setCreditPenalite("");
+                  setCreditDebut(""); setCreditFin("");
+                  setCreditDepasseCaution(false); setCreditAvalisteId("");
+                }, 1400);
+              } catch (e) {
+                console.error("Erreur de mise en place du crédit", e);
+                setCreditError(e.message || "Erreur lors de la mise en place du crédit.");
+                setCreditSuccess(false);
+              }
             }}
           >
             Valider le crédit
