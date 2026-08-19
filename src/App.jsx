@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre } from "./lib/membres";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire } from "./lib/groups";
-import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle } from "./lib/tontine";
+import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere } from "./lib/tontine";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
@@ -807,9 +807,39 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [tontineNom, setTontineNom] = useState("");
   const [tontineMontant, setTontineMontant] = useState("");
   const [tontineDateDebut, setTontineDateDebut] = useState("");
+  const [partsParMembre, setPartsParMembre] = useState({});
+  const [showPartsDetail, setShowPartsDetail] = useState(false);
+
+  const ajusterParts = (membreId, delta) => {
+    setPartsParMembre((prev) => {
+      const actuel = prev[membreId] || 1;
+      const nouveau = Math.max(1, Math.min(6, actuel + delta));
+      return { ...prev, [membreId]: nouveau };
+    });
+  };
+
+  // Construit la liste de rotation en tenant compte des parts :
+  // chaque membre apparaît autant de fois que ses parts, mais réparti
+  // en "manches" successives plutôt que collé (round 1 = tout le monde
+  // une fois, round 2 = ceux qui ont ≥2 parts, etc.)
+  const construireRotationAvecParts = (membresActifs) => {
+    const maxParts = Math.max(1, ...membresActifs.map((m) => partsParMembre[m.id] || 1));
+    const rotation = [];
+    for (let manche = 0; manche < maxParts; manche++) {
+      membresActifs.forEach((m) => {
+        if ((partsParMembre[m.id] || 1) > manche) rotation.push(m);
+      });
+    }
+    return rotation;
+  };
   const [tontineError, setTontineError] = useState("");
   const [tontineSuccess, setTontineSuccess] = useState(false);
   const [showPayout, setShowPayout] = useState(null);
+  const [showEnchere, setShowEnchere] = useState(false);
+  const [enchereTour, setEnchereTour] = useState(null);
+  const [enchereBeneficiaire, setEnchereBeneficiaire] = useState("");
+  const [enchereMontant, setEnchereMontant] = useState("");
+  const [enchereErreur, setEnchereErreur] = useState("");
   const [seances, setSeances] = useState([]);
   const [newDate, setNewDate] = useState("");
   const [modeSaisie, setModeSaisie] = useState("manuel"); // "manuel" | "auto"
@@ -1296,7 +1326,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     <Plus size={15} /> Ajouter un membre au cycle
                   </button>
                 )}
-                <button style={btnPrimary} onClick={() => { setTontineNom(""); setTontineMontant(""); setTontineDateDebut(""); setTontineError(""); setTontineSuccess(false); setSeances([]); setModeSaisie("manuel"); setShowCreateTontine(true); }}><Plus size={15} /> Créer une tontine</button>
+                <button style={btnPrimary} onClick={() => { setTontineNom(""); setTontineMontant(""); setTontineDateDebut(""); setTontineError(""); setTontineSuccess(false); setSeances([]); setModeSaisie("manuel"); setPartsParMembre({}); setShowPartsDetail(false); setShowCreateTontine(true); }}><Plus size={15} /> Créer une tontine</button>
               </div>
             </div>
 
@@ -1314,12 +1344,21 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     t.tour, t.beneficiaire, t.montant, t.mode,
                     <Badge bg={tourStatus[t.statut].bg} fg={tourStatus[t.statut].fg}>{t.statut}</Badge>,
                     t.statut === "en cours" ? (
-                      <button
-                        onClick={() => setShowPayout(t)}
-                        style={{ background: "#2E7D46", color: "#FAF6ED", border: "none", borderRadius: "7px", padding: "6px 12px", fontSize: "11.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}
-                      >
-                        <Banknote size={13} /> Bénéficiaire
-                      </button>
+                      t.mode === "Enchères" && !t.beneficiaireId ? (
+                        <button
+                          onClick={() => { setEnchereTour(t); setEnchereBeneficiaire(""); setEnchereMontant(""); setEnchereErreur(""); setShowEnchere(true); }}
+                          style={{ background: C.vifViolet, color: "#FFFFFF", border: "none", borderRadius: "7px", padding: "6px 12px", fontSize: "11.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}
+                        >
+                          <Gavel size={13} /> Enregistrer l'enchère
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setShowPayout(t)}
+                          style={{ background: "#2E7D46", color: "#FAF6ED", border: "none", borderRadius: "7px", padding: "6px 12px", fontSize: "11.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}
+                        >
+                          <Banknote size={13} /> Bénéficiaire
+                        </button>
+                      )
                     ) : null,
                   ])} />
 
@@ -2713,6 +2752,70 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         </Modal>
       )}
 
+      {showEnchere && enchereTour && tontineActive && (
+        <Modal onClose={() => setShowEnchere(false)} title="Enregistrer l'enchère" icon={<Gavel />} accentColor={C.vifViolet}>
+          <div style={{ fontSize: "12px", color: C.sub }}>
+            Tour {enchereTour.tour} — mode Enchères. Indique qui a remporté l'enchère et pour quel montant.
+          </div>
+
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Gagnant de l'enchère</label>
+            <select
+              value={enchereBeneficiaire}
+              onChange={(e) => setEnchereBeneficiaire(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+            >
+              <option value="">Sélectionner un membre</option>
+              {membres.filter((m) => m.statut === "actif").map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
+            </select>
+          </div>
+
+          <FormField label="Montant de l'enchère (commission)" placeholder="Ex. 22 500 FCFA" value={enchereMontant} onChange={(e) => setEnchereMontant(e.target.value)} />
+
+          {(() => {
+            const cagnotte = tontineActive.montantParTour * membres.filter((m) => m.statut === "actif").length;
+            const montantNum = parseInt(enchereMontant.replace(/[^\d]/g, ""), 10) || 0;
+            return (
+              <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "9px 11px" }}>
+                Cagnotte totale estimée : <b>{fmtFCFA(cagnotte)}</b> ({fmtFCFA(tontineActive.montantParTour)} × {membres.filter((m) => m.statut === "actif").length} membres)<br />
+                Montant net versé au bénéficiaire : <b style={{ color: C.vifVert }}>{fmtFCFA(Math.max(0, cagnotte - montantNum))}</b>
+              </div>
+            );
+          })()}
+
+          <div style={{ fontSize: "11px", color: C.vifViolet, background: `${C.vifViolet}0D`, border: `1px solid ${C.vifViolet}33`, borderRadius: "8px", padding: "8px 10px" }}>
+            Ce montant d'enchère est mis de côté comme commission, redistribuée à tous les membres à la clôture du cycle.
+          </div>
+
+          {enchereErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {enchereErreur}
+            </div>
+          )}
+
+          <button
+            style={{ marginTop: "6px", background: C.vifViolet, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}
+            onClick={async () => {
+              const montantNum = parseInt(enchereMontant.replace(/[^\d]/g, ""), 10);
+              if (!enchereBeneficiaire) { setEnchereErreur("Sélectionne le gagnant de l'enchère."); return; }
+              if (!montantNum || montantNum <= 0) { setEnchereErreur("Saisis un montant d'enchère valide."); return; }
+              const cagnotte = tontineActive.montantParTour * membres.filter((m) => m.statut === "actif").length;
+              if (montantNum >= cagnotte) { setEnchereErreur("Le montant de l'enchère ne peut pas dépasser la cagnotte totale."); return; }
+              try {
+                await enregistrerEnchere(enchereTour.id, enchereBeneficiaire, montantNum, cagnotte);
+                await rechargerTontine();
+                setShowEnchere(false);
+              } catch (e) {
+                console.error("Erreur d'enregistrement de l'enchère", e);
+                setEnchereErreur(e.message || "Erreur lors de l'enregistrement.");
+              }
+            }}
+          >
+            Enregistrer l'enchère
+          </button>
+        </Modal>
+      )}
+
       {showPayout && (
         <Modal onClose={() => setShowPayout(null)} title="Verser la cagnotte">
           <div style={{ textAlign: "center", padding: "6px 0 4px" }}>
@@ -2824,6 +2927,36 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <div style={{ fontSize: "11px", color: C.vifVert, marginTop: "-4px", display: "flex", alignItems: "center", gap: "5px", fontWeight: 600 }}>
             <Users size={13} /> {membres.filter((m) => m.statut === "actif").length} membre(s) actif(s) participent automatiquement, désignés par rotation.
           </div>
+
+          <div>
+            <button
+              onClick={() => setShowPartsDetail(!showPartsDetail)}
+              style={{ background: "transparent", border: "none", padding: 0, fontSize: "11.5px", color: C.vifBleu, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}
+            >
+              <Repeat size={12} /> {showPartsDetail ? "Masquer" : "Un membre prend plusieurs parts ?"}
+            </button>
+            {showPartsDetail && (
+              <div style={{ marginTop: "8px", background: `${C.vifBleu}0D`, border: `1px solid ${C.vifBleu}33`, borderRadius: "10px", padding: "10px" }}>
+                <div style={{ fontSize: "10.5px", color: C.sub, marginBottom: "8px" }}>
+                  Un membre avec plusieurs parts cotise et reçoit plusieurs fois dans ce même cycle.
+                </div>
+                {membres.filter((m) => m.statut === "actif").map((m) => (
+                  <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0" }}>
+                    <span style={{ fontSize: "12.5px", fontWeight: 600 }}>{m.nom}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <button onClick={() => ajusterParts(m.id, -1)} style={{ width: "22px", height: "22px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "#FFFFFF", cursor: "pointer", fontSize: "13px", lineHeight: 1 }}>−</button>
+                      <span style={{ fontSize: "12.5px", fontWeight: 700, color: C.vifBleu, minWidth: "14px", textAlign: "center" }}>{partsParMembre[m.id] || 1}</span>
+                      <button onClick={() => ajusterParts(m.id, 1)} style={{ width: "22px", height: "22px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "#FFFFFF", cursor: "pointer", fontSize: "13px", lineHeight: 1 }}>+</button>
+                    </div>
+                  </div>
+                ))}
+                <div style={{ fontSize: "10.5px", color: C.sub, marginTop: "6px" }}>
+                  Total des parts : <b>{membres.filter((m) => m.statut === "actif").reduce((s, m) => s + (partsParMembre[m.id] || 1), 0)}</b> — idéalement égal au nombre de séances ci-dessous, pour que chaque part reçoive un tour.
+                </div>
+              </div>
+            )}
+          </div>
+
           <div>
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "flex", alignItems: "center", gap: "5px" }}>
               <Repeat size={13} color={C.vifViolet} /> Mode de distribution actuel
@@ -2959,6 +3092,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               if (!montantNum || montantNum <= 0) { setTontineError("Montant invalide."); setTontineSuccess(false); return; }
               try {
                 const membresActifs = membres.filter((m) => m.statut === "actif");
+                const rotationAvecParts = construireRotationAvecParts(membresActifs);
                 const seancesISO = seances.map((s) => ({ ...s, date: versDateISO(s.date) }));
                 const dateDebutAuto = seancesISO.length
                   ? seancesISO.slice().sort((a, b) => a.date.localeCompare(b.date))[0].date
@@ -2967,7 +3101,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   nom: tontineNom.trim(),
                   montantParTour: montantNum,
                   seances: seancesISO,
-                  membresActifs,
+                  membresActifs: rotationAvecParts,
                   dateDebut: dateDebutAuto,
                 });
                 await rechargerTontine();
