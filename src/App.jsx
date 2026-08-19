@@ -32,7 +32,7 @@ import {
   Users, Plus, KeyRound, Search, ShieldAlert, ChevronRight, Building2, X,
   CreditCard, ScrollText, LayoutDashboard, Wallet, Shield, FileBarChart,
   Gavel, Bell, LogOut, Moon, Sun, Lock, ChevronLeft, CheckCircle2, Clock,
-  Banknote, PiggyBank, HeartHandshake, UserCog,
+  Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat,
 } from "lucide-react";
 
 // ---------- Palette partagée ----------
@@ -40,6 +40,8 @@ const C = {
   ink: "#1B2420", sub: "#5B6B5F", accent: "#B8860F", accent2: "#1B4332",
   border: "#E5DFCE", bg: "#FAF6ED", panel: "#FFFFFF", purple: "#6B5FA6",
   warn: "#A44A1F", warnBg: "#F9E4D8", ok: "#E4EFE6",
+  // Couleurs vives par module, pour distinguer les formulaires d'un coup d'œil
+  vifOr: "#E8A317", vifVert: "#16A34A", vifBleu: "#2563EB", vifRose: "#DB2777", vifViolet: "#7C3AED", vifCorail: "#EA580C",
 };
 
 export default function AppPrototype() {
@@ -808,10 +810,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [tontineError, setTontineError] = useState("");
   const [tontineSuccess, setTontineSuccess] = useState(false);
   const [showPayout, setShowPayout] = useState(null);
-  const [seances, setSeances] = useState([
-    { date: "05/09/2026", mode: "Ordre fixe" },
-    { date: "05/10/2026", mode: "Enchères" },
-  ]);
+  const [seances, setSeances] = useState([]);
   const [newDate, setNewDate] = useState("");
   const [modeSaisie, setModeSaisie] = useState("manuel"); // "manuel" | "auto"
   const [autoDateDebut, setAutoDateDebut] = useState("");
@@ -877,14 +876,29 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
     if (dates.length === 0) { setAutoErreur("Aucune date trouvée dans cette période avec ces critères."); return; }
     dates.sort((a, b) => a - b);
     const nouvellesSeances = dates.map((d) => ({ date: formatJJMMAAAA(d), mode: newMode }));
-    setSeances([...seances, ...nouvellesSeances]);
+    // Fusionne avec l'existant, retire les doublons de date, puis trie chronologiquement
+    const fusion = [...seances, ...nouvellesSeances];
+    const datesVues = new Set();
+    const sansDoublons = fusion.filter((s) => {
+      if (datesVues.has(s.date)) return false;
+      datesVues.add(s.date);
+      return true;
+    });
+    sansDoublons.sort((a, b) => (parseJJMMAAAA(a.date) || 0) - (parseJJMMAAAA(b.date) || 0));
+    setSeances(sansDoublons);
   };
 
   const [newMode, setNewMode] = useState("Ordre fixe");
 
   const addSeance = () => {
     if (!newDate.trim()) return;
-    setSeances([...seances, { date: newDate.trim(), mode: newMode }]);
+    if (seances.some((s) => s.date === newDate.trim())) {
+      setNewDate("");
+      return; // cette date existe déjà, on ne l'ajoute pas en double
+    }
+    const fusion = [...seances, { date: newDate.trim(), mode: newMode }];
+    fusion.sort((a, b) => (parseJJMMAAAA(a.date) || 0) - (parseJJMMAAAA(b.date) || 0));
+    setSeances(fusion);
     setNewDate("");
   };
 
@@ -1282,7 +1296,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     <Plus size={15} /> Ajouter un membre au cycle
                   </button>
                 )}
-                <button style={btnPrimary} onClick={() => { setTontineNom(""); setTontineMontant(""); setTontineDateDebut(""); setTontineError(""); setTontineSuccess(false); setShowCreateTontine(true); }}><Plus size={15} /> Créer une tontine</button>
+                <button style={btnPrimary} onClick={() => { setTontineNom(""); setTontineMontant(""); setTontineDateDebut(""); setTontineError(""); setTontineSuccess(false); setSeances([]); setModeSaisie("manuel"); setShowCreateTontine(true); }}><Plus size={15} /> Créer une tontine</button>
               </div>
             </div>
 
@@ -2804,18 +2818,20 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       )}
 
       {showCreateTontine && (
-        <Modal onClose={() => setShowCreateTontine(false)} title="Créer une tontine">
+        <Modal onClose={() => setShowCreateTontine(false)} title="Créer une tontine" icon={<Banknote />} accentColor={C.vifOr}>
           <FormField label="Nom de la tontine" placeholder="Ex. Tontine des Bâtisseurs — Cycle 2" value={tontineNom} onChange={(e) => setTontineNom(e.target.value)} />
           <FormField label="Montant cotisé par tour" placeholder="Ex. 75 000 FCFA" value={tontineMontant} onChange={(e) => setTontineMontant(e.target.value)} />
-          <div style={{ fontSize: "11px", color: C.sub, marginTop: "-4px" }}>
-            Les {membres.filter((m) => m.statut === "actif").length} membre(s) actif(s) du groupe participent automatiquement, désignés par rotation.
+          <div style={{ fontSize: "11px", color: C.vifVert, marginTop: "-4px", display: "flex", alignItems: "center", gap: "5px", fontWeight: 600 }}>
+            <Users size={13} /> {membres.filter((m) => m.statut === "actif").length} membre(s) actif(s) participent automatiquement, désignés par rotation.
           </div>
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Mode de distribution actuel</label>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "flex", alignItems: "center", gap: "5px" }}>
+              <Repeat size={13} color={C.vifViolet} /> Mode de distribution actuel
+            </label>
             <select
               value={newMode}
               onChange={(e) => setNewMode(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: "8px", border: `1px solid ${C.accent2}55`, background: C.ok, fontSize: "13px", outline: "none", color: C.accent2, fontWeight: 600 }}
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: "8px", border: `1.5px solid ${C.vifViolet}`, background: `${C.vifViolet}14`, fontSize: "13px", outline: "none", color: C.vifViolet, fontWeight: 700 }}
             >
               <option>Ordre fixe</option>
               <option>Désignation</option>
@@ -2827,8 +2843,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>
-              Dates de séance
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "flex", alignItems: "center", gap: "5px" }}>
+              <Calendar size={13} color={C.vifOr} /> Dates de séance
             </label>
 
             <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
@@ -2882,9 +2898,9 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
                 <button
                   onClick={genererDatesAuto}
-                  style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "9px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+                  style={{ background: C.vifOr, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "9px", fontSize: "12.5px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                 >
-                  Générer les dates avec le mode "{newMode}"
+                  <Calendar size={14} /> Générer les dates avec le mode "{newMode}"
                 </button>
               </div>
             )}
@@ -2893,7 +2909,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", marginBottom: "6px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px" }}>
                   <span style={{ fontWeight: 600 }}>{s.date}</span>
-                  <Badge bg={s.mode === "Enchères" ? "#EBE6F5" : C.ok} fg={s.mode === "Enchères" ? C.purple : C.accent2}>{s.mode}</Badge>
+                  <Badge bg={`${C.vifViolet}1A`} fg={C.vifViolet}>{s.mode}</Badge>
                 </div>
                 <X size={14} color={C.sub} style={{ cursor: "pointer" }} onClick={() => removeSeance(i)} />
               </div>
@@ -2934,7 +2950,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            style={{ marginTop: "6px", background: `linear-gradient(135deg, ${C.vifOr}, ${C.accent2})`, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "13px", fontSize: "13.5px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}
             onClick={async () => {
               if (!tontineNom.trim()) { setTontineError("Le nom de la tontine est obligatoire."); setTontineSuccess(false); return; }
               if (!tontineMontant.trim()) { setTontineError("Le montant cotisé par tour est obligatoire."); setTontineSuccess(false); return; }
@@ -2969,7 +2985,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               }
             }}
           >
-            Créer la tontine
+            <Banknote size={16} /> Créer la tontine
           </button>
         </Modal>
       )}
@@ -3105,12 +3121,19 @@ function Badge({ bg, fg, children }) {
   return <span style={{ background: bg, color: fg, fontSize: "11px", fontWeight: 600, padding: "4px 10px", borderRadius: "999px", textTransform: "capitalize" }}>{children}</span>;
 }
 
-function Modal({ children, onClose, title }) {
+function Modal({ children, onClose, title, icon, accentColor }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(20,24,20,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10 }}>
       <div style={{ background: "#FFFFFF", borderRadius: "16px", padding: "26px", width: "360px", maxHeight: "85vh", overflowY: "auto", border: `1px solid ${C.border}` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-          <h2 style={{ fontSize: "16px", fontWeight: 700, margin: 0, color: C.ink }}>{title}</h2>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {icon && (
+              <div style={{ width: "34px", height: "34px", borderRadius: "10px", background: `${accentColor || C.accent2}1A`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                {React.cloneElement(icon, { size: 17, color: accentColor || C.accent2 })}
+              </div>
+            )}
+            <h2 style={{ fontSize: "16px", fontWeight: 700, margin: 0, color: C.ink }}>{title}</h2>
+          </div>
           <X size={18} color={C.sub} style={{ cursor: "pointer" }} onClick={onClose} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>{children}</div>
