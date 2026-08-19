@@ -4,7 +4,7 @@ import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateCh
 import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit } from "./lib/banque";
-import { fetchConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement } from "./lib/assurance";
+import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
@@ -1232,9 +1232,18 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [evenementSuccess, setEvenementSuccess] = useState(false);
   const [soldeMinimum, setSoldeMinimum] = useState(80000);
   const [delaiJoursAssurance, setDelaiJoursAssurance] = useState(60);
+  const [montantPrelevementDefaut, setMontantPrelevementDefaut] = useState(10000);
   const [assuranceSoldes, setAssuranceSoldes] = useState({});
   const [evenements, setEvenements] = useState([]);
   const [chargementAssurance, setChargementAssurance] = useState(true);
+  const [showConfigAssurance, setShowConfigAssurance] = useState(false);
+  const [configSoldeMinimum, setConfigSoldeMinimum] = useState("");
+  const [configDelaiJours, setConfigDelaiJours] = useState("");
+  const [configMontantPrelevement, setConfigMontantPrelevement] = useState("");
+  const [configAssuranceErreur, setConfigAssuranceErreur] = useState("");
+  const [configAssuranceSuccess, setConfigAssuranceSuccess] = useState(false);
+  const [historiqueAssurance, setHistoriqueAssurance] = useState([]);
+  const [assuranceTab, setAssuranceTab] = useState("apercu");
 
   const rechargerAssurance = async () => {
     if (!groupId || membres.length === 0) return;
@@ -1242,10 +1251,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       const config = await fetchConfigAssurance(groupId);
       setSoldeMinimum(config.soldeMinimum);
       setDelaiJoursAssurance(config.delaiJours);
+      setMontantPrelevementDefaut(config.montantPrelevementDefaut);
       const soldes = await fetchSoldesAssurance(groupId, membres, config.soldeMinimum);
       setAssuranceSoldes(soldes);
       const evts = await fetchEvenements(groupId);
       setEvenements(evts);
+      const histo = await fetchHistoriqueAssurance(groupId);
+      setHistoriqueAssurance(histo);
     } catch (e) {
       console.error("Erreur de chargement de l'assurance", e);
     } finally {
@@ -1563,24 +1575,76 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Assurance mutuelle</h1>
                 <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>Solde minimum requis : {fmtFCFA(soldeMinimum)} par membre · délai de reconstitution : {delaiJoursAssurance} jours.</p>
               </div>
-              <button style={btnSecondary} onClick={() => setShowCotisationAssurance(true)}><Plus size={15} /> Enregistrer une cotisation</button>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  style={btnSecondary}
+                  onClick={() => {
+                    setConfigSoldeMinimum(String(soldeMinimum));
+                    setConfigDelaiJours(String(delaiJoursAssurance));
+                    setConfigMontantPrelevement(String(montantPrelevementDefaut));
+                    setConfigAssuranceErreur(""); setConfigAssuranceSuccess(false);
+                    setShowConfigAssurance(true);
+                  }}
+                >
+                  <UserCog size={15} /> Configurer
+                </button>
+                <button style={btnSecondary} onClick={() => setShowCotisationAssurance(true)}><Plus size={15} /> Enregistrer une cotisation</button>
+              </div>
             </div>
             <div style={{ marginTop: "22px" }} />
-            <Table cols={["Membre", "Solde assurance", "Statut", "Délai restant"]} widths="1.6fr 1.2fr 1fr 1.2fr"
-              rows={membres.map((m) => {
-                const info = assuranceSoldes[m.id] || { solde: 0, delai_expire_le: null };
-                const aJour = info.solde >= soldeMinimum;
-                return [
-                  m.nom,
-                  fmtFCFA(info.solde),
-                  aJour
-                    ? <Badge bg={C.ok} fg={C.accent2}>à jour</Badge>
-                    : <Badge bg={C.warnBg} fg={C.warn}>en reconstitution</Badge>,
-                  aJour ? "—" : (info.delai_expire_le || "à définir"),
-                ];
-              })}
-            />
-            <button style={{ ...btnPrimary, marginTop: "18px" }} onClick={() => { setEvenementBeneficiaire(""); setEvenementMontant(""); setEvenementError(""); setEvenementSuccess(false); setShowDeclarerEvenement(true); }}><HeartHandshake size={15} /> Déclarer un événement</button>
+
+            <div style={{ display: "flex", gap: "6px", marginBottom: "18px" }}>
+              {[{ key: "apercu", label: "Vue d'ensemble" }, { key: "historique", label: "Historique des mouvements" }].map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setAssuranceTab(t.key)}
+                  style={{
+                    padding: "8px 14px", borderRadius: "8px", border: `1px solid ${assuranceTab === t.key ? C.vifRose : C.border}`,
+                    background: assuranceTab === t.key ? `${C.vifRose}14` : "transparent", color: assuranceTab === t.key ? C.vifRose : C.sub,
+                    fontSize: "12.5px", fontWeight: 600, cursor: "pointer",
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {assuranceTab === "apercu" && (
+              <>
+                <Table cols={["Membre", "Solde assurance", "Statut", "Délai restant"]} widths="1.6fr 1.2fr 1fr 1.2fr"
+                  rows={membres.map((m) => {
+                    const info = assuranceSoldes[m.id] || { solde: 0, delai_expire_le: null };
+                    const aJour = info.solde >= soldeMinimum;
+                    return [
+                      m.nom,
+                      fmtFCFA(info.solde),
+                      aJour
+                        ? <Badge bg={C.ok} fg={C.accent2}>à jour</Badge>
+                        : <Badge bg={C.warnBg} fg={C.warn}>en reconstitution</Badge>,
+                      aJour ? "—" : (info.delai_expire_le || "à définir"),
+                    ];
+                  })}
+                />
+                <button style={{ ...btnPrimary, marginTop: "18px" }} onClick={() => { setEvenementBeneficiaire(""); setEvenementMontant(""); setEvenementError(""); setEvenementSuccess(false); setShowDeclarerEvenement(true); }}><HeartHandshake size={15} /> Déclarer un événement</button>
+              </>
+            )}
+
+            {assuranceTab === "historique" && (
+              <>
+                <Table cols={["Date", "Membre", "Type", "Montant", "Solde après"]} widths="1fr 1.4fr 1fr 1.1fr 1.2fr"
+                  rows={historiqueAssurance.map((h) => [
+                    <span style={{ color: C.sub, fontSize: 12 }}>{h.date}</span>,
+                    h.membre,
+                    <Badge bg={h.type === "Cotisation" ? C.ok : "#FBE8E8"} fg={h.type === "Cotisation" ? C.accent2 : C.warn}>{h.type}</Badge>,
+                    <span style={{ fontWeight: 700, color: h.type === "Cotisation" ? C.accent2 : C.warn }}>{h.type === "Cotisation" ? "+" : "-"}{fmtFCFA(h.montant)}</span>,
+                    <span style={{ color: C.sub, fontSize: 12 }}>{fmtFCFA(h.solde)}</span>,
+                  ])}
+                />
+                {historiqueAssurance.length === 0 && (
+                  <div style={{ fontSize: "12.5px", color: C.sub, marginTop: "12px" }}>Aucun mouvement enregistré pour l'instant.</div>
+                )}
+              </>
+            )}
           </>
         )}
 
@@ -1785,6 +1849,55 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         </Modal>
       )}
 
+      {showConfigAssurance && (
+        <Modal onClose={() => setShowConfigAssurance(false)} title="Configurer l'assurance" icon={<HeartHandshake />} accentColor={C.vifRose}>
+          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+            Chaque groupe fixe son propre montant minimum, son propre délai de reconstitution, et le montant standard prélevé par membre à chaque événement.
+          </div>
+          <FormField label="Solde minimum requis par membre (FCFA)" placeholder="Ex. 80 000" value={configSoldeMinimum} onChange={(e) => setConfigSoldeMinimum(e.target.value)} />
+          <FormField label="Délai de reconstitution (en jours)" placeholder="Ex. 60" value={configDelaiJours} onChange={(e) => setConfigDelaiJours(e.target.value)} />
+          <FormField label="Montant standard prélevé par membre (FCFA)" placeholder="Ex. 10 000" value={configMontantPrelevement} onChange={(e) => setConfigMontantPrelevement(e.target.value)} />
+
+          {configAssuranceErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {configAssuranceErreur}
+            </div>
+          )}
+          {configAssuranceSuccess && (
+            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <CheckCircle2 size={14} /> Configuration enregistrée.
+            </div>
+          )}
+
+          <button
+            style={{ marginTop: "6px", background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}
+            onClick={async () => {
+              const soldeNum = parseInt(configSoldeMinimum.replace(/[^\d]/g, ""), 10);
+              const delaiNum = parseInt(configDelaiJours.replace(/[^\d]/g, ""), 10);
+              const montantNum = parseInt(configMontantPrelevement.replace(/[^\d]/g, ""), 10);
+              if (!soldeNum || soldeNum <= 0) { setConfigAssuranceErreur("Saisis un solde minimum valide."); return; }
+              if (!delaiNum || delaiNum <= 0) { setConfigAssuranceErreur("Saisis un délai valide (en jours)."); return; }
+              if (!montantNum || montantNum <= 0) { setConfigAssuranceErreur("Saisis un montant de prélèvement valide."); return; }
+              try {
+                await sauvegarderConfigAssurance(groupId, { soldeMinimum: soldeNum, delaiJours: delaiNum, montantPrelevementDefaut: montantNum });
+                await rechargerAssurance();
+                setConfigAssuranceErreur("");
+                setConfigAssuranceSuccess(true);
+                setTimeout(() => {
+                  setShowConfigAssurance(false);
+                  setConfigAssuranceSuccess(false);
+                }, 1200);
+              } catch (e) {
+                console.error("Erreur de sauvegarde de la configuration", e);
+                setConfigAssuranceErreur(e.message || "Erreur lors de l'enregistrement.");
+              }
+            }}
+          >
+            Enregistrer la configuration
+          </button>
+        </Modal>
+      )}
+
       {showDeclarerEvenement && (
         <Modal onClose={() => setShowDeclarerEvenement(false)} title="Déclarer un événement">
           <div>
@@ -1881,6 +1994,15 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <FormField label="Montant brut de l'aide" placeholder="Ex. 50 000 FCFA" value={evenementMontant} onChange={(e) => setEvenementMontant(e.target.value)} />
+          <div style={{ fontSize: "11px", color: C.sub, marginTop: "-6px" }}>
+            Montant standard configuré pour ce groupe : <b>{fmtFCFA(montantPrelevementDefaut)}</b> par membre — soit {fmtFCFA(montantPrelevementDefaut * membres.filter((m) => m.statut === "actif").length)} au total pour {membres.filter((m) => m.statut === "actif").length} membre(s) actif(s).{" "}
+            <button
+              onClick={() => setEvenementMontant(String(montantPrelevementDefaut * membres.filter((m) => m.statut === "actif").length))}
+              style={{ background: "none", border: "none", color: C.vifRose, fontWeight: 700, cursor: "pointer", padding: 0, fontSize: "11px" }}
+            >
+              Utiliser ce montant
+            </button>
+          </div>
 
           <div>
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Déductions (transport, achats, etc.)</label>
