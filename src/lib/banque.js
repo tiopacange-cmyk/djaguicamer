@@ -47,8 +47,6 @@ export async function creerEpargne(groupId, { nom, type, cotisationParSeance, ta
 // MOUVEMENTS D'ÉPARGNE (versements et retraits)
 // ============================================================
 
-// Enregistre une cotisation (versement) pour plusieurs membres à la
-// fois sur une épargne donnée, et met à jour son solde en conséquence.
 export async function enregistrerCotisationsEpargne(epargneId, cotisations) {
   const lignes = cotisations.filter((c) => c.montant && parseFloat(c.montant) > 0);
   if (lignes.length === 0) return;
@@ -143,61 +141,4 @@ export async function fetchPrets(groupId) {
     montant: p.montant,
     avaliste: p.avalisations?.[0]?.avaliste?.profile?.nom_complet || "—",
     statut: p.statut,
-    dateDebut: p.date_debut,
-    dateFin: p.date_fin,
-  }));
-}
-
-// Met en place un crédit : crée le prêt, un retrait correspondant
-// sur l'épargne (le solde diminue du montant prêté), et l'avalisation
-// si un garant a été désigné.
-export async function mettreEnPlaceCredit(epargneId, { membreId, montant, fraisDossier, commission, dateDebut, dateFin, penaliteRetard, avalisteId, montantGaranti }) {
-  const { data: epargne, error: errLecture } = await supabase
-    .from("epargnes")
-    .select("solde")
-    .eq("id", epargneId)
-    .single();
-  if (errLecture) throw errLecture;
-
-  const { data: pret, error: errPret } = await supabase
-    .from("prets")
-    .insert({
-      epargne_id: epargneId,
-      membre_id: membreId,
-      montant,
-      frais_dossier: fraisDossier || 0,
-      commission: commission || 0,
-      date_debut: dateDebut,
-      date_fin: dateFin,
-      penalite_retard: penaliteRetard || null,
-      statut: "en cours",
-    })
-    .select()
-    .single();
-  if (errPret) throw errPret;
-
-  if (avalisteId) {
-    const { error: errAval } = await supabase.from("avalisations").insert({
-      pret_id: pret.id,
-      avaliste_id: avalisteId,
-      montant_garanti: montantGaranti || montant,
-    });
-    if (errAval) throw errAval;
-  }
-
-  const nouveauSolde = epargne.solde - montant;
-  const { error: errMouvement } = await supabase.from("epargne_mouvements").insert({
-    epargne_id: epargneId,
-    membre_id: membreId,
-    type: "Retrait",
-    montant,
-    date_mouvement: dateDebut,
-    solde_apres: nouveauSolde,
-  });
-  if (errMouvement) throw errMouvement;
-
-  const { error: errMaj } = await supabase.from("epargnes").update({ solde: nouveauSolde }).eq("id", epargneId);
-  if (errMaj) throw errMaj;
-
-  return pret;
-}
+    dateDebut: p.date
