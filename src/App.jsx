@@ -56,6 +56,7 @@ export default function AppPrototype() {
   const [monProfil, setMonProfil] = useState(null);
   const [mesGroupes, setMesGroupes] = useState([]);
   const [modeRecuperation, setModeRecuperation] = useState(false);
+  const [vueEspacePersonnel, setVueEspacePersonnel] = useState(false);
 
   const chargerSessionEtRole = async () => {
     setChargementSession(true);
@@ -148,17 +149,29 @@ export default function AppPrototype() {
         <span style={{ fontSize: "12px", color: "#9AA69C" }}>
           Connecté : {monProfil?.nom_complet || "—"} {estSuperAdmin ? "(Super Admin)" : ""}
         </span>
-        <button
-          onClick={handleDeconnexion}
-          style={{ display: "flex", alignItems: "center", gap: "6px", background: "#1D2420", color: "#9AA69C", border: "none", borderRadius: "8px", padding: "6px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
-        >
-          <LogOut size={13} /> Déconnexion
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {groupeAdmin && !estSuperAdmin && (
+            <button
+              onClick={() => setVueEspacePersonnel(!vueEspacePersonnel)}
+              style={{ display: "flex", alignItems: "center", gap: "6px", background: vueEspacePersonnel ? C.accent : "#1D2420", color: vueEspacePersonnel ? "#1B2420" : "#9AA69C", border: "none", borderRadius: "8px", padding: "6px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+            >
+              <Users size={13} /> {vueEspacePersonnel ? "Retour à l'administration" : "Mon espace personnel"}
+            </button>
+          )}
+          <button
+            onClick={handleDeconnexion}
+            style={{ display: "flex", alignItems: "center", gap: "6px", background: "#1D2420", color: "#9AA69C", border: "none", borderRadius: "8px", padding: "6px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+          >
+            <LogOut size={13} /> Déconnexion
+          </button>
+        </div>
       </div>
 
       <div style={{ minHeight: "680px" }}>
         {estSuperAdmin ? (
           <SuperAdminScreen />
+        ) : groupeAdmin && vueEspacePersonnel ? (
+          <MembreScreen groupId={groupeAdmin.group?.id} nomGroupe={groupeAdmin.group?.nom} profileId={monProfil?.id} nomComplet={monProfil?.nom_complet} />
         ) : groupeAdmin ? (
           <AdminGroupeScreen groupId={groupeAdmin.group?.id} nomGroupe={groupeAdmin.group?.nom} />
         ) : groupeMembreSimple ? (
@@ -1272,6 +1285,9 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [inviteSuccess, setInviteSuccess] = useState(false);
 
   const [showEditMembre, setShowEditMembre] = useState(false);
+  const [showHistoriqueMembre, setShowHistoriqueMembre] = useState(null);
+  const [historiqueMembreData, setHistoriqueMembreData] = useState(null);
+  const [chargementHistoriqueMembre, setChargementHistoriqueMembre] = useState(false);
   const [showDeleteMembre, setShowDeleteMembre] = useState(null);
   const [showResetMembre, setShowResetMembre] = useState(false);
   const [resetMembreId, setResetMembreId] = useState("");
@@ -2044,6 +2060,24 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       {m.statut === "actif" ? "Rendre inactif" : "Réactiver"}
                     </button>
                   )}
+                  <button
+                    onClick={async () => {
+                      setShowHistoriqueMembre(m);
+                      setChargementHistoriqueMembre(true);
+                      try {
+                        const tdb = await fetchTableauDeBordMembre(groupId, m.id, 30);
+                        setHistoriqueMembreData(tdb);
+                      } catch (e) {
+                        console.error("Erreur de chargement de l'historique du membre", e);
+                        setHistoriqueMembreData(null);
+                      } finally {
+                        setChargementHistoriqueMembre(false);
+                      }
+                    }}
+                    style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}55`, borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                  >
+                    Historique
+                  </button>
                   <button
                     onClick={() => {
                       setEditMembre(m);
@@ -3173,6 +3207,58 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           >
             Envoyer l'invitation
           </button>
+        </Modal>
+      )}
+
+      {showHistoriqueMembre && (
+        <Modal onClose={() => { setShowHistoriqueMembre(null); setHistoriqueMembreData(null); }} title={`Historique — ${showHistoriqueMembre.nom}`} icon={<FileBarChart />} accentColor={C.vifBleu}>
+          {chargementHistoriqueMembre ? (
+            <div style={{ fontSize: "13px", color: C.sub, textAlign: "center", padding: "20px 0" }}>Chargement...</div>
+          ) : !historiqueMembreData ? (
+            <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>Impossible de charger l'historique.</div>
+          ) : (
+            <>
+              {historiqueMembreData.tontine && (
+                <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", fontSize: "12px" }}>
+                  <b>{historiqueMembreData.tontine.nom}</b> — {fmtFCFA(historiqueMembreData.tontine.montantParTour)}/tour
+                  {historiqueMembreData.tontine.tourEnCoursNumero && (
+                    <div style={{ color: C.sub, fontSize: "11px", marginTop: "3px" }}>
+                      Tour {historiqueMembreData.tontine.tourEnCoursNumero} en cours — {historiqueMembreData.tontine.aCotiseCeTour ? "cotisation à jour" : "cotisation non reçue"}
+                    </div>
+                  )}
+                </div>
+              )}
+              {historiqueMembreData.assurance && (
+                <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", fontSize: "12px" }}>
+                  Solde assurance : <b>{fmtFCFA(historiqueMembreData.assurance.solde)}</b>
+                  {historiqueMembreData.assurance.delaiExpireLe && (
+                    <span style={{ color: C.warn }}> — à reconstituer avant le {historiqueMembreData.assurance.delaiExpireLe}</span>
+                  )}
+                </div>
+              )}
+
+              <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", margin: "4px 0 2px" }}>
+                Mouvements ({historiqueMembreData.historique.length})
+              </div>
+              {historiqueMembreData.historique.length === 0 ? (
+                <div style={{ fontSize: "12px", color: C.sub, textAlign: "center", padding: "10px 0" }}>Aucun mouvement enregistré.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "280px", overflowY: "auto" }}>
+                  {historiqueMembreData.historique.map((h, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: "8px", padding: "8px 10px", background: "#FBFAF6", borderRadius: "8px", fontSize: "12px" }}>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{h.label}</div>
+                        <div style={{ color: C.sub, fontSize: "10.5px" }}>{h.date}</div>
+                      </div>
+                      <div style={{ fontWeight: 700, color: h.montant < 0 ? C.warn : C.accent2, whiteSpace: "nowrap" }}>
+                        {h.montant < 0 ? "-" : "+"}{fmtFCFA(Math.abs(h.montant))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </Modal>
       )}
 
