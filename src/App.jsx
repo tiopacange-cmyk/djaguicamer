@@ -3,8 +3,8 @@ import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActif
 import { fetchTypesFonds, creerTypeFonds, supprimerTypeFonds, fetchFondsTousMembres, fixerCibleFonds, enregistrerVersementFonds, fetchFondsMembre } from "./lib/fonds";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire } from "./lib/groups";
-import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere } from "./lib/tontine";
-import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit } from "./lib/banque";
+import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere, fetchApercuRedistribution, redistribuerCommission } from "./lib/tontine";
+import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit, fetchApercuCloture, cloturerEpargne } from "./lib/banque";
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
 import { fetchComptesBancaires, creerCompteBancaire, fetchSignataires, ajouterSignataire, fetchMouvementsCompte, creerMouvementExterne, fetchCategoriesFrais, creerCategorieFrais, supprimerCategorieFrais, joindreRecu } from "./lib/depots_retrait";
 import { fetchRapportJournalier } from "./lib/rapports";
@@ -966,6 +966,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [showPayout, setShowPayout] = useState(null);
   const [rappelEnCours, setRappelEnCours] = useState(false);
   const [rappelMessage, setRappelMessage] = useState("");
+  const [showRedistribution, setShowRedistribution] = useState(false);
+  const [redistributionApercu, setRedistributionApercu] = useState(null);
+  const [redistributionErreur, setRedistributionErreur] = useState("");
+  const [redistributionChargement, setRedistributionChargement] = useState(false);
+  const [redistributionEnCours, setRedistributionEnCours] = useState(false);
+  const [redistributionSuccess, setRedistributionSuccess] = useState(false);
   const [showEnchere, setShowEnchere] = useState(false);
   const [enchereTour, setEnchereTour] = useState(null);
   const [enchereBeneficiaire, setEnchereBeneficiaire] = useState("");
@@ -1365,6 +1371,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
     setShowNewPoste(false);
   };
   const [showCreateEpargne, setShowCreateEpargne] = useState(false);
+  const [showCloture, setShowCloture] = useState(null);
+  const [clotureEtape, setClotureEtape] = useState(1);
+  const [clotureApercu, setClotureApercu] = useState(null);
+  const [clotureDecisions, setClotureDecisions] = useState({});
+  const [clotureNouveauNom, setClotureNouveauNom] = useState("");
+  const [clotureErreur, setClotureErreur] = useState("");
+  const [clotureChargement, setClotureChargement] = useState(false);
+  const [clotureEnCours, setClotureEnCours] = useState(false);
   const [epargneType, setEpargneType] = useState("Personnalisée");
   const [epargneNom, setEpargneNom] = useState("");
   const [epargneCotisation, setEpargneCotisation] = useState("");
@@ -1531,6 +1545,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           { icon: <Banknote size={16} />, label: "Tontine", key: "tontine" },
           { icon: <PiggyBank size={16} />, label: "Banque", key: "banque" },
           { icon: <HeartHandshake size={16} />, label: "Assurance", key: "assurance" },
+          { icon: <Wallet size={16} />, label: "Fonds", key: "fonds" },
           { icon: <Building2 size={16} />, label: "Dépôt / Retrait externe", key: "depots" },
           { icon: <FileBarChart size={16} />, label: "Bilan", key: "bilan" },
           { icon: <UserCog size={16} />, label: "Membres", key: "membres" },
@@ -1578,6 +1593,29 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     }}
                   >
                     <Bell size={15} /> {rappelEnCours ? "Envoi..." : "Envoyer un rappel"}
+                  </button>
+                )}
+                {tontineActive && !tourEnCours && (
+                  <button
+                    style={{ ...btnSecondary, borderColor: `${C.vifRose}66`, color: C.vifRose }}
+                    onClick={async () => {
+                      setShowRedistribution(true);
+                      setRedistributionApercu(null);
+                      setRedistributionErreur("");
+                      setRedistributionSuccess(false);
+                      setRedistributionChargement(true);
+                      try {
+                        const apercu = await fetchApercuRedistribution(tontineActive.id);
+                        setRedistributionApercu(apercu);
+                      } catch (e) {
+                        console.error("Erreur de chargement de la redistribution", e);
+                        setRedistributionErreur("Erreur lors du chargement.");
+                      } finally {
+                        setRedistributionChargement(false);
+                      }
+                    }}
+                  >
+                    <Gavel size={15} /> Redistribuer la commission
                   </button>
                 )}
                 {tontineActive && (
@@ -1695,7 +1733,37 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               <>
                 <div style={{ display: "flex", gap: "14px", margin: "18px 0", flexWrap: "wrap" }}>
                   {epargnes.map((ep) => (
-                    <StatCard key={ep.nom} label={ep.nom} value={fmtFCFA(ep.solde)} sub={`Clôture ${ep.cloture}`} icon={<PiggyBank size={16} />} />
+                    <div key={ep.nom} style={{ flex: 1, minWidth: "220px" }}>
+                      <StatCard label={ep.nom} value={fmtFCFA(ep.solde)} sub={`Clôture ${ep.cloture}`} icon={<PiggyBank size={16} />} />
+                      {ep.statut !== "clôturée" && (
+                        <button
+                          onClick={async () => {
+                            setShowCloture(ep);
+                            setClotureEtape(1);
+                            setClotureApercu(null);
+                            setClotureDecisions({});
+                            setClotureNouveauNom(`${ep.nom} — cycle suivant`);
+                            setClotureErreur("");
+                            setClotureChargement(true);
+                            try {
+                              const apercu = await fetchApercuCloture(ep.id);
+                              setClotureApercu(apercu);
+                              const decisionsInit = {};
+                              apercu.membres.forEach((m) => { decisionsInit[m.membreId] = "recuperer"; });
+                              setClotureDecisions(decisionsInit);
+                            } catch (e) {
+                              console.error("Erreur de chargement de l'aperçu de clôture", e);
+                              setClotureErreur("Erreur lors du chargement.");
+                            } finally {
+                              setClotureChargement(false);
+                            }
+                          }}
+                          style={{ width: "100%", marginTop: "6px", background: "transparent", color: C.vifRose, border: `1px solid ${C.vifRose}66`, borderRadius: "8px", padding: "7px", fontSize: "11.5px", fontWeight: 600, cursor: "pointer" }}
+                        >
+                          Clôturer le cycle
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "10px 0" }}>
@@ -1723,6 +1791,65 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   Chaque cotisation apparaît comme un <b>versement</b>, chaque prêt octroyé comme un <b>retrait</b> — ce sont les deux seuls types de mouvement de la banque.
                 </div>
               </div>
+            )}
+          </>
+        )}
+
+        {view === "fonds" && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Fonds</h1>
+                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
+                  Fonds de garantie, fonds de solidarité, ou toute autre rubrique — chaque membre cotise progressivement vers un objectif fixé.
+                </p>
+              </div>
+              <button
+                style={btnPrimary}
+                onClick={() => { setShowGererTypesFonds(true); setNewTypeFondsNom(""); }}
+              >
+                <Plus size={15} /> Types de fonds
+              </button>
+            </div>
+
+            {typesFonds.length === 0 ? (
+              <div style={{ marginTop: "22px", fontSize: "13px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
+                Aucun type de fonds créé pour l'instant — clique "Types de fonds" pour en ajouter un (ex. Fonds de garantie).
+              </div>
+            ) : (
+              typesFonds.map((t) => (
+                <div key={t.id} style={{ marginTop: "26px" }}>
+                  <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px" }}>{t.nom}</h2>
+                  <Table cols={["Membre", "Progression", "Statut", ""]} widths="1.3fr 1.4fr 1fr 1fr"
+                    rows={membres.map((m) => {
+                      const f = (fondsParMembre[m.id] || []).find((x) => x.typeFondsId === t.id) || { cible: 0, solde: 0 };
+                      const atteint = f.cible > 0 && f.solde >= f.cible;
+                      return [
+                        m.nom,
+                        <div>
+                          <div style={{ fontSize: "11.5px", fontWeight: 600 }}>{fmtFCFA(f.solde)} / {fmtFCFA(f.cible)}</div>
+                          {f.cible > 0 && (
+                            <div style={{ width: "100%", height: "5px", background: "#EEE", borderRadius: "3px", marginTop: "4px", overflow: "hidden" }}>
+                              <div style={{ width: `${Math.min(100, (f.solde / f.cible) * 100)}%`, height: "100%", background: atteint ? C.accent2 : C.warn }} />
+                            </div>
+                          )}
+                        </div>,
+                        f.cible > 0 ? (
+                          <Badge bg={atteint ? C.ok : C.warnBg} fg={atteint ? C.accent2 : C.warn}>{atteint ? "objectif atteint" : "en cours"}</Badge>
+                        ) : (
+                          <span style={{ color: C.sub, fontSize: 11.5 }}>pas d'objectif</span>
+                        ),
+                        <button
+                          onClick={() => setShowGererFondsMembre(m)}
+                          style={{ background: "transparent", color: C.vifOr, border: `1px solid ${C.vifOr}66`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                        >
+                          Gérer
+                        </button>,
+                      ];
+                    })}
+                  />
+                </div>
+              ))
             )}
           </>
         )}
@@ -2598,6 +2725,119 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           >
             Enregistrer les cotisations
           </button>
+        </Modal>
+      )}
+
+      {showCloture && (
+        <Modal onClose={() => setShowCloture(null)} title={`Clôturer — ${showCloture.nom}`} icon={<PiggyBank />} accentColor={C.vifRose}>
+          {clotureChargement ? (
+            <div style={{ fontSize: "13px", color: C.sub, textAlign: "center", padding: "20px 0" }}>Calcul en cours...</div>
+          ) : !clotureApercu ? (
+            <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>{clotureErreur || "Erreur de chargement."}</div>
+          ) : clotureEtape === 1 ? (
+            <>
+              <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+                Taux annuel : <b>{clotureApercu.taux}%</b> — intérêt calculé au prorata du montant et de la durée de chaque dépôt.
+              </div>
+
+              {clotureApercu.membres.length === 0 ? (
+                <div style={{ fontSize: "12.5px", color: C.sub, textAlign: "center", padding: "10px 0" }}>Aucune cotisation enregistrée sur cette épargne.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {clotureApercu.membres.map((m) => (
+                    <div key={m.membreId} style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px", fontSize: "12px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <b>{m.nom}</b>
+                        <b style={{ color: C.accent2 }}>{fmtFCFA(m.total)}</b>
+                      </div>
+                      <div style={{ color: C.sub, fontSize: "11px" }}>Capital {fmtFCFA(m.capital)} + intérêt {fmtFCFA(m.interet)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                disabled={clotureApercu.membres.length === 0}
+                style={{ marginTop: "6px", background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: clotureApercu.membres.length === 0 ? "default" : "pointer", opacity: clotureApercu.membres.length === 0 ? 0.6 : 1 }}
+                onClick={() => setClotureEtape(2)}
+              >
+                Continuer
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+                Pour chaque membre, choisis s'il récupère son montant (sort de la caisse) ou le reconduit (reversé dans une nouvelle épargne).
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {clotureApercu.membres.map((m) => (
+                  <div key={m.membreId} style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "6px" }}>
+                      <b>{m.nom}</b>
+                      <b style={{ color: C.accent2 }}>{fmtFCFA(m.total)}</b>
+                    </div>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      {["recuperer", "reconduire"].map((opt) => (
+                        <div
+                          key={opt}
+                          onClick={() => setClotureDecisions({ ...clotureDecisions, [m.membreId]: opt })}
+                          style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "7px", border: `1px solid ${clotureDecisions[m.membreId] === opt ? C.vifRose : C.border}`, background: clotureDecisions[m.membreId] === opt ? `${C.vifRose}14` : "#FFFFFF", fontSize: "11px", fontWeight: 600, color: clotureDecisions[m.membreId] === opt ? C.vifRose : C.sub, cursor: "pointer" }}
+                        >
+                          {opt === "recuperer" ? "Récupérer" : "Reconduire"}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {Object.values(clotureDecisions).includes("reconduire") && (
+                <FormField label="Nom de la nouvelle épargne (cycle suivant)" placeholder="Ex. Banque scolaire — cycle suivant" value={clotureNouveauNom} onChange={(e) => setClotureNouveauNom(e.target.value)} />
+              )}
+
+              {clotureErreur && (
+                <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                  {clotureErreur}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button onClick={() => setClotureEtape(1)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, color: C.sub, cursor: "pointer" }}>
+                  Retour
+                </button>
+                <button
+                  disabled={clotureEnCours}
+                  style={{ flex: 2, background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: clotureEnCours ? "default" : "pointer" }}
+                  onClick={async () => {
+                    setClotureEnCours(true);
+                    setClotureErreur("");
+                    try {
+                      await cloturerEpargne(showCloture.id, groupId, clotureApercu.membres, clotureDecisions, clotureNouveauNom.trim());
+                      clotureApercu.membres.forEach((m) => {
+                        if (m.telephone) {
+                          const decision = clotureDecisions[m.membreId];
+                          envoyerSMS({
+                            message: `Bonjour ${m.nom}, votre cycle "${clotureApercu.epargneNom}" est clôturé. Capital ${fmtFCFA(m.capital)} + intérêt ${fmtFCFA(m.interet)} = ${fmtFCFA(m.total)}, ${decision === "recuperer" ? "à récupérer" : "reconduit pour le cycle suivant"}.`,
+                            numeros: [m.telephone],
+                          });
+                        }
+                      });
+                      await rechargerEpargnes();
+                      await rechargerHistoriqueBanque();
+                      setShowCloture(null);
+                    } catch (e) {
+                      console.error("Erreur de clôture", e);
+                      setClotureErreur(e.message || "Erreur lors de la clôture.");
+                    } finally {
+                      setClotureEnCours(false);
+                    }
+                  }}
+                >
+                  {clotureEnCours ? "Clôture en cours..." : "Valider la clôture"}
+                </button>
+              </div>
+            </>
+          )}
         </Modal>
       )}
 
@@ -4265,6 +4505,77 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         </Modal>
       )}
 
+      {showRedistribution && (
+        <Modal onClose={() => setShowRedistribution(false)} title="Redistribuer la commission d'enchères" icon={<Gavel />} accentColor={C.vifRose}>
+          {redistributionChargement ? (
+            <div style={{ fontSize: "13px", color: C.sub, textAlign: "center", padding: "20px 0" }}>Calcul en cours...</div>
+          ) : !redistributionApercu ? (
+            <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>{redistributionErreur || "Erreur de chargement."}</div>
+          ) : redistributionApercu.commissionTotale === 0 ? (
+            <div style={{ fontSize: "12.5px", color: C.sub, textAlign: "center", padding: "10px 0" }}>Aucune commission d'enchères à redistribuer sur ce cycle.</div>
+          ) : (
+            <>
+              <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+                Commission totale : <b>{fmtFCFA(redistributionApercu.commissionTotale)}</b> — répartie proportionnellement au nombre de tours où chaque membre a cotisé ({redistributionApercu.totalCotisations} cotisation(s) au total sur ce cycle).
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {redistributionApercu.membres.map((m) => (
+                  <div key={m.membreId} style={{ display: "flex", justifyContent: "space-between", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px", fontSize: "12px" }}>
+                    <div>
+                      <b>{m.nom}</b>
+                      <div style={{ color: C.sub, fontSize: "11px" }}>{m.nbCotisations} cotisation(s) sur ce cycle</div>
+                    </div>
+                    <b style={{ color: C.accent2 }}>{fmtFCFA(m.part)}</b>
+                  </div>
+                ))}
+              </div>
+
+              {redistributionErreur && (
+                <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                  {redistributionErreur}
+                </div>
+              )}
+              {redistributionSuccess && (
+                <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <CheckCircle2 size={14} /> Commission redistribuée avec succès.
+                </div>
+              )}
+
+              {!redistributionSuccess && (
+                <button
+                  disabled={redistributionEnCours}
+                  style={{ marginTop: "6px", background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: redistributionEnCours ? "default" : "pointer" }}
+                  onClick={async () => {
+                    setRedistributionEnCours(true);
+                    setRedistributionErreur("");
+                    try {
+                      await redistribuerCommission(tontineActive.id, redistributionApercu.membres);
+                      redistributionApercu.membres.forEach((m) => {
+                        if (m.telephone && m.part > 0) {
+                          envoyerSMS({
+                            message: `Bonjour ${m.nom}, votre part de la commission d'enchères "${tontineActive.nom}" est de ${fmtFCFA(m.part)} (${m.nbCotisations} tour(s) cotisé(s)).`,
+                            numeros: [m.telephone],
+                          });
+                        }
+                      });
+                      setRedistributionSuccess(true);
+                    } catch (e) {
+                      console.error("Erreur de redistribution", e);
+                      setRedistributionErreur(e.message || "Erreur lors de la redistribution.");
+                    } finally {
+                      setRedistributionEnCours(false);
+                    }
+                  }}
+                >
+                  {redistributionEnCours ? "Redistribution..." : "Valider la redistribution"}
+                </button>
+              )}
+            </>
+          )}
+        </Modal>
+      )}
+
       {showCreateTontine && (
         <Modal onClose={() => setShowCreateTontine(false)} title="Créer une tontine" icon={<Banknote />} accentColor={C.vifOr}>
           <FormField label="Nom de la tontine" placeholder="Ex. Tontine des Bâtisseurs — Cycle 2" value={tontineNom} onChange={(e) => setTontineNom(e.target.value)} />
@@ -4581,13 +4892,11 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
                 ))}
 
                 {tableauDeBord?.assurance && (
-                  <MiniCard
-                    icon={<HeartHandshake size={16} color={tableauDeBord.assurance.solde >= 80000 ? C.accent2 : C.warn} />}
+                  <CarteProgression
+                    icon={<HeartHandshake size={16} color={C.accent2} />}
                     label="Assurance"
-                    value={fmtFCFA(tableauDeBord.assurance.solde)}
-                    note={tableauDeBord.assurance.delaiExpireLe ? `À reconstituer avant le ${tableauDeBord.assurance.delaiExpireLe}` : "Solde à jour"}
-                    warn={!!tableauDeBord.assurance.delaiExpireLe}
-                    ok={!tableauDeBord.assurance.delaiExpireLe}
+                    solde={tableauDeBord.assurance.solde}
+                    cible={tableauDeBord.assurance.soldeMinimum}
                   />
                 )}
 
@@ -4596,14 +4905,12 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
                 ))}
 
                 {mesFonds.filter((f) => f.cible > 0 || f.solde > 0).map((f) => (
-                  <MiniCard
+                  <CarteProgression
                     key={f.typeFondsId}
                     icon={<Wallet size={16} color={C.accent2} />}
                     label={f.nom}
-                    value={`${fmtFCFA(f.solde)} / ${fmtFCFA(f.cible)}`}
-                    note={f.cible > 0 && f.solde >= f.cible ? "Objectif atteint" : "Cotise progressivement jusqu'à l'objectif"}
-                    ok={f.cible > 0 && f.solde >= f.cible}
-                    warn={f.cible > 0 && f.solde < f.cible}
+                    solde={f.solde}
+                    cible={f.cible}
                   />
                 ))}
               </div>
@@ -4626,6 +4933,29 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
               </div>
             ))}
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CarteProgression({ icon, label, solde, cible }) {
+  const fmtFCFA = (n) => `${Math.round(n || 0).toLocaleString("fr-FR")} FCFA`;
+  const complet = cible > 0 && solde >= cible;
+  const pourcentage = cible > 0 ? Math.min(100, (solde / cible) * 100) : 100;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", borderRadius: "12px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
+      <div style={{ width: "34px", height: "34px", borderRadius: "9px", background: complet ? C.ok : "#F9E4D8", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{icon}</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: "11px", color: C.sub }}>{label}</div>
+        <div style={{ fontSize: "14px", fontWeight: 700 }}>{fmtFCFA(solde)}{cible > 0 ? ` / ${fmtFCFA(cible)}` : ""}</div>
+        {cible > 0 && (
+          <>
+            <div style={{ width: "100%", height: "5px", background: "#EEE", borderRadius: "3px", marginTop: "5px", marginBottom: "3px", overflow: "hidden" }}>
+              <div style={{ width: `${pourcentage}%`, height: "100%", background: complet ? C.accent2 : C.warn }} />
+            </div>
+            <div style={{ fontSize: "10.5px", fontWeight: 600, color: complet ? C.accent2 : C.warn }}>{complet ? "Complet" : "Incomplet"}</div>
+          </>
         )}
       </div>
     </div>
