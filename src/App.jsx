@@ -4158,24 +4158,38 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
   const [tableauDeBord, setTableauDeBord] = useState(null);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
+  const [erreurDetail, setErreurDetail] = useState("");
   const fmtFCFA = (n) => `${Math.round(n || 0).toLocaleString("fr-FR")} FCFA`;
 
   useEffect(() => {
     if (!groupId || !profileId) return;
+    let annule = false;
+
     (async () => {
       try {
         const data = await fetchMonCompteMembre(groupId, profileId);
+        if (annule) return;
         setMonCompte(data);
-        const tdb = await fetchTableauDeBordMembre(groupId, data.id);
-        setTableauDeBord(tdb);
-        setErreur("");
+        setChargement(false); // affiche déjà rôle/statut/caution sans attendre le reste
+
+        try {
+          const tdb = await fetchTableauDeBordMembre(groupId, data.id);
+          if (!annule) setTableauDeBord(tdb);
+        } catch (e2) {
+          console.error("Erreur de chargement du tableau de bord", e2);
+          if (!annule) setErreurDetail(e2.message || JSON.stringify(e2));
+        }
       } catch (e) {
         console.error("Erreur de chargement du compte membre", e);
-        setErreur("Impossible de charger tes informations.");
-      } finally {
-        setChargement(false);
+        if (!annule) {
+          setErreur("Impossible de charger tes informations.");
+          setErreurDetail(e.message || JSON.stringify(e));
+          setChargement(false);
+        }
       }
     })();
+
+    return () => { annule = true; };
   }, [groupId, profileId]);
 
   return (
@@ -4186,6 +4200,12 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
           <div style={{ fontSize: "18px", fontWeight: 700 }}>{nomComplet || "—"}</div>
           <div style={{ fontSize: "11px", color: "#9DB3A6", marginTop: "2px" }}>{nomGroupe || "—"}</div>
         </div>
+
+        {erreurDetail && (
+          <div style={{ margin: "12px 20px 0", fontSize: "10.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px", wordBreak: "break-word" }}>
+            Détail technique : {erreurDetail}
+          </div>
+        )}
 
         <div style={{ padding: "18px 20px" }}>
           {chargement ? (
