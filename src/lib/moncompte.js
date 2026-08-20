@@ -1,10 +1,9 @@
-
 import { supabase } from "./supabaseClient";
 
 // Récupère un aperçu complet des données financières du membre
 // connecté : sa tontine en cours, son solde d'assurance, les
 // épargnes du groupe, et son historique récent (tous modules).
-export async function fetchTableauDeBordMembre(groupId, membreId) {
+export async function fetchTableauDeBordMembre(groupId, membreId, limite = 20) {
   // --- Tontine active + mon tour ---
   const { data: tontine, error: errTontine } = await supabase
     .from("tontines")
@@ -81,7 +80,7 @@ export async function fetchTableauDeBordMembre(groupId, membreId) {
     .select("montant, date_paiement")
     .eq("membre_id", membreId)
     .order("date_paiement", { ascending: false })
-    .limit(5);
+    .limit(limite);
   (mesCotisationsTontine || []).forEach((c) =>
     historique.push({ label: "Cotisation tontine", date: c.date_paiement, montant: -c.montant })
   );
@@ -93,7 +92,7 @@ export async function fetchTableauDeBordMembre(groupId, membreId) {
       .eq("membre_id", membreId)
       .in("epargne_id", idsEpargnes)
       .order("date_mouvement", { ascending: false })
-      .limit(5);
+      .limit(limite);
     (mesMouvementsEpargne || []).forEach((m) =>
       historique.push({ label: `Banque — ${m.type}`, date: m.date_mouvement, montant: m.type === "Versement" ? -m.montant : m.montant })
     );
@@ -104,7 +103,7 @@ export async function fetchTableauDeBordMembre(groupId, membreId) {
     .select("montant, type, date_mouvement")
     .eq("membre_id", membreId)
     .order("date_mouvement", { ascending: false })
-    .limit(5);
+    .limit(limite);
   (mesMouvementsAssurance || []).forEach((m) =>
     historique.push({ label: `Assurance — ${m.type}`, date: m.date_mouvement, montant: m.type === "Cotisation" ? -m.montant : m.montant })
   );
@@ -123,6 +122,6 @@ export async function fetchTableauDeBordMembre(groupId, membreId) {
     assurance: assurance ? { solde: assurance.solde, delaiExpireLe: assurance.delai_expire_le } : null,
     epargnes: epargnes.map((e) => ({ nom: e.nom, solde: e.solde })),
     mesPrets: mesPrets.map((p) => ({ montant: p.montant, dateFin: p.date_fin })),
-    historique: historique.slice(0, 5),
+    historique: historique.slice(0, limite),
   };
 }
