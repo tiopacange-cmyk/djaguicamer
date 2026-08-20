@@ -186,3 +186,73 @@ export async function appliquerAmendeTontine(tourId, membreId, { joursRetard, mo
   });
   if (error) throw error;
 }
+
+// ============================================================
+// REDISTRIBUTION DE LA COMMISSION D'ENCHÈRES (fin de cycle)
+// La part de chaque membre est proportionnelle au nombre de tours
+// où il a effectivement cotisé, pas seulement au nombre total de
+// membres — un membre qui n'a pas fait tout le cycle reçoit une
+// part réduite, calculée équitablement.
+// ============================================================
+
+export async function fetchApercuRedistribution(tontineId) {
+  const { data: tours, error: errTours } = await supabase
+    .from("tontine_tours")
+    .select("id, commission_enchere")
+    .eq("tontine_id", tontineId);
+  if (errTours) throw errTours;
+
+  const commissionTotale = tours.reduce((s, t) => s + Number(t.commission_enchere || 0), 0);
+  const idsTours = tours.map((t) => t.id);
+
+  if (idsTours.length === 0 || commissionTotale === 0) {
+    return { commissionTotale: 0, membres: [] };
+  }
+
+  const { data: cotisations, error: errCot } = await supabase
+    .from("tontine_cotisations")
+    .select("membre_id, membre:group_members(profile:profiles(nom_complet, telephone))")
+    .in("tour_id", idsTours);
+  if (errCot) throw errCot;
+
+  const totalCotisations = cotisations.length;
+  const parMembre = {};
+  cotisations.forEach((c) => {
+    if (!parMembre[c.membre_id]) {
+      parMembre[c.membre_id] = {
+        membreId: c.membre_id,
+        nom: c.membre?.profile?.nom_complet || "—",
+        telephone: c.membre?.profile?.telephone || "",
+        nbCotisations: 0,
+      };
+    }
+    parMembre[c.membre_id].nbCotisations += 1;
+  });
+
+  return {
+    commissionTotale,
+    totalCotisations,
+    membres: Object.values(parMembre).map((m) => ({
+      ...m,
+      part: Math.round(commissionTotale * (m.nbCotisations / totalCotisations)),
+    })),
+  };
+}
+
+// Enregistre la redistribution : une ligne par membre dans
+// tontine_redistributions, en mode "pondéré" (proportionnel au
+// nombre de tours où chacun a cotisé).
+export async function redistribuerCommission(tontineId, membresApercu) {
+  const lignes = membresApercu
+    .filter((m) => m.part > 0)
+    .map((m) => ({
+      tontine_id: tontineId,
+      membre_id: m.membreId,
+      montant: m.part,
+      mode: "pondéré",
+    }));
+  if (lignes.length === 0) return;
+
+  const { error } = await supabase.from("tontine_redistributions").insert(lignes);
+  if (error) throw error;
+}
