@@ -87,7 +87,12 @@ export default function AppPrototype() {
         setChargementSession(false);
         return;
       }
-      chargerSessionEtRole();
+      // On ne recharge tout que lors d'une vraie connexion/déconnexion —
+      // pas à chaque rafraîchissement automatique du jeton en arrière-plan,
+      // qui ne change rien au profil ni aux groupes de la personne.
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+        chargerSessionEtRole();
+      }
     });
     return () => sub?.unsubscribe?.();
   }, []);
