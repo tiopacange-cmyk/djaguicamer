@@ -1,4 +1,3 @@
-
 import { supabase } from "./supabaseClient";
 
 // ============================================================
@@ -34,9 +33,6 @@ export async function supprimerTypeFonds(typeFondsId) {
 // FONDS PAR MEMBRE (cible + solde, pour chaque type de fonds)
 // ============================================================
 
-// Récupère, pour TOUS les membres du groupe, leur progression sur
-// CHAQUE type de fonds — utilisé pour l'affichage du tableau des
-// membres (une colonne par type de fonds).
 export async function fetchFondsTousMembres(groupId) {
   const { data, error } = await supabase
     .from("fonds_membres")
@@ -54,7 +50,6 @@ export async function fetchFondsTousMembres(groupId) {
   }));
 }
 
-// Fixe (ou crée) la cible d'un membre pour un type de fonds donné
 export async function fixerCibleFonds(membreId, typeFondsId, cible) {
   const { error } = await supabase
     .from("fonds_membres")
@@ -62,8 +57,46 @@ export async function fixerCibleFonds(membreId, typeFondsId, cible) {
   if (error) throw error;
 }
 
-// Enregistre un versement vers un fonds, met à jour le solde, et
-// trace le mouvement dans l'historique.
 export async function enregistrerVersementFonds(membreId, typeFondsId, montant, date) {
   const { data: existant, error: errLecture } = await supabase
     .from("fonds_membres")
+    .select("solde")
+    .eq("membre_id", membreId)
+    .eq("type_fonds_id", typeFondsId)
+    .maybeSingle();
+  if (errLecture) throw errLecture;
+
+  const nouveauSolde = (existant?.solde || 0) + montant;
+
+  const { error: errUpsert } = await supabase
+    .from("fonds_membres")
+    .upsert({ membre_id: membreId, type_fonds_id: typeFondsId, solde: nouveauSolde, cible: existant ? undefined : 0 }, { onConflict: "membre_id,type_fonds_id" });
+  if (errUpsert) throw errUpsert;
+
+  const { error: errMouvement } = await supabase.from("fonds_mouvements").insert({
+    membre_id: membreId,
+    type_fonds_id: typeFondsId,
+    montant,
+    date_mouvement: date || new Date().toISOString().slice(0, 10),
+  });
+  if (errMouvement) throw errMouvement;
+
+  return nouveauSolde;
+}
+
+export async function fetchFondsMembre(groupId, membreId) {
+  const types = await fetchTypesFonds(groupId);
+  const { data, error } = await supabase
+    .from("fonds_membres")
+    .select("type_fonds_id, cible, solde")
+    .eq("membre_id", membreId);
+  if (error) throw error;
+
+  const parType = Object.fromEntries(data.map((f) => [f.type_fonds_id, f]));
+  return types.map((t) => ({
+    typeFondsId: t.id,
+    nom: t.nom,
+    cible: parType[t.id]?.cible || 0,
+    solde: parType[t.id]?.solde || 0,
+  }));
+}
