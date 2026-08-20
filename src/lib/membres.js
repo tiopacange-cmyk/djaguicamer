@@ -21,7 +21,8 @@ export async function fetchMembres(groupId) {
       id,
       type_membre,
       statut,
-      caution,
+      fonds_garantie_cible,
+      fonds_garantie_solde,
       created_at,
       poste:postes_bureau ( nom ),
       profile:profiles ( id, nom_complet, telephone, email, identifiant, auth_user_id )
@@ -41,6 +42,8 @@ export async function fetchMembres(groupId) {
     role: m.type_membre === "Membre du bureau" ? (m.poste?.nom || "Bureau") : "Membre",
     statut: m.statut,
     compteActive: !!m.profile?.auth_user_id,
+    fondsGarantieCible: m.fonds_garantie_cible || 0,
+    fondsGarantieSolde: m.fonds_garantie_solde || 0,
   }));
 }
 
@@ -48,7 +51,7 @@ export async function fetchMembres(groupId) {
 // (identifiant + mot de passe temporaire, comme pour un admin), en
 // protégeant la session de la personne qui invite (l'admin reste
 // connecté à son propre compte pendant et après l'opération).
-export async function inviterMembre(groupId, { nom, email, telephone, typeMembre, posteId, caution }) {
+export async function inviterMembre(groupId, { nom, email, telephone, typeMembre, posteId, fondsGarantieCible }) {
   const identifiantBase = genererIdentifiant(nom);
   const identifiant = `${identifiantBase}${Math.floor(10 + Math.random() * 90)}`;
   const motDePasseTemp = genererMotDePasseTemp();
@@ -89,7 +92,8 @@ export async function inviterMembre(groupId, { nom, email, telephone, typeMembre
       profile_id: profile.id,
       type_membre: typeMembre,
       poste_id: posteId || null,
-      caution: caution || 0,
+      fonds_garantie_cible: fondsGarantieCible || 0,
+      fonds_garantie_solde: 0,
       statut: "en attente",
     })
     .select()
@@ -154,7 +158,7 @@ export async function fetchMonCompteMembre(groupId, profileId) {
   const { data, error } = await supabase
     .from("group_members")
     .select(`
-      id, type_membre, statut, caution, created_at,
+      id, type_membre, statut, fonds_garantie_cible, fonds_garantie_solde, created_at,
       poste:postes_bureau ( nom )
     `)
     .eq("group_id", groupId)
@@ -166,9 +170,47 @@ export async function fetchMonCompteMembre(groupId, profileId) {
     id: data.id,
     role: data.type_membre === "Membre du bureau" ? (data.poste?.nom || "Bureau") : "Membre",
     statut: data.statut,
-    caution: data.caution,
+    fondsGarantieCible: data.fonds_garantie_cible || 0,
+    fondsGarantieSolde: data.fonds_garantie_solde || 0,
     depuisLe: data.created_at,
   };
+}
+
+// Fixe (ou modifie) le montant cible du fonds de garantie d'un membre
+export async function fixerCibleFondsGarantie(groupMemberId, nouvelleCible) {
+  const { error } = await supabase
+    .from("group_members")
+    .update({ fonds_garantie_cible: nouvelleCible })
+    .eq("id", groupMemberId);
+  if (error) throw error;
+}
+
+// Enregistre un versement vers le fonds de garantie d'un membre,
+// et met à jour son solde accumulé en conséquence.
+export async function enregistrerVersementFondsGarantie(groupMemberId, montant, date) {
+  const { data: membre, error: errLecture } = await supabase
+    .from("group_members")
+    .select("fonds_garantie_solde")
+    .eq("id", groupMemberId)
+    .single();
+  if (errLecture) throw errLecture;
+
+  const nouveauSolde = (membre.fonds_garantie_solde || 0) + montant;
+
+  const { error: errMaj } = await supabase
+    .from("group_members")
+    .update({ fonds_garantie_solde: nouveauSolde })
+    .eq("id", groupMemberId);
+  if (errMaj) throw errMaj;
+
+  const { error: errMouvement } = await supabase.from("fonds_garantie_mouvements").insert({
+    membre_id: groupMemberId,
+    montant,
+    date_mouvement: date || new Date().toISOString().slice(0, 10),
+  });
+  if (errMouvement) throw errMouvement;
+
+  return nouveauSolde;
 }
 
 // Supprime un membre du groupe, uniquement s'il n'a JAMAIS effectué
