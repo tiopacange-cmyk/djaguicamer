@@ -8,6 +8,7 @@ import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance,
 import { fetchComptesBancaires, creerCompteBancaire, fetchSignataires, ajouterSignataire, fetchMouvementsCompte, creerMouvementExterne, fetchCategoriesFrais, creerCategorieFrais, supprimerCategorieFrais, joindreRecu } from "./lib/depots_retrait";
 import { fetchRapportJournalier } from "./lib/rapports";
 import { envoyerSMS } from "./lib/sms";
+import { fetchTableauDeBordMembre } from "./lib/moncompte";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
@@ -37,7 +38,7 @@ import {
   Users, Plus, KeyRound, Search, ShieldAlert, ChevronRight, Building2, X,
   CreditCard, ScrollText, LayoutDashboard, Wallet, Shield, FileBarChart,
   Gavel, Bell, LogOut, Moon, Sun, Lock, ChevronLeft, CheckCircle2, Clock,
-  Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat,
+  Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat, Eye, EyeOff,
 } from "lucide-react";
 
 // ---------- Palette partagée ----------
@@ -175,6 +176,7 @@ function ConnexionScreen({ onLoggedIn }) {
   const [dark, setDark] = useState(false);
   const [identifiant, setIdentifiant] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [erreur, setErreur] = useState("");
   const [chargement, setChargement] = useState(false);
   const [modeOubli, setModeOubli] = useState(false);
@@ -257,13 +259,19 @@ function ConnexionScreen({ onLoggedIn }) {
                   <div style={{ position: "relative" }}>
                     <Lock size={15} color={sub} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
                     <input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                       placeholder="••••••••"
-                      style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px 12px 38px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
+                      style={{ width: "100%", boxSizing: "border-box", padding: "12px 38px 12px 38px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
                     />
+                    <div
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", cursor: "pointer", display: "flex" }}
+                    >
+                      {showPassword ? <EyeOff size={15} color={sub} /> : <Eye size={15} color={sub} />}
+                    </div>
                   </div>
                   <div style={{ textAlign: "right", marginTop: "6px" }}>
                     <span
@@ -2375,6 +2383,25 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   delaiJours: delaiJoursAssurance,
                 });
                 await rechargerAssurance();
+
+                const membresActifs = membres.filter((m) => m.statut === "actif");
+                const beneficiaire = membresActifs.find((m) => m.id === evenementBeneficiaire);
+                if (beneficiaire?.telephone) {
+                  envoyerSMS({
+                    message: `Bonjour ${beneficiaire.nom}, votre aide assurance de ${fmtFCFA(montantBrut)} a été déclarée et sera décaissée prochainement.`,
+                    numeros: [beneficiaire.telephone],
+                  });
+                }
+                const autresNumeros = membresActifs
+                  .filter((m) => m.id !== evenementBeneficiaire && m.telephone)
+                  .map((m) => m.telephone);
+                if (autresNumeros.length > 0) {
+                  envoyerSMS({
+                    message: `Info assurance : une aide a été déclarée pour un membre. Un prélèvement au prorata a été appliqué sur votre solde d'assurance.`,
+                    numeros: autresNumeros,
+                  });
+                }
+
                 setEvenementError("");
                 setEvenementSuccess(true);
                 setTimeout(() => {
@@ -2442,6 +2469,17 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   .map((m) => ({ membreId: m.id, montant: cotisationAssuranceMontants[m.nom] }));
                 await enregistrerCotisationsAssurance(groupId, cotisations, soldeMinimum);
                 await rechargerAssurance();
+
+                cotisations.forEach((c) => {
+                  const membre = membres.find((m) => m.id === c.membreId);
+                  if (membre?.telephone) {
+                    envoyerSMS({
+                      message: `Bonjour ${membre.nom}, votre cotisation assurance de ${fmtFCFA(c.montant)} a bien été enregistrée.`,
+                      numeros: [membre.telephone],
+                    });
+                  }
+                });
+
                 setCotisationAssuranceErreur("");
                 setCotisationAssuranceDate("");
                 setCotisationAssuranceMontants({});
@@ -2592,6 +2630,18 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 await enregistrerCotisationsEpargne(cotisationEpargneId, cotisations);
                 await rechargerEpargnes();
                 await rechargerHistoriqueBanque();
+
+                const epargneNom = epargnes.find((ep) => ep.id === cotisationEpargneId)?.nom || "épargne";
+                cotisations.forEach((c) => {
+                  const membre = membres.find((m) => m.id === c.membreId);
+                  if (membre?.telephone) {
+                    envoyerSMS({
+                      message: `Bonjour ${membre.nom}, votre versement de ${fmtFCFA(c.montant)} sur "${epargneNom}" a bien été enregistré.`,
+                      numeros: [membre.telephone],
+                    });
+                  }
+                });
+
                 setCotisationBanqueErreur("");
                 setCotisationDate("");
                 setCotisationMontants({});
@@ -2730,6 +2780,15 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 await rechargerPrets();
                 await rechargerEpargnes();
                 await rechargerHistoriqueBanque();
+
+                const emprunteur = membres.find((m) => m.id === creditMembreId);
+                if (emprunteur?.telephone) {
+                  envoyerSMS({
+                    message: `Bonjour ${emprunteur.nom}, votre crédit de ${fmtFCFA(montantNum)} a été accordé. Échéance : ${creditFin}.`,
+                    numeros: [emprunteur.telephone],
+                  });
+                }
+
                 setCreditError("");
                 setCreditSuccess(true);
                 setTimeout(() => {
@@ -3683,6 +3742,15 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               if (!montantNum || montantNum <= 0) { setAmendeError("Montant invalide."); return; }
               try {
                 await appliquerAmendeTontine(showAmende.tourId, showAmende.membreId, { montant: montantNum, motif: amendeMotif.trim() });
+
+                const membre = membres.find((m) => m.id === showAmende.membreId);
+                if (membre?.telephone) {
+                  envoyerSMS({
+                    message: `Bonjour ${membre.nom}, une amende de ${fmtFCFA(montantNum)} vous a été appliquée${amendeMotif.trim() ? ` (${amendeMotif.trim()})` : ""}.`,
+                    numeros: [membre.telephone],
+                  });
+                }
+
                 setAmendeMontant(""); setAmendeMotif(""); setAmendeError("");
                 setShowAmende(null);
               } catch (e) {
@@ -3779,6 +3847,15 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               try {
                 await verserTour(tontineActive.id, showPayout.id, showPayout.tour);
                 await rechargerTontine();
+
+                const beneficiaire = membres.find((m) => m.id === showPayout.beneficiaireId);
+                if (beneficiaire?.telephone) {
+                  envoyerSMS({
+                    message: `Félicitations ${beneficiaire.nom} ! Votre cagnotte tontine du tour ${showPayout.tour} (${showPayout.montant}) vous a été versée.`,
+                    numeros: [beneficiaire.telephone],
+                  });
+                }
+
                 setShowPayout(null);
               } catch (e) {
                 console.error("Erreur lors du versement", e);
@@ -4073,8 +4150,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 }
 function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
   const [monCompte, setMonCompte] = useState(null);
+  const [tableauDeBord, setTableauDeBord] = useState(null);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
+  const fmtFCFA = (n) => `${Math.round(n || 0).toLocaleString("fr-FR")} FCFA`;
 
   useEffect(() => {
     if (!groupId || !profileId) return;
@@ -4082,6 +4161,8 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
       try {
         const data = await fetchMonCompteMembre(groupId, profileId);
         setMonCompte(data);
+        const tdb = await fetchTableauDeBordMembre(groupId, data.id);
+        setTableauDeBord(tdb);
         setErreur("");
       } catch (e) {
         console.error("Erreur de chargement du compte membre", e);
@@ -4119,25 +4200,72 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
                 </div>
               </div>
 
-              <MiniCard icon={<Wallet size={16} color={C.accent2} />} label="Caution versée" value={`${Number(monCompte?.caution || 0).toLocaleString("fr-FR")} FCFA`} note="Garantie de base pour les prêts" />
-
               {monCompte?.statut === "en attente" && (
-                <div style={{ marginTop: "12px", fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>
+                <div style={{ marginBottom: "12px", fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>
                   Ton inscription est en attente de validation par le Président du groupe.
                 </div>
               )}
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {tableauDeBord?.tontine && (
+                  <MiniCard
+                    icon={<Banknote size={16} color={C.accent2} />}
+                    label={`Tontine — ${tableauDeBord.tontine.nom}`}
+                    value={fmtFCFA(tableauDeBord.tontine.montantParTour)}
+                    note={
+                      tableauDeBord.tontine.tourEnCoursNumero
+                        ? `Tour ${tableauDeBord.tontine.tourEnCoursNumero} en cours — ${tableauDeBord.tontine.aCotiseCeTour ? "cotisation à jour" : "cotisation non reçue"}`
+                        : "Aucun tour en cours"
+                    }
+                    ok={tableauDeBord.tontine.aCotiseCeTour}
+                    warn={!tableauDeBord.tontine.aCotiseCeTour}
+                  />
+                )}
+                {tableauDeBord?.tontine?.monTourNumero && (
+                  <MiniCard icon={<CheckCircle2 size={16} color={C.accent2} />} label="Mon tour" value={`Tour ${tableauDeBord.tontine.monTourNumero}`} note={tableauDeBord.tontine.monTourStatut} ok />
+                )}
+
+                {tableauDeBord?.epargnes?.map((ep) => (
+                  <MiniCard key={ep.nom} icon={<PiggyBank size={16} color={C.accent2} />} label={ep.nom} value={fmtFCFA(ep.solde)} note="Solde collectif du groupe" />
+                ))}
+
+                {tableauDeBord?.assurance && (
+                  <MiniCard
+                    icon={<HeartHandshake size={16} color={tableauDeBord.assurance.solde >= 80000 ? C.accent2 : C.warn} />}
+                    label="Assurance"
+                    value={fmtFCFA(tableauDeBord.assurance.solde)}
+                    note={tableauDeBord.assurance.delaiExpireLe ? `À reconstituer avant le ${tableauDeBord.assurance.delaiExpireLe}` : "Solde à jour"}
+                    warn={!!tableauDeBord.assurance.delaiExpireLe}
+                    ok={!tableauDeBord.assurance.delaiExpireLe}
+                  />
+                )}
+
+                {tableauDeBord?.mesPrets?.map((p, i) => (
+                  <MiniCard key={i} icon={<Wallet size={16} color={C.accent2} />} label="Prêt en cours" value={fmtFCFA(p.montant)} note={`Échéance ${p.dateFin}`} />
+                ))}
+
+                <MiniCard icon={<Wallet size={16} color={C.accent2} />} label="Caution versée" value={fmtFCFA(monCompte?.caution)} note="Garantie de base pour les prêts" />
+              </div>
             </>
           )}
         </div>
 
-        <div style={{ padding: "0 20px 20px" }}>
-          <div style={{ fontSize: "12px", fontWeight: 700, color: C.sub, margin: "6px 0 10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Tontine, Banque, Assurance
+        {tableauDeBord?.historique?.length > 0 && (
+          <div style={{ padding: "0 20px 20px" }}>
+            <div style={{ fontSize: "12px", fontWeight: 700, color: C.sub, margin: "6px 0 10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Historique récent</div>
+            {tableauDeBord.historique.map((h, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: i < tableauDeBord.historique.length - 1 ? `1px solid ${C.border}` : "none", fontSize: "12.5px" }}>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{h.label}</div>
+                  <div style={{ color: C.sub, fontSize: "11px" }}>{h.date}</div>
+                </div>
+                <div style={{ fontWeight: 700, color: h.montant < 0 ? C.warn : C.accent2 }}>
+                  {h.montant < 0 ? "-" : "+"}{fmtFCFA(Math.abs(h.montant))}
+                </div>
+              </div>
+            ))}
           </div>
-          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px" }}>
-            Le détail de tes cotisations, prêts et solde d'assurance sera disponible ici une fois ces modules connectés à la base de données.
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
