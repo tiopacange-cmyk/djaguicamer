@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre, reinitialiserMotDePasseMembre } from "./lib/membres";
+import { fetchTypesFonds, creerTypeFonds, supprimerTypeFonds, fetchFondsTousMembres, fixerCibleFonds, enregistrerVersementFonds, fetchFondsMembre } from "./lib/fonds";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere } from "./lib/tontine";
@@ -1093,6 +1094,36 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
     if (groupId) rechargerMembres();
   }, [groupId]);
 
+  const [typesFonds, setTypesFonds] = useState([]);
+  const [fondsParMembre, setFondsParMembre] = useState({});
+
+  const rechargerFonds = async () => {
+    if (!groupId) return;
+    try {
+      const types = await fetchTypesFonds(groupId);
+      setTypesFonds(types);
+      const tousFonds = await fetchFondsTousMembres(groupId);
+      const parMembre = {};
+      tousFonds.forEach((f) => {
+        if (!parMembre[f.membreId]) parMembre[f.membreId] = [];
+        const type = types.find((t) => t.id === f.typeFondsId);
+        parMembre[f.membreId].push({ typeFondsId: f.typeFondsId, nom: type?.nom || "—", cible: f.cible, solde: f.solde });
+      });
+      setFondsParMembre(parMembre);
+    } catch (e) {
+      console.error("Erreur de chargement des fonds", e);
+    }
+  };
+
+  useEffect(() => {
+    if (groupId) rechargerFonds();
+  }, [groupId]);
+
+  // Trouve rapidement le fonds "Fonds de garantie" d'un membre
+  // (utilisé pour l'éligibilité aux crédits)
+  const fondsGarantieDe = (membreId) =>
+    (fondsParMembre[membreId] || []).find((f) => f.nom === "Fonds de garantie");
+
   const [tontineActive, setTontineActive] = useState(null);
   const [chargementTontine, setChargementTontine] = useState(true);
   const [erreurTontine, setErreurTontine] = useState("");
@@ -1286,6 +1317,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
   const [showEditMembre, setShowEditMembre] = useState(false);
   const [showHistoriqueMembre, setShowHistoriqueMembre] = useState(null);
+  const [showGererFondsMembre, setShowGererFondsMembre] = useState(null);
+  const [nouveauVersementParType, setNouveauVersementParType] = useState({});
+  const [nouvelleCibleParType, setNouvelleCibleParType] = useState({});
+  const [gererFondsErreur, setGererFondsErreur] = useState("");
+  const [gererFondsEnCours, setGererFondsEnCours] = useState("");
+  const [showGererTypesFonds, setShowGererTypesFonds] = useState(false);
+  const [newTypeFondsNom, setNewTypeFondsNom] = useState("");
+  const [inviteVersementInitial, setInviteVersementInitial] = useState("");
   const [historiqueMembreData, setHistoriqueMembreData] = useState(null);
   const [chargementHistoriqueMembre, setChargementHistoriqueMembre] = useState(false);
   const [showDeleteMembre, setShowDeleteMembre] = useState(null);
@@ -1898,13 +1937,16 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
             {assuranceTab === "apercu" && (
               <>
-                <Table cols={["Membre", "Solde assurance", "Statut", "Délai restant"]} widths="1.6fr 1.2fr 1fr 1.2fr"
+                <Table cols={["Membre", "Solde assurance", "Progression", "Statut", "Délai restant"]} widths="1.4fr 1.1fr 1.3fr 0.9fr 1.1fr"
                   rows={membres.map((m) => {
                     const info = assuranceSoldes[m.id] || { solde: 0, delai_expire_le: null };
                     const aJour = info.solde >= soldeMinimum;
                     return [
                       m.nom,
                       fmtFCFA(info.solde),
+                      <div style={{ width: "100%", height: "5px", background: "#EEE", borderRadius: "3px", overflow: "hidden" }}>
+                        <div style={{ width: `${Math.min(100, soldeMinimum > 0 ? (info.solde / soldeMinimum) * 100 : 100)}%`, height: "100%", background: aJour ? C.accent2 : C.warn }} />
+                      </div>,
                       aJour
                         ? <Badge bg={C.ok} fg={C.accent2}>à jour</Badge>
                         : <Badge bg={C.warnBg} fg={C.warn}>en reconstitution</Badge>,
@@ -2008,21 +2050,45 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               <div style={{ display: "flex", gap: "8px" }}>
                 <button
                   style={btnSecondary}
+                  onClick={() => { setShowGererTypesFonds(true); setNewTypeFondsNom(""); }}
+                >
+                  <PiggyBank size={15} /> Types de fonds
+                </button>
+                <button
+                  style={btnSecondary}
                   onClick={() => { setResetMembreId(""); setResetMembreErreur(""); setResetMembreMotDePasse(""); setShowResetMembre(true); }}
                 >
                   <KeyRound size={15} /> Accès d'urgence
                 </button>
-                <button style={btnPrimary} onClick={() => { setInviteNom(""); setInviteTelephone(""); setInviteEmail(""); setInviteCaution(""); setInviteError(""); setInviteSuccess(false); setInviteIdentifiant(""); setInviteMotDePasseTemp(""); setShowInviteMember(true); }}><Plus size={15} /> Inviter un membre</button>
+                <button style={btnPrimary} onClick={() => { setInviteNom(""); setInviteTelephone(""); setInviteEmail(""); setInviteCaution(""); setInviteVersementInitial(""); setInviteError(""); setInviteSuccess(false); setInviteIdentifiant(""); setInviteMotDePasseTemp(""); setShowInviteMember(true); }}><Plus size={15} /> Inviter un membre</button>
               </div>
             </div>
             <div style={{ marginTop: "22px" }} />
-            <Table cols={["Nom", "Identifiant", "Rôle", "Statut", ""]} widths="1.2fr 1.1fr 0.9fr 0.9fr 1.5fr"
-              rows={membres.map((m, i) => [
+            <Table cols={["Nom", "Identifiant", "Rôle", "Statut", "Fonds de garantie", ""]} widths="1.1fr 1fr 0.8fr 0.8fr 1.3fr 1.7fr"
+              rows={membres.map((m, i) => {
+                const fg = fondsGarantieDe(m.id);
+                return [
                 m.nom,
                 <span style={{ color: C.sub, fontSize: 12 }}>{m.identifiant || "—"}</span>,
                 m.role,
                 <Badge bg={m.statut === "actif" ? C.ok : C.warnBg} fg={m.statut === "actif" ? C.accent2 : C.warn}>{m.statut}</Badge>,
-                <div style={{ display: "flex", gap: "6px" }}>
+                <div>
+                  <div style={{ fontSize: "11.5px", fontWeight: 600, color: fg && fg.solde >= fg.cible && fg.cible > 0 ? C.accent2 : C.ink }}>
+                    {fmtFCFA(fg?.solde || 0)} / {fmtFCFA(fg?.cible || 0)}
+                  </div>
+                  {fg && fg.cible > 0 && (
+                    <div style={{ width: "100%", height: "5px", background: "#EEE", borderRadius: "3px", marginTop: "4px", overflow: "hidden" }}>
+                      <div style={{ width: `${Math.min(100, (fg.solde / fg.cible) * 100)}%`, height: "100%", background: fg.solde >= fg.cible ? C.accent2 : C.warn }} />
+                    </div>
+                  )}
+                </div>,
+                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => { setShowGererFondsMembre(m); }}
+                    style={{ background: "transparent", color: C.vifOr, border: `1px solid ${C.vifOr}66`, borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                  >
+                    Gérer les fonds
+                  </button>
                   {m.statut === "en attente" && (
                     <button
                       onClick={async () => {
@@ -2099,7 +2165,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     Supprimer
                   </button>
                 </div>,
-              ])} />
+              ];
+              })} />
             <div style={{ fontSize: "11px", color: C.sub, marginTop: "10px" }}>
               Les membres invités sont sauvegardés automatiquement. "Compte non activé" signifie que le membre n'a pas encore créé son mot de passe de connexion.
             </div>
@@ -2744,12 +2811,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "9px 11px" }}>
-            Caution du membre : <b>{fmtFCFA(CAUTION_DEFAUT)}</b>
+            Fonds de garantie du membre : <b>{fmtFCFA(fondsGarantieDe(creditMembreId)?.solde || 0)}</b>
           </div>
 
           <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: C.sub, cursor: "pointer" }}>
             <input type="checkbox" checked={creditDepasseCaution} onChange={(e) => setCreditDepasseCaution(e.target.checked)} />
-            Le montant demandé dépasse la caution du membre
+            Le montant demandé dépasse le fonds de garantie du membre
           </label>
 
           {creditDepasseCaution && (
@@ -2788,8 +2855,9 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               if (!creditMembreId) { setCreditError("Sélectionnez le membre emprunteur."); setCreditSuccess(false); return; }
               if (!montantNum || montantNum <= 0) { setCreditError("Saisissez un montant de prêt valide."); setCreditSuccess(false); return; }
               if (!creditDebut.trim() || !creditFin.trim()) { setCreditError("Les dates de début et de fin sont obligatoires."); setCreditSuccess(false); return; }
-              if (montantNum > CAUTION_DEFAUT && !creditDepasseCaution) {
-                setCreditError("Ce montant dépasse la caution du membre — cochez la case et désignez un avaliste.");
+              const fondsGarantieMembre = fondsGarantieDe(creditMembreId)?.solde || 0;
+              if (montantNum > fondsGarantieMembre && !creditDepasseCaution) {
+                setCreditError("Ce montant dépasse le fonds de garantie du membre — cochez la case et désignez un avaliste.");
                 setCreditSuccess(false);
                 return;
               }
@@ -3142,7 +3210,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
           )}
 
-          <FormField label="Caution à l'inscription" placeholder="Ex. 100 000 FCFA" value={inviteCaution} onChange={(e) => setInviteCaution(e.target.value)} />
+          <FormField label="Objectif du fonds de garantie (FCFA)" placeholder="Ex. 100 000 FCFA" value={inviteCaution} onChange={(e) => setInviteCaution(e.target.value)} />
+          <FormField label="Versement immédiat (optionnel)" placeholder="Ex. 20 000 FCFA — si prêt à verser tout de suite" value={inviteVersementInitial} onChange={(e) => setInviteVersementInitial(e.target.value)} />
+          <div style={{ fontSize: "11px", color: C.sub, marginTop: "-6px" }}>
+            Si le membre n'est pas prêt à verser maintenant, laisse ce champ vide — il cotisera plus tard, en séance, dans la rubrique "Fonds".
+          </div>
 
           <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
             L'invitation est envoyée au membre, puis soumise à la <b>validation du Président</b> avant qu'il ne rejoigne officiellement le groupe.
@@ -3181,8 +3253,21 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   telephone: inviteTelephone.trim(),
                   typeMembre: roleType,
                   posteId: null, // ⚠️ à relier au vrai id du poste choisi (table postes_bureau) une fois les postes créés en base
-                  caution: parseInt(inviteCaution.replace(/[^\d]/g, ""), 10) || 0,
                 });
+
+                // Lie le nouveau membre au type "Fonds de garantie" (le crée
+                // pour le groupe s'il n'existe pas encore), avec son objectif
+                // et un éventuel versement immédiat.
+                const cibleNum = parseInt(inviteCaution.replace(/[^\d]/g, ""), 10) || 0;
+                const versementNum = parseInt(inviteVersementInitial.replace(/[^\d]/g, ""), 10) || 0;
+                if (cibleNum > 0 || versementNum > 0) {
+                  let typeGarantie = typesFonds.find((t) => t.nom === "Fonds de garantie");
+                  if (!typeGarantie) typeGarantie = await creerTypeFonds(groupId, "Fonds de garantie");
+                  if (cibleNum > 0) await fixerCibleFonds(resultat.membre.id, typeGarantie.id, cibleNum);
+                  if (versementNum > 0) await enregistrerVersementFonds(resultat.membre.id, typeGarantie.id, versementNum);
+                  await rechargerFonds();
+                }
+
                 await rechargerMembres();
                 setInviteError("");
                 setInviteSuccess(true);
@@ -3192,6 +3277,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 setInviteTelephone("");
                 setInviteEmail("");
                 setInviteCaution("");
+                setInviteVersementInitial("");
                 setTimeout(() => {
                   setShowInviteMember(false);
                   setInviteSuccess(false);
@@ -3207,6 +3293,152 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           >
             Envoyer l'invitation
           </button>
+        </Modal>
+      )}
+
+      {showGererTypesFonds && (
+        <Modal onClose={() => setShowGererTypesFonds(false)} title="Types de fonds" icon={<PiggyBank />} accentColor={C.vifOr}>
+          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+            Crée les rubriques de fonds propres à ton groupe (Fonds de garantie, Fonds de solidarité, etc.).
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {typesFonds.map((t) => (
+              <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
+                <span style={{ fontSize: "13px", fontWeight: 600 }}>{t.nom}</span>
+                <X
+                  size={14}
+                  color={C.sub}
+                  style={{ cursor: "pointer" }}
+                  onClick={async () => {
+                    try {
+                      await supprimerTypeFonds(t.id);
+                      await rechargerFonds();
+                    } catch (e) {
+                      console.error("Erreur de suppression du type de fonds", e);
+                    }
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <input
+              value={newTypeFondsNom}
+              onChange={(e) => setNewTypeFondsNom(e.target.value)}
+              placeholder="Ex. Fonds de solidarité"
+              style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
+            />
+            <button
+              onClick={async () => {
+                if (!newTypeFondsNom.trim()) return;
+                try {
+                  await creerTypeFonds(groupId, newTypeFondsNom.trim());
+                  setNewTypeFondsNom("");
+                  await rechargerFonds();
+                } catch (e) {
+                  console.error("Erreur de création du type de fonds", e);
+                }
+              }}
+              style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+            >
+              Ajouter
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showGererFondsMembre && (
+        <Modal onClose={() => { setShowGererFondsMembre(null); setNouveauVersementParType({}); setNouvelleCibleParType({}); setGererFondsErreur(""); }} title={`Fonds — ${showGererFondsMembre.nom}`} icon={<Wallet />} accentColor={C.vifOr}>
+          {typesFonds.length === 0 ? (
+            <div style={{ fontSize: "12px", color: C.sub }}>Aucun type de fonds créé pour l'instant — utilise "Types de fonds" pour en ajouter.</div>
+          ) : (
+            typesFonds.map((t) => {
+              const f = (fondsParMembre[showGererFondsMembre.id] || []).find((x) => x.typeFondsId === t.id) || { cible: 0, solde: 0 };
+              return (
+                <div key={t.id} style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <b style={{ fontSize: "13px" }}>{t.nom}</b>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: f.solde >= f.cible && f.cible > 0 ? C.accent2 : C.ink }}>
+                      {fmtFCFA(f.solde)} / {fmtFCFA(f.cible)}
+                    </span>
+                  </div>
+                  {f.cible > 0 && (
+                    <div style={{ width: "100%", height: "5px", background: "#EEE", borderRadius: "3px", marginBottom: "10px", overflow: "hidden" }}>
+                      <div style={{ width: `${Math.min(100, (f.solde / f.cible) * 100)}%`, height: "100%", background: f.solde >= f.cible ? C.accent2 : C.warn }} />
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <input
+                      value={nouvelleCibleParType[t.id] ?? ""}
+                      onChange={(e) => setNouvelleCibleParType({ ...nouvelleCibleParType, [t.id]: e.target.value })}
+                      placeholder={`Objectif (${fmtFCFA(f.cible)})`}
+                      style={{ flex: 1, boxSizing: "border-box", padding: "8px 9px", borderRadius: "7px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "11.5px", outline: "none" }}
+                    />
+                    <button
+                      disabled={gererFondsEnCours === `cible-${t.id}`}
+                      onClick={async () => {
+                        const val = parseInt((nouvelleCibleParType[t.id] || "").replace(/[^\d]/g, ""), 10);
+                        if (!val) return;
+                        setGererFondsEnCours(`cible-${t.id}`);
+                        try {
+                          await fixerCibleFonds(showGererFondsMembre.id, t.id, val);
+                          await rechargerFonds();
+                          setNouvelleCibleParType({ ...nouvelleCibleParType, [t.id]: "" });
+                        } catch (e) {
+                          console.error("Erreur de mise à jour de l'objectif", e);
+                        } finally {
+                          setGererFondsEnCours("");
+                        }
+                      }}
+                      style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "7px", padding: "0 10px", fontSize: "11px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+                    >
+                      Fixer
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
+                    <input
+                      value={nouveauVersementParType[t.id] ?? ""}
+                      onChange={(e) => setNouveauVersementParType({ ...nouveauVersementParType, [t.id]: e.target.value })}
+                      placeholder="Montant à verser"
+                      style={{ flex: 1, boxSizing: "border-box", padding: "8px 9px", borderRadius: "7px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "11.5px", outline: "none" }}
+                    />
+                    <button
+                      disabled={gererFondsEnCours === `versement-${t.id}`}
+                      onClick={async () => {
+                        const val = parseInt((nouveauVersementParType[t.id] || "").replace(/[^\d]/g, ""), 10);
+                        if (!val) return;
+                        setGererFondsEnCours(`versement-${t.id}`);
+                        try {
+                          await enregistrerVersementFonds(showGererFondsMembre.id, t.id, val);
+                          await rechargerFonds();
+                          setNouveauVersementParType({ ...nouveauVersementParType, [t.id]: "" });
+                          if (showGererFondsMembre.telephone) {
+                            envoyerSMS({
+                              message: `Bonjour ${showGererFondsMembre.nom}, votre versement de ${fmtFCFA(val)} pour "${t.nom}" a été enregistré.`,
+                              numeros: [showGererFondsMembre.telephone],
+                            });
+                          }
+                        } catch (e) {
+                          console.error("Erreur d'enregistrement du versement", e);
+                          setGererFondsErreur(e.message || "Erreur lors de l'enregistrement.");
+                        } finally {
+                          setGererFondsEnCours("");
+                        }
+                      }}
+                      style={{ background: C.vifOr, color: "#FFFFFF", border: "none", borderRadius: "7px", padding: "0 12px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
+                    >
+                      Verser
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+          {gererFondsErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {gererFondsErreur}
+            </div>
+          )}
         </Modal>
       )}
 
@@ -4242,6 +4474,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
   const [monCompte, setMonCompte] = useState(null);
   const [tableauDeBord, setTableauDeBord] = useState(null);
+  const [mesFonds, setMesFonds] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
   const [erreurDetail, setErreurDetail] = useState("");
@@ -4256,7 +4489,7 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
         const data = await fetchMonCompteMembre(groupId, profileId);
         if (annule) return;
         setMonCompte(data);
-        setChargement(false); // affiche déjà rôle/statut/caution sans attendre le reste
+        setChargement(false); // affiche déjà rôle/statut sans attendre le reste
 
         try {
           const tdb = await fetchTableauDeBordMembre(groupId, data.id);
@@ -4264,6 +4497,13 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
         } catch (e2) {
           console.error("Erreur de chargement du tableau de bord", e2);
           if (!annule) setErreurDetail(e2.message || JSON.stringify(e2));
+        }
+
+        try {
+          const fonds = await fetchFondsMembre(groupId, data.id);
+          if (!annule) setMesFonds(fonds);
+        } catch (e3) {
+          console.error("Erreur de chargement des fonds", e3);
         }
       } catch (e) {
         console.error("Erreur de chargement du compte membre", e);
@@ -4355,7 +4595,17 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
                   <MiniCard key={i} icon={<Wallet size={16} color={C.accent2} />} label="Prêt en cours" value={fmtFCFA(p.montant)} note={`Échéance ${p.dateFin}`} />
                 ))}
 
-                <MiniCard icon={<Wallet size={16} color={C.accent2} />} label="Caution versée" value={fmtFCFA(monCompte?.caution)} note="Garantie de base pour les prêts" />
+                {mesFonds.filter((f) => f.cible > 0 || f.solde > 0).map((f) => (
+                  <MiniCard
+                    key={f.typeFondsId}
+                    icon={<Wallet size={16} color={C.accent2} />}
+                    label={f.nom}
+                    value={`${fmtFCFA(f.solde)} / ${fmtFCFA(f.cible)}`}
+                    note={f.cible > 0 && f.solde >= f.cible ? "Objectif atteint" : "Cotise progressivement jusqu'à l'objectif"}
+                    ok={f.cible > 0 && f.solde >= f.cible}
+                    warn={f.cible > 0 && f.solde < f.cible}
+                  />
+                ))}
               </div>
             </>
           )}
