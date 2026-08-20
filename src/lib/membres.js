@@ -13,7 +13,6 @@ function genererMotDePasseTemp() {
 // MEMBRES DU GROUPE
 // ============================================================
 
-// Récupère tous les membres d'un groupe, avec leur nom depuis "profiles"
 export async function fetchMembres(groupId) {
   const { data, error } = await supabase
     .from("group_members")
@@ -21,8 +20,6 @@ export async function fetchMembres(groupId) {
       id,
       type_membre,
       statut,
-      fonds_garantie_cible,
-      fonds_garantie_solde,
       created_at,
       poste:postes_bureau ( nom ),
       profile:profiles ( id, nom_complet, telephone, email, identifiant, auth_user_id )
@@ -42,24 +39,16 @@ export async function fetchMembres(groupId) {
     role: m.type_membre === "Membre du bureau" ? (m.poste?.nom || "Bureau") : "Membre",
     statut: m.statut,
     compteActive: !!m.profile?.auth_user_id,
-    fondsGarantieCible: m.fonds_garantie_cible || 0,
-    fondsGarantieSolde: m.fonds_garantie_solde || 0,
   }));
 }
 
-// Invite un nouveau membre : crée directement son compte de connexion
-// (identifiant + mot de passe temporaire, comme pour un admin), en
-// protégeant la session de la personne qui invite (l'admin reste
-// connecté à son propre compte pendant et après l'opération).
-export async function inviterMembre(groupId, { nom, email, telephone, typeMembre, posteId, fondsGarantieCible }) {
+export async function inviterMembre(groupId, { nom, email, telephone, typeMembre, posteId }) {
   const identifiantBase = genererIdentifiant(nom);
   const identifiant = `${identifiantBase}${Math.floor(10 + Math.random() * 90)}`;
   const motDePasseTemp = genererMotDePasseTemp();
 
-  // 1. Sauvegarde la session actuelle (l'admin), pour la restaurer après
   const { data: { session: sessionAdmin } } = await supabase.auth.getSession();
 
-  // 2. Crée le compte de connexion du nouveau membre
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password: motDePasseTemp,
@@ -67,8 +56,6 @@ export async function inviterMembre(groupId, { nom, email, telephone, typeMembre
   if (authError) throw authError;
   if (!authData.user) throw new Error("Impossible de créer le compte de ce membre.");
 
-  // 3. Restaure la session de l'admin (signUp peut avoir basculé la
-  //    session active vers le nouveau compte selon la config du projet)
   if (sessionAdmin) {
     await supabase.auth.setSession({
       access_token: sessionAdmin.access_token,
@@ -76,7 +63,6 @@ export async function inviterMembre(groupId, { nom, email, telephone, typeMembre
     });
   }
 
-  // 4. Crée le profil du membre, relié à son compte
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .insert({ auth_user_id: authData.user.id, nom_complet: nom, email, telephone, identifiant, doit_changer_mdp: true })
@@ -84,7 +70,6 @@ export async function inviterMembre(groupId, { nom, email, telephone, typeMembre
     .single();
   if (profileError) throw profileError;
 
-  // 5. Crée son appartenance au groupe, statut "en attente"
   const { data: membre, error: membreError } = await supabase
     .from("group_members")
     .insert({
@@ -92,8 +77,6 @@ export async function inviterMembre(groupId, { nom, email, telephone, typeMembre
       profile_id: profile.id,
       type_membre: typeMembre,
       poste_id: posteId || null,
-      fonds_garantie_cible: fondsGarantieCible || 0,
-      fonds_garantie_solde: 0,
       statut: "en attente",
     })
     .select()
@@ -104,8 +87,6 @@ export async function inviterMembre(groupId, { nom, email, telephone, typeMembre
   return { membre, email, identifiant, motDePasseTemp };
 }
 
-// Modifie les informations d'un membre déjà inscrit (jamais son
-// mot de passe, qui reste géré uniquement par lui-même)
 export async function modifierMembre(profileId, { nom, email, telephone, profession, quartier }) {
   const champs = {};
   if (nom !== undefined) champs.nom_complet = nom;
@@ -125,7 +106,6 @@ export async function modifierMembre(profileId, { nom, email, telephone, profess
   return data;
 }
 
-// Le Président valide l'invitation d'un membre
 export async function validerMembre(groupMemberId, validateurId) {
   const { data, error } = await supabase
     .from("group_members")
@@ -138,8 +118,6 @@ export async function validerMembre(groupMemberId, validateurId) {
   return data;
 }
 
-// Rend un membre actif ou inactif (suspend/réactive son accès au
-// groupe, sans le supprimer — ses données/historique restent intacts)
 export async function toggleActifMembre(groupMemberId, nouveauStatut) {
   const { data, error } = await supabase
     .from("group_members")
@@ -152,13 +130,11 @@ export async function toggleActifMembre(groupMemberId, nouveauStatut) {
   return data;
 }
 
-// Récupère les informations d'appartenance au groupe du membre
-// actuellement connecté (utilisé sur son propre tableau de bord)
 export async function fetchMonCompteMembre(groupId, profileId) {
   const { data, error } = await supabase
     .from("group_members")
     .select(`
-      id, type_membre, statut, fonds_garantie_cible, fonds_garantie_solde, created_at,
+      id, type_membre, statut, created_at,
       poste:postes_bureau ( nom )
     `)
     .eq("group_id", groupId)
@@ -170,55 +146,10 @@ export async function fetchMonCompteMembre(groupId, profileId) {
     id: data.id,
     role: data.type_membre === "Membre du bureau" ? (data.poste?.nom || "Bureau") : "Membre",
     statut: data.statut,
-    fondsGarantieCible: data.fonds_garantie_cible || 0,
-    fondsGarantieSolde: data.fonds_garantie_solde || 0,
     depuisLe: data.created_at,
   };
 }
 
-// Fixe (ou modifie) le montant cible du fonds de garantie d'un membre
-export async function fixerCibleFondsGarantie(groupMemberId, nouvelleCible) {
-  const { error } = await supabase
-    .from("group_members")
-    .update({ fonds_garantie_cible: nouvelleCible })
-    .eq("id", groupMemberId);
-  if (error) throw error;
-}
-
-// Enregistre un versement vers le fonds de garantie d'un membre,
-// et met à jour son solde accumulé en conséquence.
-export async function enregistrerVersementFondsGarantie(groupMemberId, montant, date) {
-  const { data: membre, error: errLecture } = await supabase
-    .from("group_members")
-    .select("fonds_garantie_solde")
-    .eq("id", groupMemberId)
-    .single();
-  if (errLecture) throw errLecture;
-
-  const nouveauSolde = (membre.fonds_garantie_solde || 0) + montant;
-
-  const { error: errMaj } = await supabase
-    .from("group_members")
-    .update({ fonds_garantie_solde: nouveauSolde })
-    .eq("id", groupMemberId);
-  if (errMaj) throw errMaj;
-
-  const { error: errMouvement } = await supabase.from("fonds_garantie_mouvements").insert({
-    membre_id: groupMemberId,
-    montant,
-    date_mouvement: date || new Date().toISOString().slice(0, 10),
-  });
-  if (errMouvement) throw errMouvement;
-
-  return nouveauSolde;
-}
-
-// Supprime un membre du groupe, uniquement s'il n'a JAMAIS effectué
-// de cotisation (tontine ou épargne/banque) — vérifié avant suppression.
-// Réinitialise directement le mot de passe d'un membre de son
-// propre groupe (accès d'urgence), sans passer par un email.
-// Génère un nouveau mot de passe temporaire, et marque que le
-// membre devra en choisir un nouveau à sa prochaine connexion.
 export async function reinitialiserMotDePasseMembre(email) {
   const nombre = Math.floor(1000 + Math.random() * 9000);
   const motDePasseTemp = `Tontine-${nombre}`;
