@@ -4209,6 +4209,7 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
 
         <div style={{ margin: "12px 20px 0", fontSize: "10px", color: "#fff", background: "#7C3AED", borderRadius: "8px", padding: "8px 10px", fontFamily: "monospace" }}>
           DIAGNOSTIC — chargement: {String(chargement)} | erreur: "{erreur}" | monCompte: {monCompte ? "présent" : "null"} | tableauDeBord: {tableauDeBord ? "présent" : "null"}
+          <br />groupId: "{groupId}" | profileId: "{profileId}"
         </div>
 
         <div style={{ padding: "18px 20px" }}>
