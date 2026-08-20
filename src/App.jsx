@@ -37,7 +37,7 @@ import {
   Users, Plus, KeyRound, Search, ShieldAlert, ChevronRight, Building2, X,
   CreditCard, ScrollText, LayoutDashboard, Wallet, Shield, FileBarChart,
   Gavel, Bell, LogOut, Moon, Sun, Lock, ChevronLeft, CheckCircle2, Clock,
-  Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat, Eye, EyeOff,
+  Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat,
 } from "lucide-react";
 
 // ---------- Palette partagée ----------
@@ -175,7 +175,6 @@ function ConnexionScreen({ onLoggedIn }) {
   const [dark, setDark] = useState(false);
   const [identifiant, setIdentifiant] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [erreur, setErreur] = useState("");
   const [chargement, setChargement] = useState(false);
   const [modeOubli, setModeOubli] = useState(false);
@@ -258,19 +257,13 @@ function ConnexionScreen({ onLoggedIn }) {
                   <div style={{ position: "relative" }}>
                     <Lock size={15} color={sub} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
                     <input
-                      type={showPassword ? "text" : "password"}
+                      type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                       placeholder="••••••••"
-                      style={{ width: "100%", boxSizing: "border-box", padding: "12px 38px 12px 38px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
+                      style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px 12px 38px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
                     />
-                    <div
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", cursor: "pointer", display: "flex" }}
-                    >
-                      {showPassword ? <EyeOff size={15} color={sub} /> : <Eye size={15} color={sub} />}
-                    </div>
                   </div>
                   <div style={{ textAlign: "right", marginTop: "6px" }}>
                     <span
@@ -2382,25 +2375,6 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   delaiJours: delaiJoursAssurance,
                 });
                 await rechargerAssurance();
-
-                const membresActifs = membres.filter((m) => m.statut === "actif");
-                const beneficiaire = membresActifs.find((m) => m.id === evenementBeneficiaire);
-                if (beneficiaire?.telephone) {
-                  envoyerSMS({
-                    message: `Bonjour ${beneficiaire.nom}, votre aide assurance de ${fmtFCFA(montantBrut)} a été déclarée et sera décaissée prochainement.`,
-                    numeros: [beneficiaire.telephone],
-                  });
-                }
-                const autresNumeros = membresActifs
-                  .filter((m) => m.id !== evenementBeneficiaire && m.telephone)
-                  .map((m) => m.telephone);
-                if (autresNumeros.length > 0) {
-                  envoyerSMS({
-                    message: `Info assurance : une aide a été déclarée pour un membre. Un prélèvement au prorata a été appliqué sur votre solde d'assurance.`,
-                    numeros: autresNumeros,
-                  });
-                }
-
                 setEvenementError("");
                 setEvenementSuccess(true);
                 setTimeout(() => {
@@ -2468,17 +2442,6 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   .map((m) => ({ membreId: m.id, montant: cotisationAssuranceMontants[m.nom] }));
                 await enregistrerCotisationsAssurance(groupId, cotisations, soldeMinimum);
                 await rechargerAssurance();
-
-                cotisations.forEach((c) => {
-                  const membre = membres.find((m) => m.id === c.membreId);
-                  if (membre?.telephone) {
-                    envoyerSMS({
-                      message: `Bonjour ${membre.nom}, votre cotisation assurance de ${fmtFCFA(c.montant)} a bien été enregistrée.`,
-                      numeros: [membre.telephone],
-                    });
-                  }
-                });
-
                 setCotisationAssuranceErreur("");
                 setCotisationAssuranceDate("");
                 setCotisationAssuranceMontants({});
@@ -2629,18 +2592,6 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 await enregistrerCotisationsEpargne(cotisationEpargneId, cotisations);
                 await rechargerEpargnes();
                 await rechargerHistoriqueBanque();
-
-                const epargneNom = epargnes.find((ep) => ep.id === cotisationEpargneId)?.nom || "épargne";
-                cotisations.forEach((c) => {
-                  const membre = membres.find((m) => m.id === c.membreId);
-                  if (membre?.telephone) {
-                    envoyerSMS({
-                      message: `Bonjour ${membre.nom}, votre versement de ${fmtFCFA(c.montant)} sur "${epargneNom}" a bien été enregistré.`,
-                      numeros: [membre.telephone],
-                    });
-                  }
-                });
-
                 setCotisationBanqueErreur("");
                 setCotisationDate("");
                 setCotisationMontants({});
@@ -2779,15 +2730,6 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 await rechargerPrets();
                 await rechargerEpargnes();
                 await rechargerHistoriqueBanque();
-
-                const emprunteur = membres.find((m) => m.id === creditMembreId);
-                if (emprunteur?.telephone) {
-                  envoyerSMS({
-                    message: `Bonjour ${emprunteur.nom}, votre crédit de ${fmtFCFA(montantNum)} a été accordé. Échéance : ${creditFin}.`,
-                    numeros: [emprunteur.telephone],
-                  });
-                }
-
                 setCreditError("");
                 setCreditSuccess(true);
                 setTimeout(() => {
@@ -3741,15 +3683,6 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               if (!montantNum || montantNum <= 0) { setAmendeError("Montant invalide."); return; }
               try {
                 await appliquerAmendeTontine(showAmende.tourId, showAmende.membreId, { montant: montantNum, motif: amendeMotif.trim() });
-
-                const membre = membres.find((m) => m.id === showAmende.membreId);
-                if (membre?.telephone) {
-                  envoyerSMS({
-                    message: `Bonjour ${membre.nom}, une amende de ${fmtFCFA(montantNum)} vous a été appliquée${amendeMotif.trim() ? ` (${amendeMotif.trim()})` : ""}.`,
-                    numeros: [membre.telephone],
-                  });
-                }
-
                 setAmendeMontant(""); setAmendeMotif(""); setAmendeError("");
                 setShowAmende(null);
               } catch (e) {
@@ -3846,15 +3779,6 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               try {
                 await verserTour(tontineActive.id, showPayout.id, showPayout.tour);
                 await rechargerTontine();
-
-                const beneficiaire = membres.find((m) => m.id === showPayout.beneficiaireId);
-                if (beneficiaire?.telephone) {
-                  envoyerSMS({
-                    message: `Félicitations ${beneficiaire.nom} ! Votre cagnotte tontine du tour ${showPayout.tour} (${showPayout.montant}) vous a été versée.`,
-                    numeros: [beneficiaire.telephone],
-                  });
-                }
-
                 setShowPayout(null);
               } catch (e) {
                 console.error("Erreur lors du versement", e);
