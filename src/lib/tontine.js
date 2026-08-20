@@ -4,8 +4,6 @@ import { supabase } from "./supabaseClient";
 // TONTINE
 // ============================================================
 
-// Récupère la tontine active du groupe (statut "en cours"), avec
-// tous ses tours et le nom du bénéficiaire de chacun.
 export async function fetchTontineActive(groupId) {
   const { data: tontine, error: errTontine } = await supabase
     .from("tontines")
@@ -47,10 +45,6 @@ export async function fetchTontineActive(groupId) {
   };
 }
 
-// Crée une nouvelle tontine : la tontine elle-même, ses séances,
-// et un tour par séance, en désignant le bénéficiaire par
-// rotation simple sur la liste des membres actifs (sauf mode
-// "Enchères", où le bénéficiaire reste à désigner).
 export async function creerTontine(groupId, { nom, montantParTour, seances, membresActifs, dateDebut }) {
   const { data: tontine, error: errTontine } = await supabase
     .from("tontines")
@@ -94,8 +88,6 @@ export async function creerTontine(groupId, { nom, montantParTour, seances, memb
   return { tontine, tours };
 }
 
-// Clôture le tour en cours (versement fait au bénéficiaire) et
-// active automatiquement le tour suivant.
 export async function verserTour(tontineId, tourId, numeroActuel) {
   const { error: errCloture } = await supabase
     .from("tontine_tours")
@@ -111,8 +103,6 @@ export async function verserTour(tontineId, tourId, numeroActuel) {
   if (errSuivant) throw errSuivant;
 }
 
-// Enregistre les cotisations d'une séance pour un tour donné
-// (un membre laissé vide n'est simplement pas inclus)
 export async function enregistrerCotisationsTontine(tourId, cotisations) {
   const lignes = cotisations
     .filter((c) => c.montant && parseFloat(c.montant) > 0)
@@ -129,10 +119,6 @@ export async function enregistrerCotisationsTontine(tourId, cotisations) {
   if (error) throw error;
 }
 
-// Ajoute un membre à une tontine déjà en cours. S'il y a des tours
-// déjà clôturés, il doit verser un "rappel" pour rattraper les tours
-// passés — ce montant est réparti en cotisations sur chaque tour
-// déjà clôturé, pour rester cohérent avec le suivi des cotisations.
 export async function ajouterMembreAuCycle(tontineId, membreId, montantRappel, toursClotures) {
   if (toursClotures.length > 0 && montantRappel > 0) {
     const parTour = montantRappel / toursClotures.length;
@@ -147,10 +133,6 @@ export async function ajouterMembreAuCycle(tontineId, membreId, montantRappel, t
   }
 }
 
-// Enregistre le résultat d'une enchère sur un tour : désigne le
-// bénéficiaire, fixe le montant de l'enchère (= la commission qui
-// sera redistribuée en fin de cycle), et calcule le montant net
-// réellement versé au bénéficiaire (cagnotte totale − commission).
 export async function enregistrerEnchere(tourId, beneficiaireId, montantEnchere, cagnotteTotale) {
   const montantNet = cagnotteTotale - montantEnchere;
   const { error } = await supabase
@@ -175,7 +157,6 @@ export async function fetchCotisationsTour(tourId) {
   return data.map((c) => c.membre_id);
 }
 
-// Applique une amende de retard sur un membre, pour un tour donné
 export async function appliquerAmendeTontine(tourId, membreId, { joursRetard, montant, motif }) {
   const { error } = await supabase.from("tontine_amendes").insert({
     tour_id: tourId,
@@ -189,10 +170,6 @@ export async function appliquerAmendeTontine(tourId, membreId, { joursRetard, mo
 
 // ============================================================
 // REDISTRIBUTION DE LA COMMISSION D'ENCHÈRES (fin de cycle)
-// La part de chaque membre est proportionnelle au nombre de tours
-// où il a effectivement cotisé, pas seulement au nombre total de
-// membres — un membre qui n'a pas fait tout le cycle reçoit une
-// part réduite, calculée équitablement.
 // ============================================================
 
 export async function fetchApercuRedistribution(tontineId) {
@@ -239,9 +216,6 @@ export async function fetchApercuRedistribution(tontineId) {
   };
 }
 
-// Enregistre la redistribution : une ligne par membre dans
-// tontine_redistributions, en mode "pondéré" (proportionnel au
-// nombre de tours où chacun a cotisé).
 export async function redistribuerCommission(tontineId, membresApercu) {
   const lignes = membresApercu
     .filter((m) => m.part > 0)
