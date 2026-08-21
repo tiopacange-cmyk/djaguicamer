@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre, reinitialiserMotDePasseMembre } from "./lib/membres";
 import { fetchTypesFonds, creerTypeFonds, supprimerTypeFonds, fetchFondsTousMembres, fixerCibleFonds, enregistrerVersementFonds, fetchFondsMembre } from "./lib/fonds";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse } from "./lib/auth";
-import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire } from "./lib/groups";
+import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere, fetchApercuRedistribution, redistribuerCommission } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit, fetchApercuCloture, cloturerEpargne } from "./lib/banque";
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
@@ -58,6 +58,7 @@ export default function AppPrototype() {
   const [mesGroupes, setMesGroupes] = useState([]);
   const [modeRecuperation, setModeRecuperation] = useState(false);
   const [vueEspacePersonnel, setVueEspacePersonnel] = useState(false);
+  const [statutAbonnement, setStatutAbonnement] = useState(null);
 
   const chargerSessionEtRole = async () => {
     setChargementSession(true);
@@ -142,6 +143,36 @@ export default function AppPrototype() {
   const estSuperAdmin = monProfil?.is_super_admin === true;
   const groupeAdmin = mesGroupes.find((g) => g.is_admin || g.is_president);
   const groupeMembreSimple = mesGroupes.find((g) => !g.is_admin && !g.is_president);
+  const monGroupeId = groupeAdmin?.group?.id || groupeMembreSimple?.group?.id;
+
+  useEffect(() => {
+    if (!monGroupeId || estSuperAdmin) return;
+    fetchStatutAbonnement(monGroupeId)
+      .then(setStatutAbonnement)
+      .catch((e) => console.error("Erreur de vérification de l'abonnement", e));
+  }, [monGroupeId, estSuperAdmin]);
+
+  if (!estSuperAdmin && monGroupeId && statutAbonnement?.expire) {
+    return (
+      <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: "30px", textAlign: "center" }}>
+        <div style={{ maxWidth: "360px" }}>
+          <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", borderRadius: "14px", background: C.warnBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <ShieldAlert size={26} color={C.warn} />
+          </div>
+          <h1 style={{ fontSize: "18px", fontWeight: 700, color: C.ink, margin: "0 0 8px" }}>Licence expirée</h1>
+          <p style={{ fontSize: "13px", color: C.sub, margin: "0 0 16px" }}>
+            L'abonnement de ton groupe a expiré le {new Date(statutAbonnement.dateExpiration).toLocaleDateString("fr-FR")}. Contacte le Super Admin de la plateforme pour le renouveler.
+          </p>
+          <button
+            onClick={handleDeconnexion}
+            style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px 20px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+          >
+            Déconnexion
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ fontFamily: "'Sora','Segoe UI',sans-serif", background: "#0E1210" }}>
@@ -149,6 +180,11 @@ export default function AppPrototype() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", background: "#0E1210" }}>
         <span style={{ fontSize: "12px", color: "#9AA69C" }}>
           Connecté : {monProfil?.nom_complet || "—"} {estSuperAdmin ? "(Super Admin)" : ""}
+          {!estSuperAdmin && statutAbonnement && !statutAbonnement.expire && statutAbonnement.joursRestants <= 7 && (
+            <span style={{ color: C.accent, marginLeft: "10px" }}>
+              — {statutAbonnement.joursRestants} jour(s) restant(s) sur l'abonnement
+            </span>
+          )}
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           {groupeAdmin && !estSuperAdmin && (
@@ -485,6 +521,14 @@ function SuperAdminScreen() {
   const [adminNom, setAdminNom] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [creationEnCours, setCreationEnCours] = useState(false);
+  const [creationFormule, setCreationFormule] = useState("Essai");
+  const [creationPeriodicite, setCreationPeriodicite] = useState("Mensuel");
+  const [showRenouveler, setShowRenouveler] = useState(null);
+  const [renouvelerFormule, setRenouvelerFormule] = useState("Basic");
+  const [renouvelerPeriodicite, setRenouvelerPeriodicite] = useState("Mensuel");
+  const [renouvelerErreur, setRenouvelerErreur] = useState("");
+  const [renouvelerSuccess, setRenouvelerSuccess] = useState(false);
+  const [renouvelerEnCours, setRenouvelerEnCours] = useState(false);
   const [creationErreur, setCreationErreur] = useState("");
   const [resultatCreation, setResultatCreation] = useState(null);
 
@@ -606,6 +650,7 @@ function SuperAdminScreen() {
                   style={btnPrimary}
                   onClick={() => {
                     setNomGroupe(""); setAdminNom(""); setAdminEmail("");
+                    setCreationFormule("Essai"); setCreationPeriodicite("Mensuel");
                     setCreationErreur(""); setResultatCreation(null);
                     setShowCreateGroupe(true);
                   }}
@@ -623,8 +668,8 @@ function SuperAdminScreen() {
 
             <div style={{ marginTop: "22px" }} />
             <Table
-              cols={["Groupe", "Formule", "Échéance", "Statut"]}
-              widths="2fr 1.1fr 1.2fr 1.1fr"
+              cols={["Groupe", "Formule", "Échéance", "Statut", ""]}
+              widths="1.8fr 1.1fr 1.2fr 1fr 1.1fr"
               rows={groupes.map((g) => {
                 const abo = g.subscriptions?.[0];
                 return [
@@ -634,6 +679,18 @@ function SuperAdminScreen() {
                   ) : "—",
                   abo?.date_expiration ? <span style={{ color: C.sub, fontSize: 12 }}>{new Date(abo.date_expiration).toLocaleDateString("fr-FR")}</span> : "—",
                   abo ? <Badge bg={(statusStyle[abo.statut] || statusStyle.actif).bg} fg={(statusStyle[abo.statut] || statusStyle.actif).fg}>{abo.statut}</Badge> : "—",
+                  <button
+                    onClick={() => {
+                      setShowRenouveler(g);
+                      setRenouvelerFormule(abo?.formule || "Basic");
+                      setRenouvelerPeriodicite(abo?.periodicite || "Mensuel");
+                      setRenouvelerErreur("");
+                      setRenouvelerSuccess(false);
+                    }}
+                    style={{ background: "transparent", color: C.vifVert, border: `1px solid ${C.vifVert}66`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                  >
+                    Renouveler
+                  </button>,
                 ];
               })}
             />
@@ -770,6 +827,73 @@ function SuperAdminScreen() {
         )}
       </div>
 
+      {showRenouveler && (
+        <Modal onClose={() => setShowRenouveler(null)} title={`Renouveler — ${showRenouveler.nom}`} icon={<CreditCard />} accentColor={C.vifVert}>
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Formule</label>
+            <select
+              value={renouvelerFormule}
+              onChange={(e) => setRenouvelerFormule(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+            >
+              {plans.filter((p) => p.formule !== "Essai").map((p) => <option key={p.id} value={p.formule}>{p.formule}</option>)}
+              {plans.length === 0 && <><option>Basic</option><option>Standard</option><option>Pro</option></>}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Périodicité</label>
+            <div style={{ display: "flex", gap: "8px" }}>
+              {["Mensuel", "Annuel"].map((p) => (
+                <div
+                  key={p}
+                  onClick={() => setRenouvelerPeriodicite(p)}
+                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${renouvelerPeriodicite === p ? C.vifVert : C.border}`, background: renouvelerPeriodicite === p ? `${C.vifVert}14` : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: renouvelerPeriodicite === p ? C.vifVert : C.sub, cursor: "pointer" }}
+                >
+                  {p}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+            Prolonge l'accès de {renouvelerPeriodicite === "Annuel" ? "365 jours" : "30 jours"}, à partir d'aujourd'hui (ou de la date d'expiration actuelle si elle n'est pas encore dépassée).
+          </div>
+
+          {renouvelerErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {renouvelerErreur}
+            </div>
+          )}
+          {renouvelerSuccess && (
+            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <CheckCircle2 size={14} /> Abonnement renouvelé.
+            </div>
+          )}
+
+          {!renouvelerSuccess && (
+            <button
+              disabled={renouvelerEnCours}
+              style={{ marginTop: "6px", background: C.vifVert, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: renouvelerEnCours ? "default" : "pointer" }}
+              onClick={async () => {
+                setRenouvelerEnCours(true);
+                setRenouvelerErreur("");
+                try {
+                  await renouvelerAbonnement(showRenouveler.id, renouvelerFormule, renouvelerPeriodicite);
+                  await chargerGroupes();
+                  setRenouvelerSuccess(true);
+                } catch (e) {
+                  console.error("Erreur de renouvellement", e);
+                  setRenouvelerErreur(e.message || "Erreur lors du renouvellement.");
+                } finally {
+                  setRenouvelerEnCours(false);
+                }
+              }}
+            >
+              {renouvelerEnCours ? "Renouvellement..." : "Renouveler l'abonnement"}
+            </button>
+          )}
+        </Modal>
+      )}
+
       {showCreateGroupe && (
         <Modal onClose={() => setShowCreateGroupe(false)} title="Créer un nouveau groupe">
           {!resultatCreation ? (
@@ -777,6 +901,41 @@ function SuperAdminScreen() {
               <FormField label="Nom du groupe" placeholder="Ex. Tontine Les Bâtisseurs" value={nomGroupe} onChange={(e) => setNomGroupe(e.target.value)} />
               <FormField label="Nom de l'administrateur" placeholder="Ex. Jean Mballa" value={adminNom} onChange={(e) => setAdminNom(e.target.value)} />
               <FormField label="Email de l'administrateur" placeholder="Ex. jean.mballa@exemple.com" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
+
+              <div>
+                <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Formule</label>
+                <select
+                  value={creationFormule}
+                  onChange={(e) => setCreationFormule(e.target.value)}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+                >
+                  {plans.length === 0 && <option value="Essai">Essai</option>}
+                  {plans.map((p) => <option key={p.id} value={p.formule}>{p.formule} ({Number(p.prix_mensuel).toLocaleString("fr-FR")} FCFA/mois)</option>)}
+                </select>
+              </div>
+
+              {creationFormule !== "Essai" && (
+                <div>
+                  <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Périodicité</label>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    {["Mensuel", "Annuel"].map((p) => (
+                      <div
+                        key={p}
+                        onClick={() => setCreationPeriodicite(p)}
+                        style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${creationPeriodicite === p ? C.accent2 : C.border}`, background: creationPeriodicite === p ? C.ok : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: creationPeriodicite === p ? C.accent2 : C.sub, cursor: "pointer" }}
+                      >
+                        {p}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+                {creationFormule === "Essai"
+                  ? "Accès gratuit pendant 14 jours."
+                  : `Accès activé pour ${creationPeriodicite === "Annuel" ? "365 jours (1 an)" : "30 jours (1 mois)"} à partir d'aujourd'hui.`}
+              </div>
 
               {creationErreur && (
                 <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
@@ -799,6 +958,8 @@ function SuperAdminScreen() {
                       nomGroupe: nomGroupe.trim(),
                       adminNom: adminNom.trim(),
                       adminEmail: adminEmail.trim(),
+                      formule: creationFormule,
+                      periodicite: creationPeriodicite,
                     });
                     setResultatCreation(resultat);
                     await chargerGroupes();
