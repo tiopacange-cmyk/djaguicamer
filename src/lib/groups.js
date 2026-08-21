@@ -28,10 +28,9 @@ export async function fetchGroupes() {
 // Crée un nouveau groupe + un compte admin pour ce groupe.
 // L'admin reçoit tout de suite un vrai compte de connexion, avec
 // un identifiant court (dérivé de son nom) pour se connecter facilement.
-export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, formule = "Essai" }) {
+export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, formule = "Essai", periodicite }) {
   const motDePasseTemp = genererMotDePasseTemp();
   const identifiantBase = genererIdentifiant(adminNom);
-  // Ajoute un petit suffixe aléatoire pour limiter les risques de collision
   const identifiant = `${identifiantBase}${Math.floor(10 + Math.random() * 90)}`;
 
   const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -55,12 +54,17 @@ export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, fo
     .single();
   if (groupeError) throw groupeError;
 
+  // La durée d'accès dépend du plan choisi : essai = 14 jours fixes,
+  // sinon 30 jours (mensuel) ou 365 jours (annuel).
   const dateExpiration = new Date();
-  dateExpiration.setDate(dateExpiration.getDate() + 14);
+  const nbJours = formule === "Essai" ? 14 : periodicite === "Annuel" ? 365 : 30;
+  dateExpiration.setDate(dateExpiration.getDate() + nbJours);
+
   const { error: subError } = await supabase.from("subscriptions").insert({
     group_id: groupe.id,
     formule,
-    statut: "essai",
+    periodicite: formule === "Essai" ? null : periodicite,
+    statut: formule === "Essai" ? "essai" : "actif",
     date_expiration: dateExpiration.toISOString(),
   });
   if (subError) throw subError;
@@ -89,9 +93,6 @@ export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, fo
 // (sans email, pour un accès immédiat)
 // ============================================================
 
-// Liste tous les admins/présidents de tous les groupes, pour que
-// le Super Admin les choisisse dans une liste plutôt que de taper
-// un email
 export async function fetchAdminsDesGroupes() {
   const { data, error } = await supabase
     .from("group_members")
@@ -116,9 +117,6 @@ export async function fetchAdminsDesGroupes() {
     }));
 }
 
-// Réinitialise directement le mot de passe (sans email), génère
-// un nouveau mot de passe temporaire, et marque que la personne
-// devra en choisir un nouveau à sa prochaine connexion.
 export async function reinitialiserMotDePasseDirect(email, groupId, groupNom) {
   const motDePasseTemp = genererMotDePasseTemp();
 
@@ -139,8 +137,6 @@ export async function reinitialiserMotDePasseDirect(email, groupId, groupNom) {
   return motDePasseTemp;
 }
 
-// Change son propre mot de passe (utilisé après une réinitialisation
-// d'urgence, à la prochaine connexion)
 export async function changerMotDePasse(nouveauMotDePasse) {
   const { error } = await supabase.auth.updateUser({ password: nouveauMotDePasse });
   if (error) throw error;
@@ -204,4 +200,54 @@ export async function modifierPlanTarifaire(planId, { prixMensuel, prixAnnuel, l
 
   if (error) throw error;
   return data;
+}
+
+// ============================================================
+// LICENCE / ABONNEMENT — vérification d'accès et renouvellement
+// ============================================================
+
+export async function fetchStatutAbonnement(groupId) {
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("*")
+    .eq("group_id", groupId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const joursRestants = Math.ceil((new Date(data.date_expiration) - new Date()) / 86400000);
+  return {
+    formule: data.formule,
+    periodicite: data.periodicite,
+    statut: data.statut,
+    dateExpiration: data.date_expiration,
+    joursRestants,
+    expire: joursRestants < 0,
+  };
+}
+
+export async function renouvelerAbonnement(groupId, formule, periodicite) {
+  const { data: actuel, error: errLecture } = await supabase
+    .from("subscriptions")
+    .select("date_expiration")
+    .eq("group_id", groupId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (errLecture) throw errLecture;
+
+  const base = actuel && new Date(actuel.date_expiration) > new Date() ? new Date(actuel.date_expiration) : new Date();
+  const nbJours = periodicite === "Annuel" ? 365 : 30;
+  base.setDate(base.getDate() + nbJours);
+
+  const { error } = await supabase.from("subscriptions").insert({
+    group_id: groupId,
+    formule,
+    periodicite,
+    statut: "actif",
+    date_expiration: base.toISOString(),
+  });
+  if (error) throw error;
 }
