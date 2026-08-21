@@ -100,6 +100,11 @@ export default function AppPrototype() {
     return () => sub?.unsubscribe?.();
   }, []);
 
+  // Détermine quel écran afficher selon le rôle réel de la personne connectée.
+  const estSuperAdmin = monProfil?.is_super_admin === true;
+  const groupeAdmin = mesGroupes.find((g) => g.is_admin || g.is_president);
+  const groupeMembreSimple = mesGroupes.find((g) => !g.is_admin && !g.is_president);
+
   const handleDeconnexion = async () => {
     await signOut();
     setConnecte(false);
@@ -135,41 +140,6 @@ export default function AppPrototype() {
     return (
       <div style={{ fontFamily: "'Sora','Segoe UI',sans-serif" }}>
         <ChangerMotDePasseScreen onDone={chargerSessionEtRole} />
-      </div>
-    );
-  }
-
-  // Détermine quel écran afficher selon le rôle réel de la personne connectée
-  const estSuperAdmin = monProfil?.is_super_admin === true;
-  const groupeAdmin = mesGroupes.find((g) => g.is_admin || g.is_president);
-  const groupeMembreSimple = mesGroupes.find((g) => !g.is_admin && !g.is_president);
-  const monGroupeId = groupeAdmin?.group?.id || groupeMembreSimple?.group?.id;
-
-  useEffect(() => {
-    if (!monGroupeId || estSuperAdmin) return;
-    fetchStatutAbonnement(monGroupeId)
-      .then(setStatutAbonnement)
-      .catch((e) => console.error("Erreur de vérification de l'abonnement", e));
-  }, [monGroupeId, estSuperAdmin]);
-
-  if (!estSuperAdmin && monGroupeId && statutAbonnement?.expire) {
-    return (
-      <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: "30px", textAlign: "center" }}>
-        <div style={{ maxWidth: "360px" }}>
-          <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", borderRadius: "14px", background: C.warnBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ShieldAlert size={26} color={C.warn} />
-          </div>
-          <h1 style={{ fontSize: "18px", fontWeight: 700, color: C.ink, margin: "0 0 8px" }}>Licence expirée</h1>
-          <p style={{ fontSize: "13px", color: C.sub, margin: "0 0 16px" }}>
-            L'abonnement de ton groupe a expiré le {new Date(statutAbonnement.dateExpiration).toLocaleDateString("fr-FR")}. Contacte le Super Admin de la plateforme pour le renouveler.
-          </p>
-          <button
-            onClick={handleDeconnexion}
-            style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px 20px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
-          >
-            Déconnexion
-          </button>
-        </div>
       </div>
     );
   }
