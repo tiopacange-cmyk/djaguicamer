@@ -1051,6 +1051,19 @@ function SuperAdminScreen() {
 function AdminGroupeScreen({ groupId, nomGroupe }) {
   const fmtFCFA = (n) => `${Math.round(n).toLocaleString("fr-FR")} FCFA`;
 
+  // Vérifie le statut de la licence du groupe (bloque l'accès si
+  // expirée). Placé tout en haut, avant tout autre Hook, et le
+  // "return" plus bas reste unique — jamais de retour anticipé
+  // entre deux Hooks, pour rester conforme aux règles de React.
+  const [statutAbonnement, setStatutAbonnement] = useState(null);
+  useEffect(() => {
+    if (!groupId) return;
+    fetchStatutAbonnement(groupId)
+      .then(setStatutAbonnement)
+      .catch((e) => console.error("Erreur de vérification de la licence", e));
+  }, [groupId]);
+  const licenceExpiree = statutAbonnement?.expire === true;
+
   // Convertit une date saisie au format jj/mm/aaaa (celui utilisé
   // dans toute l'interface) vers le format aaaa-mm-jj attendu par
   // la base de données. Retourne null si le format est invalide.
@@ -1668,7 +1681,19 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
     setCotisationAssuranceMontants((prev) => ({ ...prev, [nom]: val }));
   };
 
-  return (
+  return licenceExpiree ? (
+    <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: "30px", textAlign: "center" }}>
+      <div style={{ maxWidth: "360px" }}>
+        <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", borderRadius: "14px", background: C.warnBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <ShieldAlert size={26} color={C.warn} />
+        </div>
+        <h1 style={{ fontSize: "18px", fontWeight: 700, color: C.ink, margin: "0 0 8px" }}>Licence expirée</h1>
+        <p style={{ fontSize: "13px", color: C.sub, margin: 0 }}>
+          L'abonnement de ce groupe a expiré{statutAbonnement?.dateExpiration ? ` le ${new Date(statutAbonnement.dateExpiration).toLocaleDateString("fr-FR")}` : ""}. Contacte le Super Admin de la plateforme pour le renouveler.
+        </p>
+      </div>
+    </div>
+  ) : (
     <div style={{ minHeight: "680px", background: C.bg, display: "flex", color: C.ink }}>
       <Sidebar
         role="Admin Groupe" sub={nomGroupe || "—"}
@@ -4920,7 +4945,16 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
   const [erreurDetail, setErreurDetail] = useState("");
+  const [statutAbonnement, setStatutAbonnement] = useState(null);
   const fmtFCFA = (n) => `${Math.round(n || 0).toLocaleString("fr-FR")} FCFA`;
+
+  useEffect(() => {
+    if (!groupId) return;
+    fetchStatutAbonnement(groupId)
+      .then(setStatutAbonnement)
+      .catch((e) => console.error("Erreur de vérification de la licence", e));
+  }, [groupId]);
+  const licenceExpiree = statutAbonnement?.expire === true;
 
   useEffect(() => {
     if (!groupId || !profileId) return;
@@ -4960,7 +4994,19 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
     return () => { annule = true; };
   }, [groupId, profileId]);
 
-  return (
+  return licenceExpiree ? (
+    <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: "30px", textAlign: "center" }}>
+      <div style={{ maxWidth: "320px" }}>
+        <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", borderRadius: "14px", background: C.warnBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <ShieldAlert size={26} color={C.warn} />
+        </div>
+        <h1 style={{ fontSize: "18px", fontWeight: 700, color: C.ink, margin: "0 0 8px" }}>Licence expirée</h1>
+        <p style={{ fontSize: "13px", color: C.sub, margin: 0 }}>
+          L'abonnement de ton groupe a expiré. Contacte l'admin de ton groupe ou le Super Admin de la plateforme.
+        </p>
+      </div>
+    </div>
+  ) : (
     <div style={{ minHeight: "680px", background: C.bg, display: "flex", justifyContent: "center", padding: "30px 0" }}>
       <div style={{ width: "360px", background: C.panel, borderRadius: "26px", border: `1px solid ${C.border}`, overflow: "hidden", boxShadow: "0 20px 50px rgba(27,67,50,0.1)" }}>
         <div style={{ background: C.accent2, padding: "22px 20px", color: "#FAF6ED" }}>
