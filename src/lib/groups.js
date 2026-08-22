@@ -1,292 +1,230 @@
 import { supabase } from "./supabaseClient";
 
-// Génère un mot de passe temporaire lisible (ex. Tontine-4821)
+function genererIdentifiant(nom) {
+  return nom.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+}
+
 function genererMotDePasseTemp() {
   const nombre = Math.floor(1000 + Math.random() * 9000);
   return `Tontine-${nombre}`;
 }
 
-// Génère un identifiant court à partir du nom (ex. "Jean Mballa" -> "jeanmballa")
-function genererIdentifiant(nom) {
-  return nom.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+// ============================================================
+// MEMBRES DU GROUPE
+// ============================================================
+
+export async function fetchMembres(groupId) {
+  const { data, error } = await supabase
+    .from("group_members")
+    .select(`
+      id,
+      type_membre,
+      statut,
+      created_at,
+      poste:postes_bureau ( nom ),
+      profile:profiles ( id, nom_complet, telephone, email, identifiant, auth_user_id )
+    `)
+    .eq("group_id", groupId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+
+  return data.map((m) => ({
+    id: m.id,
+    profileId: m.profile?.id,
+    nom: m.profile?.nom_complet || "—",
+    telephone: m.profile?.telephone || "",
+    email: m.profile?.email || "",
+    identifiant: m.profile?.identifiant || "",
+    role: m.type_membre === "Membre du bureau" ? (m.poste?.nom || "Bureau") : "Membre",
+    statut: m.statut,
+    compteActive: !!m.profile?.auth_user_id,
+  }));
 }
 
-// Liste tous les groupes (réservé au Super Admin)
-export async function fetchGroupes() {
+export async function inviterMembre(groupId, { nom, email, telephone, typeMembre, posteId }) {
+  const identifiantBase = genererIdentifiant(nom);
+  const identifiant = `${identifiantBase}${Math.floor(10 + Math.random() * 90)}`;
+  const motDePasseTemp = genererMotDePasseTemp();
+
+  const { data: { session: sessionAdmin } } = await supabase.auth.getSession();
+
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email,
+    password: motDePasseTemp,
+  });
+  if (authError) throw authError;
+  if (!authData.user) throw new Error("Impossible de créer le compte de ce membre.");
+
+  if (sessionAdmin) {
+    await supabase.auth.setSession({
+      access_token: sessionAdmin.access_token,
+      refresh_token: sessionAdmin.refresh_token,
+    });
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .insert({ auth_user_id: authData.user.id, nom_complet: nom, email, telephone, identifiant, doit_changer_mdp: true })
+    .select()
+    .single();
+  if (profileError) throw profileError;
+
+  const { data: membre, error: membreError } = await supabase
+    .from("group_members")
+    .insert({
+      group_id: groupId,
+      profile_id: profile.id,
+      type_membre: typeMembre,
+      poste_id: posteId || null,
+      statut: "en attente",
+    })
+    .select()
+    .single();
+
+  if (membreError) throw membreError;
+
+  return { membre, email, identifiant, motDePasseTemp };
+}
+
+export async function modifierMembre(profileId, { nom, email, telephone, profession, quartier }) {
+  const champs = {};
+  if (nom !== undefined) champs.nom_complet = nom;
+  if (email !== undefined) champs.email = email;
+  if (telephone !== undefined) champs.telephone = telephone;
+  if (profession !== undefined) champs.profession = profession;
+  if (quartier !== undefined) champs.quartier = quartier;
+
   const { data, error } = await supabase
-    .from("groups")
-    .select(`
-      id, nom, created_at,
-      subscriptions ( formule, periodicite, statut, date_expiration )
-    `)
-    .order("created_at", { ascending: false });
+    .from("profiles")
+    .update(champs)
+    .eq("id", profileId)
+    .select()
+    .single();
 
   if (error) throw error;
   return data;
 }
 
-// Crée un nouveau groupe + un compte admin pour ce groupe.
-// L'admin reçoit tout de suite un vrai compte de connexion, avec
-// un identifiant court (dérivé de son nom) pour se connecter facilement.
-export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, formule = "Essai", periodicite }) {
-  const motDePasseTemp = genererMotDePasseTemp();
-  const identifiantBase = genererIdentifiant(adminNom);
-  // Ajoute un petit suffixe aléatoire pour limiter les risques de collision
-  const identifiant = `${identifiantBase}${Math.floor(10 + Math.random() * 90)}`;
-
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email: adminEmail,
-    password: motDePasseTemp,
-  });
-  if (authError) throw authError;
-  if (!authData.user) throw new Error("Impossible de créer le compte administrateur.");
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .insert({ auth_user_id: authData.user.id, nom_complet: adminNom, email: adminEmail, identifiant, doit_changer_mdp: true })
+export async function validerMembre(groupMemberId, validateurId) {
+  const { data, error } = await supabase
+    .from("group_members")
+    .update({ statut: "actif", valide_par: validateurId, valide_le: new Date().toISOString() })
+    .eq("id", groupMemberId)
     .select()
     .single();
-  if (profileError) throw profileError;
 
-  const { data: groupe, error: groupeError } = await supabase
-    .from("groups")
-    .insert({ nom: nomGroupe })
-    .select()
-    .single();
-  if (groupeError) throw groupeError;
-
-  // La durée d'accès dépend du plan choisi : essai = 14 jours fixes,
-  // sinon 30 jours (mensuel) ou 365 jours (annuel).
-  const dateExpiration = new Date();
-  const nbJours = formule === "Essai" ? 14 : periodicite === "Annuel" ? 365 : 30;
-  dateExpiration.setDate(dateExpiration.getDate() + nbJours);
-
-  const { error: subError } = await supabase.from("subscriptions").insert({
-    group_id: groupe.id,
-    formule,
-    periodicite: formule === "Essai" ? null : periodicite,
-    statut: formule === "Essai" ? "essai" : "actif",
-    date_expiration: dateExpiration.toISOString(),
-  });
-  if (subError) throw subError;
-
-  const { error: memberError } = await supabase.from("group_members").insert({
-    group_id: groupe.id,
-    profile_id: profile.id,
-    type_membre: "Membre du bureau",
-    is_admin: true,
-    statut: "actif",
-  });
-  if (memberError) throw memberError;
-
-  await supabase.from("audit_log").insert({
-    group_id: groupe.id,
-    action: "Groupe créé",
-    detail: `Formule ${formule} — admin désigné : ${adminNom}`,
-    type: "création",
-  });
-
-  return { groupe, motDePasseTemp, adminEmail, identifiant };
+  if (error) throw error;
+  return data;
 }
 
-// ============================================================
-// ACCÈS D'URGENCE — réinitialisation directe du mot de passe
-// (sans email, pour un accès immédiat)
-// ============================================================
+export async function toggleActifMembre(groupMemberId, nouveauStatut) {
+  const { data, error } = await supabase
+    .from("group_members")
+    .update({ statut: nouveauStatut })
+    .eq("id", groupMemberId)
+    .select()
+    .single();
 
-// Liste tous les admins/présidents de tous les groupes, pour que
-// le Super Admin les choisisse dans une liste plutôt que de taper
-// un email
-export async function fetchAdminsDesGroupes() {
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchMonCompteMembre(groupId, profileId) {
   const { data, error } = await supabase
     .from("group_members")
     .select(`
-      is_admin, is_president,
-      profile:profiles ( email, nom_complet ),
-      group:groups ( id, nom )
+      id, type_membre, statut, created_at,
+      poste:postes_bureau ( nom )
     `)
-    .or("is_admin.eq.true,is_president.eq.true")
-    .eq("statut", "actif");
+    .eq("group_id", groupId)
+    .eq("profile_id", profileId)
+    .single();
 
   if (error) throw error;
-
-  return data
-    .filter((m) => m.profile?.email)
-    .map((m) => ({
-      email: m.profile.email,
-      nom: m.profile.nom_complet,
-      groupId: m.group?.id,
-      groupNom: m.group?.nom,
-      role: m.is_president ? "Président" : "Admin",
-    }));
+  return {
+    id: data.id,
+    role: data.type_membre === "Membre du bureau" ? (data.poste?.nom || "Bureau") : "Membre",
+    statut: data.statut,
+    depuisLe: data.created_at,
+  };
 }
 
-// Réinitialise directement le mot de passe (sans email), génère
-// un nouveau mot de passe temporaire, et marque que la personne
-// devra en choisir un nouveau à sa prochaine connexion.
-export async function reinitialiserMotDePasseDirect(email, groupId, groupNom) {
-  const motDePasseTemp = genererMotDePasseTemp();
+export async function reinitialiserMotDePasseMembre(email) {
+  const nombre = Math.floor(1000 + Math.random() * 9000);
+  const motDePasseTemp = `Tontine-${nombre}`;
 
-  const { error } = await supabase.rpc("reset_password_super_admin", {
+  const { error } = await supabase.rpc("reset_password_admin_groupe", {
     p_email: email,
     p_nouveau_mdp: motDePasseTemp,
   });
   if (error) throw error;
 
-  const { error: logError } = await supabase.from("audit_log").insert({
-    group_id: groupId || null,
-    action: "Réinitialisation mot de passe",
-    detail: `Mot de passe réinitialisé pour ${email}${groupNom ? ` (groupe : ${groupNom})` : ""}`,
-    type: "urgence",
-  });
-  if (logError) console.error("Erreur d'écriture dans le journal d'audit", logError);
-
   return motDePasseTemp;
 }
 
-// Change son propre mot de passe (utilisé après une réinitialisation
-// d'urgence, à la prochaine connexion)
-export async function changerMotDePasse(nouveauMotDePasse) {
-  const { error } = await supabase.auth.updateUser({ password: nouveauMotDePasse });
-  if (error) throw error;
+export async function supprimerMembre(groupMemberId) {
+  const { data: cotisationsTontine, error: errTontine } = await supabase
+    .from("tontine_cotisations")
+    .select("id")
+    .eq("membre_id", groupMemberId)
+    .limit(1);
+  if (errTontine) throw errTontine;
 
-  const { data: userData } = await supabase.auth.getUser();
-  if (userData.user) {
-    await supabase.from("profiles").update({ doit_changer_mdp: false }).eq("auth_user_id", userData.user.id);
+  const { data: mouvementsBanque, error: errBanque } = await supabase
+    .from("epargne_mouvements")
+    .select("id")
+    .eq("membre_id", groupMemberId)
+    .eq("type", "Versement")
+    .limit(1);
+  if (errBanque) throw errBanque;
+
+  if ((cotisationsTontine && cotisationsTontine.length > 0) || (mouvementsBanque && mouvementsBanque.length > 0)) {
+    throw new Error("Ce membre a déjà effectué au moins une cotisation — suppression impossible.");
   }
-}
 
-// ============================================================
-// JOURNAL D'AUDIT
-// ============================================================
-export async function fetchAuditLog() {
-  const { data, error } = await supabase
-    .from("audit_log")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const { error } = await supabase
+    .from("group_members")
+    .delete()
+    .eq("id", groupMemberId);
 
   if (error) throw error;
-  return data;
-}
-
-export async function logAudit({ groupId, action, detail, type }) {
-  const { error } = await supabase.from("audit_log").insert({
-    group_id: groupId || null,
-    action,
-    detail,
-    type,
-  });
-  if (error) console.error("Erreur d'écriture dans le journal d'audit", error);
 }
 
 // ============================================================
-// TARIFS / FORMULES D'ABONNEMENT
-// ============================================================
-export async function fetchPlansTarifaires() {
-  const { data, error } = await supabase
-    .from("plans_tarifaires")
-    .select("*")
-    .order("prix_mensuel", { ascending: true });
-
-  if (error) throw error;
-  return data;
-}
-
-export async function modifierPlanTarifaire(planId, { prixMensuel, prixAnnuel, limiteMembres, description }) {
-  const champs = { updated_at: new Date().toISOString() };
-  if (prixMensuel !== undefined) champs.prix_mensuel = prixMensuel;
-  if (prixAnnuel !== undefined) champs.prix_annuel = prixAnnuel;
-  if (limiteMembres !== undefined) champs.limite_membres = limiteMembres;
-  if (description !== undefined) champs.description = description;
-
-  const { data, error } = await supabase
-    .from("plans_tarifaires")
-    .update(champs)
-    .eq("id", planId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-// ============================================================
-// LICENCE / ABONNEMENT — vérification d'accès et renouvellement
+// DOCUMENTS DU MEMBRE (photo, CNI, plan de localisation)
 // ============================================================
 
-// Récupère le statut d'abonnement le plus récent d'un groupe, avec
-// le nombre de jours restants avant expiration.
-export async function fetchStatutAbonnement(groupId) {
-  const { data, error } = await supabase
-    .from("subscriptions")
-    .select("*")
-    .eq("group_id", groupId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return null;
-
-  const joursRestants = Math.ceil((new Date(data.date_expiration) - new Date()) / 86400000);
-  return {
-    formule: data.formule,
-    periodicite: data.periodicite,
-    statut: data.statut,
-    dateExpiration: data.date_expiration,
-    joursRestants,
-    expire: joursRestants < 0,
-  };
-}
-
-// Renouvelle l'abonnement d'un groupe : prolonge la date
-// d'expiration de 30 (mensuel) ou 365 (annuel) jours, à partir
-// d'aujourd'hui ou de la date d'expiration actuelle si elle n'est
-// pas encore dépassée.
-export async function renouvelerAbonnement(groupId, formule, periodicite) {
-  const { data: actuel, error: errLecture } = await supabase
-    .from("subscriptions")
-    .select("date_expiration")
-    .eq("group_id", groupId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (errLecture) throw errLecture;
-
-  const base = actuel && new Date(actuel.date_expiration) > new Date() ? new Date(actuel.date_expiration) : new Date();
-  const nbJours = periodicite === "Annuel" ? 365 : 30;
-  base.setDate(base.getDate() + nbJours);
-
-  const { error } = await supabase.from("subscriptions").insert({
-    group_id: groupId,
-    formule,
-    periodicite,
-    statut: "actif",
-    date_expiration: base.toISOString(),
-  });
-  if (error) throw error;
-}
-
-// ============================================================
-// LOGO DU GROUPE
-// ============================================================
-export async function televerserLogoGroupe(groupId, fichier) {
+export async function televerserDocumentMembre(groupMemberId, type, fichier) {
   const extension = fichier.name.split(".").pop();
-  const chemin = `${groupId}/logo-${Date.now()}.${extension}`;
+  const chemin = `${groupMemberId}/${type}-${Date.now()}.${extension}`;
 
-  const { error: errUpload } = await supabase.storage.from("logos-groupes").upload(chemin, fichier);
+  const { error: errUpload } = await supabase.storage.from("documents-membres").upload(chemin, fichier);
   if (errUpload) throw errUpload;
 
-  const { data: urlData } = supabase.storage.from("logos-groupes").getPublicUrl(chemin);
+  const { data: urlData } = supabase.storage.from("documents-membres").getPublicUrl(chemin);
 
-  const { error } = await supabase.from("groups").update({ logo_url: urlData.publicUrl }).eq("id", groupId);
+  const { error } = await supabase.from("member_documents").insert({
+    group_member_id: groupMemberId,
+    type,
+    fichier_url: urlData.publicUrl,
+  });
   if (error) throw error;
 
   return urlData.publicUrl;
 }
 
-export async function fetchLogoGroupe(groupId) {
-  const { data, error } = await supabase.from("groups").select("logo_url").eq("id", groupId).maybeSingle();
+export async function fetchDocumentsMembre(groupMemberId) {
+  const { data, error } = await supabase
+    .from("member_documents")
+    .select("type, fichier_url, uploaded_at")
+    .eq("group_member_id", groupMemberId)
+    .order("uploaded_at", { ascending: false });
   if (error) throw error;
-  return data?.logo_url || "";
+
+  const parType = {};
+  data.forEach((d) => {
+    if (!parType[d.type]) parType[d.type] = d.fichier_url;
+  });
+  return parType;
 }
