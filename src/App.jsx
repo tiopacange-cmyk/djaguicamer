@@ -266,7 +266,8 @@ function ConnexionScreen({ onLoggedIn }) {
                   <Users size={26} color="#FAF6ED" />
                 </div>
                 <div style={{ fontSize: "11px", letterSpacing: "0.12em", textTransform: "uppercase", color: C.accent, fontWeight: 600, marginBottom: "6px" }}>Connexion</div>
-                <h1 style={{ fontSize: "22px", fontWeight: 700, color: ink, margin: 0 }}>Plateforme Tontine</h1>
+                <h1 style={{ fontSize: "22px", fontWeight: 700, color: ink, margin: 0 }}>DJANGUI</h1>
+                <div style={{ fontSize: "10.5px", color: sub, marginTop: "4px", letterSpacing: "0.04em" }}>By 3TSOLUTION</div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                 <div>
@@ -577,7 +578,7 @@ function SuperAdminScreen() {
   const typeStyle = { urgence: { bg: "#FBF1DC", fg: C.accent }, "création": { bg: C.ok, fg: C.accent2 }, abonnement: { bg: "#EBE6F5", fg: C.purple } };
 
   return (
-    <div style={{ minHeight: "680px", background: C.bg, display: "flex", color: C.ink }}>
+    <div className="app-layout" style={{ minHeight: "680px", background: C.bg, display: "flex", color: C.ink }}>
       <Sidebar
         role="Super Admin" sub="Plateforme"
         items={[
@@ -587,10 +588,10 @@ function SuperAdminScreen() {
         ]}
         active={view} onSelect={setView}
       />
-      <div style={{ flex: 1, padding: "32px 40px" }}>
+      <div className="app-main" style={{ flex: 1, padding: "32px 40px", minWidth: 0 }}>
         {view === "groupes" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
               <div>
                 <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Groupes enregistrés</h1>
                 <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
@@ -1694,7 +1695,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       </div>
     </div>
   ) : (
-    <div style={{ minHeight: "680px", background: C.bg, display: "flex", color: C.ink }}>
+    <div className="app-layout" style={{ minHeight: "680px", background: C.bg, display: "flex", color: C.ink }}>
       <Sidebar
         role="Admin Groupe" sub={nomGroupe || "—"}
         items={[
@@ -1708,10 +1709,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         ]}
         active={view} onSelect={setView}
       />
-      <div style={{ flex: 1, padding: "32px 40px" }}>
+      <div className="app-main" style={{ flex: 1, padding: "32px 40px", minWidth: 0 }}>
         {view === "tontine" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
               <div>
                 <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
                   {tontineActive ? tontineActive.nom : "Aucune tontine active"}
@@ -1855,7 +1856,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
         {view === "banque" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
               <div>
                 <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Banques du groupe</h1>
                 <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>Banque scolaire, banque annuelle, et épargnes personnalisées.</p>
@@ -1953,7 +1954,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
         {view === "fonds" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
               <div>
                 <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Fonds</h1>
                 <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
@@ -2012,7 +2013,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
         {view === "depots" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
               <div>
                 <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Dépôt et retrait externe</h1>
                 <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
@@ -2179,7 +2180,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
         {view === "assurance" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
               <div>
                 <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Assurance mutuelle</h1>
                 <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>Solde minimum requis : {fmtFCFA(soldeMinimum)} par membre · délai de reconstitution : {delaiJoursAssurance} jours.</p>
@@ -2318,7 +2319,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
         {view === "membres" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
               <div>
                 <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Membres</h1>
                 <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
@@ -5008,7 +5009,7 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
     </div>
   ) : (
     <div style={{ minHeight: "680px", background: C.bg, display: "flex", justifyContent: "center", padding: "30px 0" }}>
-      <div style={{ width: "360px", background: C.panel, borderRadius: "26px", border: `1px solid ${C.border}`, overflow: "hidden", boxShadow: "0 20px 50px rgba(27,67,50,0.1)" }}>
+      <div className="responsive-card" style={{ width: "360px", maxWidth: "94vw", background: C.panel, borderRadius: "26px", border: `1px solid ${C.border}`, overflow: "hidden", boxShadow: "0 20px 50px rgba(27,67,50,0.1)" }}>
         <div style={{ background: C.accent2, padding: "22px 20px", color: "#FAF6ED" }}>
           <div style={{ fontSize: "12px", color: "#B7CCBD" }}>Bonjour,</div>
           <div style={{ fontSize: "18px", fontWeight: 700 }}>{nomComplet || "—"}</div>
@@ -5157,8 +5158,8 @@ function MiniCard({ icon, label, value, note, ok, warn }) {
 // ============================================================
 function Sidebar({ role, sub, items, active, onSelect }) {
   return (
-    <div style={{ width: "210px", background: C.accent2, padding: "26px 16px", display: "flex", flexDirection: "column", gap: "6px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "30px", paddingLeft: "6px" }}>
+    <div className="app-sidebar" style={{ width: "210px", background: C.accent2, padding: "26px 16px", display: "flex", flexDirection: "column", gap: "6px" }}>
+      <div className="sidebar-header" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "30px", paddingLeft: "6px" }}>
         <div style={{ width: "32px", height: "32px", borderRadius: "9px", background: C.accent, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <LayoutDashboard size={16} color={C.accent2} />
         </div>
@@ -5168,26 +5169,28 @@ function Sidebar({ role, sub, items, active, onSelect }) {
         </div>
       </div>
       {items.map((item) => (
-        <div key={item.key} onClick={() => onSelect(item.key)} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "8px", color: active === item.key ? C.accent2 : "#D7E3DA", background: active === item.key ? C.accent : "transparent", fontSize: "13px", fontWeight: active === item.key ? 600 : 500, cursor: "pointer" }}>
+        <div key={item.key} className="sidebar-item" onClick={() => onSelect(item.key)} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "8px", color: active === item.key ? C.accent2 : "#D7E3DA", background: active === item.key ? C.accent : "transparent", fontSize: "13px", fontWeight: active === item.key ? 600 : 500, cursor: "pointer" }}>
           {item.icon} {item.label}
         </div>
       ))}
-      <div style={{ marginTop: "auto", fontSize: "10.5px", color: "#7F9788", paddingLeft: "6px" }}>Three T Solutions — 2026</div>
+      <div className="sidebar-footer" style={{ marginTop: "auto", fontSize: "10.5px", color: "#7F9788", paddingLeft: "6px" }}>Three T Solutions — 2026</div>
     </div>
   );
 }
 
 function Table({ cols, widths, rows }) {
   return (
-    <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden" }}>
-      <div style={{ display: "grid", gridTemplateColumns: widths, padding: "12px 20px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: C.sub, borderBottom: `1px solid ${C.border}` }}>
-        {cols.map((c) => <div key={c}>{c}</div>)}
-      </div>
-      {rows.map((row, i) => (
-        <div key={i} style={{ display: "grid", gridTemplateColumns: widths, padding: "14px 20px", fontSize: "13px", alignItems: "center", borderBottom: i < rows.length - 1 ? `1px solid ${C.border}` : "none" }}>
-          {row.map((cell, j) => <div key={j}>{cell}</div>)}
+    <div className="table-scroll">
+      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: widths, padding: "12px 20px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: C.sub, borderBottom: `1px solid ${C.border}` }}>
+          {cols.map((c) => <div key={c}>{c}</div>)}
         </div>
-      ))}
+        {rows.map((row, i) => (
+          <div key={i} style={{ display: "grid", gridTemplateColumns: widths, padding: "14px 20px", fontSize: "13px", alignItems: "center", borderBottom: i < rows.length - 1 ? `1px solid ${C.border}` : "none" }}>
+            {row.map((cell, j) => <div key={j}>{cell}</div>)}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -5198,8 +5201,8 @@ function Badge({ bg, fg, children }) {
 
 function Modal({ children, onClose, title, icon, accentColor }) {
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(20,24,20,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10 }}>
-      <div style={{ background: "#FFFFFF", borderRadius: "16px", padding: "26px", width: "360px", maxHeight: "85vh", overflowY: "auto", border: `1px solid ${C.border}` }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(20,24,20,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, padding: "16px" }}>
+      <div className="responsive-modal" style={{ background: "#FFFFFF", borderRadius: "16px", padding: "26px", width: "360px", maxWidth: "100%", maxHeight: "85vh", overflowY: "auto", border: `1px solid ${C.border}` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             {icon && (
