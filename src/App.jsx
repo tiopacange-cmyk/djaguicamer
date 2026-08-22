@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre, reinitialiserMotDePasseMembre } from "./lib/membres";
+import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre, reinitialiserMotDePasseMembre, televerserDocumentMembre, fetchDocumentsMembre } from "./lib/membres";
 import { fetchTypesFonds, creerTypeFonds, supprimerTypeFonds, fetchFondsTousMembres, fixerCibleFonds, enregistrerVersementFonds, fetchFondsMembre } from "./lib/fonds";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse } from "./lib/auth";
-import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement } from "./lib/groups";
+import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement, televerserLogoGroupe, fetchLogoGroupe } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere, fetchApercuRedistribution, redistribuerCommission } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit, fetchApercuCloture, cloturerEpargne } from "./lib/banque";
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
@@ -502,6 +502,9 @@ function SuperAdminScreen() {
   const [renouvelerEnCours, setRenouvelerEnCours] = useState(false);
   const [creationErreur, setCreationErreur] = useState("");
   const [resultatCreation, setResultatCreation] = useState(null);
+  const [logoGroupeUrl, setLogoGroupeUrl] = useState("");
+  const [logoEnCours, setLogoEnCours] = useState(false);
+  const logoInputRef = useRef(null);
 
   // Accès d'urgence
   const [showResetAccess, setShowResetAccess] = useState(false);
@@ -622,7 +625,7 @@ function SuperAdminScreen() {
                   onClick={() => {
                     setNomGroupe(""); setAdminNom(""); setAdminEmail("");
                     setCreationFormule("Essai"); setCreationPeriodicite("Mensuel");
-                    setCreationErreur(""); setResultatCreation(null);
+                    setCreationErreur(""); setResultatCreation(null); setLogoGroupeUrl("");
                     setShowCreateGroupe(true);
                   }}
                 >
@@ -959,6 +962,41 @@ function SuperAdminScreen() {
                 <div><b>Identifiant de connexion :</b> {resultatCreation.identifiant}</div>
                 <div><b>Mot de passe temporaire :</b> {resultatCreation.motDePasseTemp}</div>
                 <div style={{ color: C.sub, fontSize: "11px", marginTop: "4px" }}>(Email associé : {resultatCreation.adminEmail})</div>
+              </div>
+              <div style={{ fontSize: "12px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "12px" }}>
+                <div style={{ marginBottom: "8px" }}>Logo du groupe (optionnel)</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  {logoGroupeUrl && (
+                    <img src={logoGroupeUrl} alt="Logo" style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "cover" }} />
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={logoInputRef}
+                    style={{ display: "none" }}
+                    onChange={async (e) => {
+                      const fichier = e.target.files[0];
+                      if (!fichier) return;
+                      setLogoEnCours(true);
+                      try {
+                        const url = await televerserLogoGroupe(resultatCreation.groupe.id, fichier);
+                        setLogoGroupeUrl(url);
+                      } catch (err) {
+                        console.error("Erreur de téléversement du logo", err);
+                      } finally {
+                        setLogoEnCours(false);
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+                  <button
+                    disabled={logoEnCours}
+                    onClick={() => logoInputRef.current?.click()}
+                    style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}55`, borderRadius: "7px", padding: "7px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                  >
+                    {logoEnCours ? "Envoi..." : logoGroupeUrl ? "Remplacer" : "Ajouter un logo"}
+                  </button>
+                </div>
               </div>
               <button
                 style={{ marginTop: "8px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
@@ -1345,7 +1383,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
     }
   };
 
-  useEffect(() => { rechargerPrets(); }, [groupId]);
+  useEffect(() => { if (view === "banque" || view === "bilan") rechargerPrets(); }, [groupId, view]);
 
   const tourStatus = { "clôturé": { bg: C.ok, fg: C.accent2 }, "en cours": { bg: "#FBF1DC", fg: C.accent }, "à venir": { bg: "#EEE", fg: C.sub } };
 
@@ -1412,7 +1450,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
     }
   };
 
-  useEffect(() => { rechargerComptes(); }, [groupId]);
+  useEffect(() => { if (view === "depots" || view === "bilan") rechargerComptes(); }, [groupId, view]);
 
   const rechargerDepots = async () => {
     if (!compteActifId) { setDepots([]); return; }
@@ -1428,7 +1466,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
     }
   };
 
-  useEffect(() => { rechargerDepots(); }, [compteActifId]);
+  useEffect(() => { if (view === "depots") rechargerDepots(); }, [compteActifId, view]);
 
   const compteActif = comptesBancaires.find((c) => c.id === compteActifId) || null;
   const soldeCompteActuel = depots.length ? depots[0].solde : fmtFCFA(0);
@@ -1457,7 +1495,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
     }
   };
 
-  useEffect(() => { rechargerHistoriqueBanque(); }, [groupId]);
+  useEffect(() => { if (view === "depots") rechargerHistoriqueBanque(); }, [groupId, view]);
   const [showInviteMember, setShowInviteMember] = useState(false);
   const [inviteNom, setInviteNom] = useState("");
   const [inviteTelephone, setInviteTelephone] = useState("");
@@ -1467,6 +1505,9 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [inviteSuccess, setInviteSuccess] = useState(false);
 
   const [showEditMembre, setShowEditMembre] = useState(false);
+  const [editDocuments, setEditDocuments] = useState({});
+  const [documentEnCours, setDocumentEnCours] = useState("");
+  const inputsDocumentsRef = useRef({});
   const [showHistoriqueMembre, setShowHistoriqueMembre] = useState(null);
   const [showGererFondsMembre, setShowGererFondsMembre] = useState(null);
   const [nouveauVersementParType, setNouveauVersementParType] = useState({});
@@ -1546,7 +1587,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
     }
   };
 
-  useEffect(() => { rechargerEpargnes(); }, [groupId]);
+  useEffect(() => { if (view === "banque" || view === "bilan") rechargerEpargnes(); }, [groupId, view]);
   const [showCotisationBanque, setShowCotisationBanque] = useState(false);
   const [showCreditForm, setShowCreditForm] = useState(false);
   const CAUTION_DEFAUT = 100000;
@@ -1625,7 +1666,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
     }
   };
 
-  useEffect(() => { rechargerAssurance(); }, [groupId, membres.length]);
+  useEffect(() => { if (view === "assurance" || view === "bilan") rechargerAssurance(); }, [groupId, membres.length, view]);
   const [eventTypes, setEventTypes] = useState([]);
   const [typeEvenementId, setTypeEvenementId] = useState("");
   const [showNewType, setShowNewType] = useState(false);
@@ -1648,7 +1689,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       console.error("Erreur de chargement des types d'événement", e);
     }
   };
-  useEffect(() => { rechargerTypesEvenement(); }, [groupId]);
+  useEffect(() => { if (view === "assurance") rechargerTypesEvenement(); }, [groupId, view]);
 
   const addEventType = async () => {
     if (!newTypeName.trim()) return;
@@ -2429,14 +2470,21 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     Historique
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       setEditMembre(m);
                       setEditNom(m.nom);
                       setEditEmail(m.email || "");
                       setEditTelephone(m.telephone || "");
                       setEditError("");
                       setEditSuccess(false);
+                      setEditDocuments({});
                       setShowEditMembre(true);
+                      try {
+                        const docs = await fetchDocumentsMembre(m.id);
+                        setEditDocuments(docs);
+                      } catch (e) {
+                        console.error("Erreur de chargement des documents", e);
+                      }
                     }}
                     style={{ background: "transparent", color: C.accent2, border: `1px solid ${C.border}`, borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
                   >
@@ -3897,6 +3945,55 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <FormField label="Email" placeholder="Ex. andre.fotso@exemple.com" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
           <FormField label="Téléphone" placeholder="Ex. 6XX XXX XXX" value={editTelephone} onChange={(e) => setEditTelephone(e.target.value)} />
 
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "8px", display: "block" }}>Documents</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {[
+                { type: "photo", label: "Photo 4×4", accept: "image/*" },
+                { type: "cni", label: "CNI (recto/verso)", accept: "image/*,.pdf" },
+                { type: "plan_localisation", label: "Plan de localisation", accept: "image/*,.pdf" },
+              ].map((doc) => (
+                <div key={doc.type} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+                  <span style={{ fontSize: "12px" }}>{doc.label}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    {editDocuments[doc.type] && (
+                      <a href={editDocuments[doc.type]} target="_blank" rel="noopener noreferrer" style={{ fontSize: "11px", color: C.accent2, fontWeight: 600 }}>
+                        Voir
+                      </a>
+                    )}
+                    <input
+                      type="file"
+                      accept={doc.accept}
+                      ref={(el) => { inputsDocumentsRef.current[doc.type] = el; }}
+                      style={{ display: "none" }}
+                      onChange={async (e) => {
+                        const fichier = e.target.files[0];
+                        if (!fichier || !editMembre) return;
+                        setDocumentEnCours(doc.type);
+                        try {
+                          const url = await televerserDocumentMembre(editMembre.id, doc.type, fichier);
+                          setEditDocuments((prev) => ({ ...prev, [doc.type]: url }));
+                        } catch (err) {
+                          console.error("Erreur de téléversement", err);
+                        } finally {
+                          setDocumentEnCours("");
+                          e.target.value = "";
+                        }
+                      }}
+                    />
+                    <button
+                      disabled={documentEnCours === doc.type}
+                      onClick={() => inputsDocumentsRef.current[doc.type]?.click()}
+                      style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}55`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                    >
+                      {documentEnCours === doc.type ? "Envoi..." : editDocuments[doc.type] ? "Remplacer" : "Ajouter"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
             Le mot de passe de connexion n'est jamais modifiable ici — seul le membre lui-même peut le changer, une fois son compte activé.
           </div>
@@ -4947,6 +5044,8 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
   const [erreur, setErreur] = useState("");
   const [erreurDetail, setErreurDetail] = useState("");
   const [statutAbonnement, setStatutAbonnement] = useState(null);
+  const [maPhotoUrl, setMaPhotoUrl] = useState("");
+  const [logoGroupeUrl, setLogoGroupeUrl] = useState("");
   const fmtFCFA = (n) => `${Math.round(n || 0).toLocaleString("fr-FR")} FCFA`;
 
   useEffect(() => {
@@ -4954,6 +5053,9 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
     fetchStatutAbonnement(groupId)
       .then(setStatutAbonnement)
       .catch((e) => console.error("Erreur de vérification de la licence", e));
+    fetchLogoGroupe(groupId)
+      .then(setLogoGroupeUrl)
+      .catch((e) => console.error("Erreur de chargement du logo", e));
   }, [groupId]);
   const licenceExpiree = statutAbonnement?.expire === true;
 
@@ -4981,6 +5083,13 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
           if (!annule) setMesFonds(fonds);
         } catch (e3) {
           console.error("Erreur de chargement des fonds", e3);
+        }
+
+        try {
+          const docs = await fetchDocumentsMembre(data.id);
+          if (!annule && docs.photo) setMaPhotoUrl(docs.photo);
+        } catch (e4) {
+          console.error("Erreur de chargement de la photo", e4);
         }
       } catch (e) {
         console.error("Erreur de chargement du compte membre", e);
@@ -5010,10 +5119,22 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
   ) : (
     <div style={{ minHeight: "680px", background: C.bg, display: "flex", justifyContent: "center", padding: "30px 0" }}>
       <div className="responsive-card" style={{ width: "360px", maxWidth: "94vw", background: C.panel, borderRadius: "26px", border: `1px solid ${C.border}`, overflow: "hidden", boxShadow: "0 20px 50px rgba(27,67,50,0.1)" }}>
-        <div style={{ background: C.accent2, padding: "22px 20px", color: "#FAF6ED" }}>
-          <div style={{ fontSize: "12px", color: "#B7CCBD" }}>Bonjour,</div>
-          <div style={{ fontSize: "18px", fontWeight: 700 }}>{nomComplet || "—"}</div>
-          <div style={{ fontSize: "11px", color: "#9DB3A6", marginTop: "2px" }}>{nomGroupe || "—"}</div>
+        <div style={{ background: C.accent2, padding: "22px 20px", color: "#FAF6ED", display: "flex", alignItems: "center", gap: "14px" }}>
+          {maPhotoUrl ? (
+            <img src={maPhotoUrl} alt="Photo" style={{ width: "52px", height: "52px", borderRadius: "12px", objectFit: "cover", border: "2px solid rgba(255,255,255,0.3)" }} />
+          ) : (
+            <div style={{ width: "52px", height: "52px", borderRadius: "12px", background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Users size={22} color="#FAF6ED" />
+            </div>
+          )}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: "12px", color: "#B7CCBD" }}>Bonjour,</div>
+            <div style={{ fontSize: "18px", fontWeight: 700 }}>{nomComplet || "—"}</div>
+            <div style={{ fontSize: "11px", color: "#9DB3A6", marginTop: "2px" }}>{nomGroupe || "—"}</div>
+          </div>
+          {logoGroupeUrl && (
+            <img src={logoGroupeUrl} alt="Logo du groupe" style={{ width: "36px", height: "36px", borderRadius: "9px", objectFit: "cover", background: "#FFFFFF" }} />
+          )}
         </div>
 
         {erreurDetail && (
