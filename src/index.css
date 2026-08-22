@@ -4,3 +4,62 @@ body {
   font-family: 'Sora', 'Segoe UI', sans-serif;
   background: #0E1210;
 }
+
+/* ============================================================
+   RESPONSIVE — mobile & tablette
+   ============================================================ */
+
+/* Les tableaux passent en défilement horizontal plutôt que de
+   s'écraser, sur les écrans étroits */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 900px) {
+  /* La mise en page Sidebar + contenu passe en colonne */
+  .app-layout {
+    flex-direction: column !important;
+  }
+  .app-sidebar {
+    width: 100% !important;
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    gap: 4px !important;
+    padding: 12px !important;
+    align-items: center;
+  }
+  .app-sidebar .sidebar-header {
+    width: 100%;
+    margin-bottom: 10px !important;
+  }
+  .app-sidebar .sidebar-footer {
+    display: none;
+  }
+  .app-sidebar .sidebar-item {
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+  }
+  .app-main {
+    padding: 18px 16px !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .app-main {
+    padding: 14px 12px !important;
+  }
+  .table-scroll > div {
+    min-width: 560px;
+  }
+  .responsive-card {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .responsive-modal {
+    width: 92vw !important;
+    max-width: 92vw !important;
+    padding: 20px !important;
+  }
+}
+
