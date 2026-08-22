@@ -598,7 +598,7 @@ function SuperAdminScreen() {
                   {chargement ? "Chargement..." : `${groupes.length} groupe(s).`} Création + abonnement uniquement — aucune visibilité sur les données internes.
                 </p>
               </div>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <button
                   style={btnSecondary}
                   onClick={async () => {
@@ -714,7 +714,7 @@ function SuperAdminScreen() {
                         <label style={{ fontSize: "10.5px", color: C.sub, display: "block", marginBottom: "3px" }}>Description</label>
                         <input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.border}`, fontSize: "12px", outline: "none" }} />
                       </div>
-                      <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+                      <div style={{ display: "flex", gap: "6px", marginTop: "4px", flexWrap: "wrap" }}>
                         <button
                           disabled={savingPlan}
                           onClick={async () => {
@@ -813,7 +813,7 @@ function SuperAdminScreen() {
           </div>
           <div>
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Périodicité</label>
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {["Mensuel", "Annuel"].map((p) => (
                 <div
                   key={p}
@@ -888,7 +888,7 @@ function SuperAdminScreen() {
               {creationFormule !== "Essai" && (
                 <div>
                   <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Périodicité</label>
-                  <div style={{ display: "flex", gap: "8px" }}>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     {["Mensuel", "Annuel"].map((p) => (
                       <div
                         key={p}
@@ -1725,7 +1725,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     : "Crée une tontine pour démarrer un cycle."}
                 </p>
               </div>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 {tontineActive && (
                   <button style={btnSecondary} onClick={() => setShowCotisationTontine(true)}><Plus size={15} /> Enregistrer une cotisation</button>
                 )}
@@ -1861,13 +1861,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Banques du groupe</h1>
                 <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>Banque scolaire, banque annuelle, et épargnes personnalisées.</p>
               </div>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <button style={btnSecondary} onClick={() => { setCotisationEpargneId(""); setCotisationDate(""); setCotisationMontants({}); setCotisationBanqueErreur(""); setShowCotisationBanque(true); }}><Plus size={15} /> Enregistrer une cotisation</button>
                 <button style={btnPrimary} onClick={() => { setEpargneNom(""); setEpargneCotisation(""); setEpargneTaux(""); setEpargneCloture(""); setEpargneType("Personnalisée"); setEpargneError(""); setEpargneSuccess(false); setShowCreateEpargne(true); }}><Plus size={15} /> Créer une épargne</button>
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: "6px", margin: "18px 0 4px" }}>
+            <div style={{ display: "flex", gap: "6px", margin: "18px 0 4px", flexWrap: "wrap" }}>
               {[
                 { key: "apercu", label: "Vue d'ensemble" },
                 { key: "historique", label: "Historique des mouvements" },
@@ -2020,7 +2020,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   Versement des fonds du groupe dans une banque externe, après chaque séance, par un signataire du compte.
                 </p>
               </div>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <button
                   style={btnSecondary}
                   onClick={() => { setCompteNom(""); setCompteBanque(""); setCompteNumero(""); setCompteType("Courant"); setCompteTauxInteret(""); setCompteError(""); setCompteSuccess(false); setShowCreerCompte(true); }}
@@ -2185,7 +2185,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Assurance mutuelle</h1>
                 <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>Solde minimum requis : {fmtFCFA(soldeMinimum)} par membre · délai de reconstitution : {delaiJoursAssurance} jours.</p>
               </div>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <button
                   style={btnSecondary}
                   onClick={() => {
@@ -2203,7 +2203,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
             <div style={{ marginTop: "22px" }} />
 
-            <div style={{ display: "flex", gap: "6px", marginBottom: "18px" }}>
+            <div style={{ display: "flex", gap: "6px", marginBottom: "18px", flexWrap: "wrap" }}>
               {[{ key: "apercu", label: "Vue d'ensemble" }, { key: "historique", label: "Historique des mouvements" }].map((t) => (
                 <button
                   key={t.key}
@@ -2331,7 +2331,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   </p>
                 )}
               </div>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <button
                   style={btnSecondary}
                   onClick={() => { setShowGererTypesFonds(true); setNewTypeFondsNom(""); }}
@@ -2589,7 +2589,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         <Modal onClose={() => setShowDeclarerEvenement(false)} title="Déclarer un événement">
           <div>
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Type d'événement</label>
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               <select
                 value={typeEvenementId}
                 onChange={(e) => setTypeEvenementId(e.target.value)}
@@ -2605,7 +2605,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               </button>
             </div>
             {showNewType && (
-              <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+              <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
                 <input
                   value={newTypeName}
                   onChange={(e) => setNewTypeName(e.target.value)}
@@ -2647,7 +2647,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <FormField label="Lien avec le membre" placeholder="Ex. Père du membre, membre lui-même..." />
 
-          <div style={{ display: "flex", gap: "10px" }}>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <div style={{ flex: 1 }}>
               <FormField label="Date de déclaration" placeholder="jj/mm/aaaa" />
             </div>
@@ -2933,7 +2933,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       <b>{m.nom}</b>
                       <b style={{ color: C.accent2 }}>{fmtFCFA(m.total)}</b>
                     </div>
-                    <div style={{ display: "flex", gap: "6px" }}>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                       {["recuperer", "reconduire"].map((opt) => (
                         <div
                           key={opt}
@@ -2958,7 +2958,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <button onClick={() => setClotureEtape(1)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, color: C.sub, cursor: "pointer" }}>
                   Retour
                 </button>
@@ -3002,7 +3002,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         <Modal onClose={() => setShowCreateEpargne(false)} title="Créer une épargne">
           <div>
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Type</label>
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {["Banque scolaire", "Banque annuelle", "Personnalisée"].map((m) => (
                 <div
                   key={m}
@@ -3188,7 +3188,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <FormField label="Frais de dossier" placeholder="Ex. 5 000 FCFA" value={creditFraisDossier} onChange={(e) => setCreditFraisDossier(e.target.value)} />
           <FormField label="Commission du prêt" placeholder="Ex. 2 %" value={creditCommission} onChange={(e) => setCreditCommission(e.target.value)} />
 
-          <div style={{ display: "flex", gap: "10px" }}>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <div style={{ flex: 1 }}>
               <FormField label="Date de début du crédit" placeholder="jj/mm/aaaa" value={creditDebut} onChange={(e) => setCreditDebut(e.target.value)} />
             </div>
@@ -3353,7 +3353,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             <>
               <div style={{ fontSize: "13px", fontWeight: 700 }}>{rapportJourDate}</div>
 
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <div style={{ flex: 1, background: C.ok, borderRadius: "10px", padding: "10px 12px" }}>
                   <div style={{ fontSize: "10.5px", color: C.accent2 }}>Total encaissé</div>
                   <div style={{ fontSize: "15px", fontWeight: 700, color: C.accent2 }}>{fmtFCFA(rapportJour.totalEncaisse)}</div>
@@ -3449,7 +3449,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
           <div>
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Format</label>
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {["PDF", "Excel"].map((f, idx) => (
                 <div key={f} style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${idx === 0 ? C.accent2 : C.border}`, background: idx === 0 ? C.ok : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: idx === 0 ? C.accent2 : C.sub, cursor: "pointer" }}>
                   {f}
@@ -3487,7 +3487,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <div>
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Statut de logement</label>
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {["Locataire", "Propriétaire"].map((t) => (
                 <div
                   key={t}
@@ -3504,7 +3504,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Carte Nationale d'Identité (CNI)</label>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <input placeholder="Numéro CNI" style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }} />
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <input placeholder="Date de délivrance" style={{ flex: 1, boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }} />
                 <input placeholder="Lieu de délivrance" style={{ flex: 1, boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }} />
               </div>
@@ -3557,7 +3557,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <div>
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Type de membre</label>
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {["Membre simple", "Membre du bureau"].map((t) => (
                 <div
                   key={t}
@@ -3573,7 +3573,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           {roleType === "Membre du bureau" && (
             <div>
               <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Poste</label>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <select
                   value={posteChoisi}
                   onChange={(e) => setPosteChoisi(e.target.value)}
@@ -3589,7 +3589,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 </button>
               </div>
               {showNewPoste && (
-                <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+                <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
                   <input
                     value={newPosteName}
                     onChange={(e) => setNewPosteName(e.target.value)}
@@ -3718,7 +3718,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               </div>
             ))}
           </div>
-          <div style={{ display: "flex", gap: "6px" }}>
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
             <input
               value={newTypeFondsNom}
               onChange={(e) => setNewTypeFondsNom(e.target.value)}
@@ -3764,7 +3764,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       <div style={{ width: `${Math.min(100, (f.solde / f.cible) * 100)}%`, height: "100%", background: f.solde >= f.cible ? C.accent2 : C.warn }} />
                     </div>
                   )}
-                  <div style={{ display: "flex", gap: "6px" }}>
+                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                     <input
                       value={nouvelleCibleParType[t.id] ?? ""}
                       onChange={(e) => setNouvelleCibleParType({ ...nouvelleCibleParType, [t.id]: e.target.value })}
@@ -3792,7 +3792,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       Fixer
                     </button>
                   </div>
-                  <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
+                  <div style={{ display: "flex", gap: "6px", marginTop: "6px", flexWrap: "wrap" }}>
                     <input
                       value={nouveauVersementParType[t.id] ?? ""}
                       onChange={(e) => setNouveauVersementParType({ ...nouveauVersementParType, [t.id]: e.target.value })}
@@ -4113,7 +4113,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <div>
             <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Type de compte</label>
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {["Courant", "Épargne"].map((t) => (
                 <div
                   key={t}
@@ -4207,7 +4207,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           {typeMouvementBanque === "Frais" && (
             <div>
               <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Catégorie de frais</label>
-              <div style={{ display: "flex", gap: "6px" }}>
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                 <select
                   value={depotCategorie}
                   onChange={(e) => setDepotCategorie(e.target.value)}
@@ -4224,7 +4224,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 </button>
               </div>
               {showNewCategorieFrais && (
-                <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+                <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
                   <input
                     value={newCategorieFraisNom}
                     onChange={(e) => setNewCategorieFraisNom(e.target.value)}
@@ -4793,7 +4793,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               <Calendar size={13} color={C.vifOr} /> Dates de séance
             </label>
 
-            <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+            <div style={{ display: "flex", gap: "6px", marginBottom: "10px", flexWrap: "wrap" }}>
               {[{ key: "manuel", label: "Ajout manuel" }, { key: "auto", label: "Génération automatique" }].map((o) => (
                 <div
                   key={o.key}
@@ -4807,7 +4807,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
             {modeSaisie === "auto" && (
               <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", marginBottom: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                <div style={{ display: "flex", gap: "8px" }}>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                   <input value={autoDateDebut} onChange={(e) => setAutoDateDebut(e.target.value)} placeholder="Début jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "12.5px", outline: "none" }} />
                   <input value={autoDateFin} onChange={(e) => setAutoDateFin(e.target.value)} placeholder="Fin jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "12.5px", outline: "none" }} />
                 </div>
@@ -4862,7 +4862,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             ))}
 
             {modeSaisie === "manuel" && (
-            <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+            <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
               <input
                 value={newDate}
                 onChange={(e) => setNewDate(e.target.value)}
@@ -5254,7 +5254,7 @@ function RapportLigne({ gauche, droite, positif }) {
 
 function StatCard({ label, value, sub, icon }) {
   return (
-    <div style={{ flex: 1, background: C.panel, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "16px 18px" }}>
+    <div style={{ flex: "1 1 160px", minWidth: "160px", background: C.panel, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "16px 18px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "8px", color: C.sub, fontSize: "12px", marginBottom: "8px" }}>{icon} {label}</div>
       <div style={{ fontSize: "18px", fontWeight: 700 }}>{value}</div>
       {sub && <div style={{ fontSize: "11px", color: C.sub, marginTop: "3px" }}>{sub}</div>}
