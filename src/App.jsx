@@ -3,11 +3,11 @@ import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActif
 import { fetchTypesFonds, creerTypeFonds, supprimerTypeFonds, fetchFondsTousMembres, fixerCibleTypeFonds, enregistrerVersementFonds, fetchFondsMembre } from "./lib/fonds";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement, televerserLogoGroupe, fetchLogoGroupe, modifierGroupe, suspendreGroupe, reactiverGroupe } from "./lib/groups";
-import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere, fetchApercuRedistribution, redistribuerCommission } from "./lib/tontine";
+import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere, fetchApercuRedistribution, redistribuerCommission, fetchTotalRedistributions } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit, fetchApercuCloture, cloturerEpargne } from "./lib/banque";
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
 import { fetchComptesBancaires, creerCompteBancaire, fetchSignataires, ajouterSignataire, fetchMouvementsCompte, creerMouvementExterne, fetchCategoriesFrais, creerCategorieFrais, supprimerCategorieFrais, joindreRecu } from "./lib/depots_retrait";
-import { fetchRapportJournalier } from "./lib/rapports";
+import { fetchRapportJournalier, fetchRapportMensuel, fetchBilanAnnuel } from "./lib/rapports";
 import { envoyerSMS } from "./lib/sms";
 import { fetchTableauDeBordMembre } from "./lib/moncompte";
 
@@ -1302,6 +1302,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [rappelEnCours, setRappelEnCours] = useState(false);
   const [rappelMessage, setRappelMessage] = useState("");
   const [showRedistribution, setShowRedistribution] = useState(false);
+  const [totalRedistributions, setTotalRedistributions] = useState(0);
+  useEffect(() => {
+    if (groupId && view === "bilan") {
+      fetchTotalRedistributions(groupId).then(setTotalRedistributions).catch((e) => console.error("Erreur de chargement des redistributions", e));
+    }
+  }, [groupId, view]);
   const [redistributionApercu, setRedistributionApercu] = useState(null);
   const [redistributionErreur, setRedistributionErreur] = useState("");
   const [redistributionChargement, setRedistributionChargement] = useState(false);
@@ -1697,6 +1703,15 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [rapportJourChargement, setRapportJourChargement] = useState(false);
   const [rapportJourErreur, setRapportJourErreur] = useState("");
   const [showRapportMensuel, setShowRapportMensuel] = useState(false);
+  const [rapportMoisSelection, setRapportMoisSelection] = useState(String(new Date().getMonth() + 1).padStart(2, "0"));
+  const [rapportAnneeSelection, setRapportAnneeSelection] = useState(String(new Date().getFullYear()));
+  const [rapportMois, setRapportMois] = useState(null);
+  const [rapportMoisChargement, setRapportMoisChargement] = useState(false);
+  const [rapportMoisErreur, setRapportMoisErreur] = useState("");
+  const [exportAnnee, setExportAnnee] = useState(String(new Date().getFullYear()));
+  const [exportEnCours, setExportEnCours] = useState(false);
+  const [exportErreur, setExportErreur] = useState("");
+  const [exportSuccess, setExportSuccess] = useState(false);
   const [showExportBilan, setShowExportBilan] = useState(false);
   const [logementType, setLogementType] = useState("Locataire");
   const [parrain, setParrain] = useState("");
@@ -2480,6 +2495,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               <StatCard label="Total en épargnes" value={fmtFCFA(epargnes.reduce((s, ep) => s + ep.solde, 0))} icon={<Wallet size={16} />} />
               <StatCard label="Total comptes bancaires" value={fmtFCFA(comptesBancaires.reduce((s, c) => s + (c.solde || 0), 0))} icon={<Building2 size={16} />} />
               <StatCard label="Solde assurance cumulé" value={fmtFCFA(Object.values(assuranceSoldes).reduce((s, a) => s + (a.solde || 0), 0))} icon={<HeartHandshake size={16} />} />
+              <StatCard label="Total en fonds" value={fmtFCFA(Object.values(fondsParMembre).flat().reduce((s, f) => s + (f.solde || 0), 0))} icon={<PiggyBank size={16} />} />
               <StatCard label="Tours effectués" value={`${tours.filter((t) => t.statut === "clôturé").length} / ${tours.length}`} icon={<CheckCircle2 size={16} />} />
               <StatCard label="Membres" value={`${membres.filter((m) => m.statut === "actif").length} actif(s)`} icon={<Users size={16} />} />
             </div>
@@ -2500,11 +2516,21 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   `${tours.filter((t) => t.statut === "clôturé").length} tour(s) clôturé(s)`,
                   <span style={{ color: C.sub, fontSize: 12 }}>{tours.length} tour(s) au total, {tours.filter((t) => t.statut === "en cours").length} en cours</span>,
                 ],
+                ...(totalRedistributions > 0 ? [[
+                  "Commissions redistribuées",
+                  fmtFCFA(totalRedistributions),
+                  <span style={{ color: C.sub, fontSize: 12 }}>Commissions d'enchères déjà reversées aux membres</span>,
+                ]] : []),
                 [
                   "Assurance",
                   fmtFCFA(Object.values(assuranceSoldes).reduce((s, a) => s + (a.solde || 0), 0)),
                   <span style={{ color: C.sub, fontSize: 12 }}>{evenements.length} événement(s) déclaré(s) cette année</span>,
                 ],
+                ...typesFonds.map((t) => [
+                  t.nom,
+                  fmtFCFA(Object.values(fondsParMembre).flat().filter((f) => f.typeFondsId === t.id).reduce((s, f) => s + (f.solde || 0), 0)),
+                  <span style={{ color: C.sub, fontSize: 12 }}>Objectif {fmtFCFA(t.cible)} par membre</span>,
+                ]),
                 [
                   "Prêts en cours",
                   `${prets.filter((p) => p.statut === "en cours").length} prêt(s)`,
@@ -2520,7 +2546,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
             <div style={{ display: "flex", gap: "10px", marginTop: "22px" }}>
               <button style={btnSecondary} onClick={() => { setRapportJour(null); setRapportJourDate(""); setRapportJourErreur(""); setShowRapportJournalier(true); }}>Rapport journalier</button>
-              <button style={btnSecondary} onClick={() => setShowRapportMensuel(true)}>Rapport mensuel</button>
+              <button style={btnSecondary} onClick={() => { setRapportMois(null); setRapportMoisErreur(""); setShowRapportMensuel(true); }}>Rapport mensuel</button>
               <button style={btnPrimary} onClick={() => setShowExportBilan(true)}>Exporter le bilan annuel</button>
             </div>
           </>
@@ -3580,7 +3606,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               </div>
 
               {rapportJour.tontineCotisations.length === 0 && rapportJour.tontineVersements.length === 0 && rapportJour.tontineAmendes.length === 0 &&
-               rapportJour.mouvementsEpargne.length === 0 && rapportJour.assuranceMouvements.length === 0 && rapportJour.mouvementsExternes.length === 0 && (
+               rapportJour.mouvementsEpargne.length === 0 && rapportJour.assuranceMouvements.length === 0 && rapportJour.mouvementsExternes.length === 0 &&
+               (!rapportJour.mouvementsFonds || rapportJour.mouvementsFonds.length === 0) && (
                 <div style={{ fontSize: "12.5px", color: C.sub, textAlign: "center", padding: "10px 0" }}>Aucune activité enregistrée à cette date.</div>
               )}
 
@@ -3626,6 +3653,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   ))}
                 </RapportSection>
               )}
+              {rapportJour.mouvementsFonds?.length > 0 && (
+                <RapportSection titre="Fonds">
+                  {rapportJour.mouvementsFonds.map((m, i) => (
+                    <RapportLigne key={i} gauche={`${m.membre} — ${m.typeFonds}`} droite={fmtFCFA(m.montant)} positif />
+                  ))}
+                </RapportSection>
+              )}
 
               <button
                 onClick={() => { setRapportJour(null); setRapportJourDate(""); }}
@@ -3639,41 +3673,174 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       )}
 
       {showRapportMensuel && (
-        <Modal onClose={() => setShowRapportMensuel(false)} title="Rapport mensuel">
-          <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Mois</label>
-            <select style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}>
-              <option>Août 2026</option>
-              <option>Juillet 2026</option>
-              <option>Juin 2026</option>
-            </select>
-          </div>
-          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "9px 11px" }}>
-            Synthèse de toutes les activités du mois sélectionné, tous modules confondus.
-          </div>
-          <button style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }} onClick={() => setShowRapportMensuel(false)}>
-            Générer le rapport
-          </button>
+        <Modal onClose={() => setShowRapportMensuel(false)} title="Rapport mensuel" icon={<FileBarChart />} accentColor={C.vifBleu}>
+          {!rapportMois ? (
+            <>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Mois</label>
+                  <select value={rapportMoisSelection} onChange={(e) => setRapportMoisSelection(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}>
+                    {["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map((m, i) => (
+                      <option key={m} value={m}>{["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"][i]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Année</label>
+                  <input value={rapportAnneeSelection} onChange={(e) => setRapportAnneeSelection(e.target.value.replace(/[^\d]/g, ""))} maxLength={4} style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }} />
+                </div>
+              </div>
+              <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "9px 11px" }}>
+                Synthèse de toutes les activités du mois sélectionné, tous modules confondus.
+              </div>
+              {rapportMoisErreur && (
+                <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                  {rapportMoisErreur}
+                </div>
+              )}
+              <button
+                disabled={rapportMoisChargement}
+                style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: rapportMoisChargement ? "default" : "pointer" }}
+                onClick={async () => {
+                  setRapportMoisChargement(true);
+                  setRapportMoisErreur("");
+                  try {
+                    const data = await fetchRapportMensuel(groupId, `${rapportAnneeSelection}-${rapportMoisSelection}`);
+                    setRapportMois(data);
+                  } catch (e) {
+                    console.error("Erreur de génération du rapport mensuel", e);
+                    setRapportMoisErreur("Erreur lors de la génération du rapport.");
+                  } finally {
+                    setRapportMoisChargement(false);
+                  }
+                }}
+              >
+                {rapportMoisChargement ? "Génération..." : "Générer le rapport"}
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: "13px", fontWeight: 700 }}>
+                {["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"][parseInt(rapportMois.periode.slice(5, 7), 10) - 1]} {rapportMois.periode.slice(0, 4)}
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <div style={{ flex: 1, background: C.ok, borderRadius: "10px", padding: "10px 12px" }}>
+                  <div style={{ fontSize: "10.5px", color: C.accent2 }}>Total encaissé</div>
+                  <div style={{ fontSize: "15px", fontWeight: 700, color: C.accent2 }}>{fmtFCFA(rapportMois.totalEncaisse)}</div>
+                </div>
+                <div style={{ flex: 1, background: C.warnBg, borderRadius: "10px", padding: "10px 12px" }}>
+                  <div style={{ fontSize: "10.5px", color: C.warn }}>Total décaissé</div>
+                  <div style={{ fontSize: "15px", fontWeight: 700, color: C.warn }}>{fmtFCFA(rapportMois.totalDecaisse)}</div>
+                </div>
+              </div>
+
+              {Object.keys(rapportMois.parModule).length === 0 ? (
+                <div style={{ fontSize: "12.5px", color: C.sub, textAlign: "center", padding: "10px 0" }}>Aucune activité enregistrée ce mois-ci.</div>
+              ) : (
+                <RapportSection titre="Par module">
+                  {Object.entries(rapportMois.parModule).map(([module, t]) => (
+                    <div key={module} style={{ background: "#FBFAF6", borderRadius: "7px", padding: "8px 10px", fontSize: "12px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <b>{module}</b>
+                        <span style={{ color: C.sub }}>{t.nb} mouvement(s)</span>
+                      </div>
+                      <div style={{ color: C.accent2 }}>+ {fmtFCFA(t.encaisse)} {t.decaisse > 0 && <span style={{ color: C.warn }}>· − {fmtFCFA(t.decaisse)}</span>}</div>
+                    </div>
+                  ))}
+                </RapportSection>
+              )}
+
+              {rapportMois.mouvements.length > 0 && (
+                <RapportSection titre={`Journal du mois (${rapportMois.mouvements.length})`}>
+                  <div style={{ maxHeight: "260px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
+                    {rapportMois.mouvements.map((m, i) => (
+                      <RapportLigne key={i} gauche={`${m.date} — ${m.module} : ${m.type}${m.membre !== "—" ? ` (${m.membre})` : ""}`} droite={fmtFCFA(m.montant)} positif={m.sens === "encaisse"} />
+                    ))}
+                  </div>
+                </RapportSection>
+              )}
+
+              <button
+                onClick={() => setRapportMois(null)}
+                style={{ marginTop: "6px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+              >
+                Choisir un autre mois
+              </button>
+            </>
+          )}
         </Modal>
       )}
 
       {showExportBilan && (
-        <Modal onClose={() => setShowExportBilan(false)} title="Exporter le bilan annuel">
+        <Modal onClose={() => setShowExportBilan(false)} title="Exporter le bilan annuel" icon={<FileBarChart />} accentColor={C.vifBleu}>
           <div style={{ fontSize: "12.5px", color: C.sub }}>
-            Le bilan annuel complet sera généré pour présentation à l'assemblée générale : total cotisé, intérêts générés, tours effectués, et détail par module (Tontine, Banque, Assurance).
+            Génère un fichier <b>.csv</b> (s'ouvre directement dans Excel) avec tous les mouvements de l'année, tous modules confondus, prêt pour l'assemblée générale.
           </div>
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Format</label>
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              {["PDF", "Excel"].map((f, idx) => (
-                <div key={f} style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${idx === 0 ? C.accent2 : C.border}`, background: idx === 0 ? C.ok : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: idx === 0 ? C.accent2 : C.sub, cursor: "pointer" }}>
-                  {f}
-                </div>
-              ))}
-            </div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Année</label>
+            <input value={exportAnnee} onChange={(e) => setExportAnnee(e.target.value.replace(/[^\d]/g, ""))} maxLength={4} style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }} />
           </div>
-          <button style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }} onClick={() => setShowExportBilan(false)}>
-            Télécharger le bilan
+
+          {exportErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {exportErreur}
+            </div>
+          )}
+          {exportSuccess && (
+            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <CheckCircle2 size={14} /> Fichier téléchargé.
+            </div>
+          )}
+
+          <button
+            disabled={exportEnCours}
+            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: exportEnCours ? "default" : "pointer" }}
+            onClick={async () => {
+              setExportEnCours(true);
+              setExportErreur("");
+              setExportSuccess(false);
+              try {
+                const data = await fetchBilanAnnuel(groupId, exportAnnee);
+
+                const lignes = [];
+                lignes.push(["BILAN ANNUEL", exportAnnee, nomGroupe || ""]);
+                lignes.push([]);
+                lignes.push(["Total encaissé", fmtFCFA(data.totalEncaisse)]);
+                lignes.push(["Total décaissé", fmtFCFA(data.totalDecaisse)]);
+                lignes.push([]);
+                lignes.push(["RÉPARTITION PAR MODULE"]);
+                lignes.push(["Module", "Encaissé", "Décaissé", "Nb mouvements"]);
+                Object.entries(data.parModule).forEach(([module, t]) => {
+                  lignes.push([module, fmtFCFA(t.encaisse), fmtFCFA(t.decaisse), t.nb]);
+                });
+                lignes.push([]);
+                lignes.push(["JOURNAL COMPLET DE L'ANNÉE"]);
+                lignes.push(["Date", "Module", "Type", "Membre", "Montant", "Sens", "Détail"]);
+                data.mouvements.forEach((m) => {
+                  lignes.push([m.date, m.module, m.type, m.membre, m.montant, m.sens === "encaisse" ? "Encaissé" : "Décaissé", m.detail]);
+                });
+
+                const csv = lignes.map((ligne) => ligne.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";")).join("\n");
+                const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `bilan-annuel-${exportAnnee}-${(nomGroupe || "groupe").replace(/[^a-z0-9]/gi, "-")}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                setExportSuccess(true);
+              } catch (e) {
+                console.error("Erreur d'export du bilan annuel", e);
+                setExportErreur(e.message || "Erreur lors de la génération du fichier.");
+              } finally {
+                setExportEnCours(false);
+              }
+            }}
+          >
+            {exportEnCours ? "Génération..." : "Télécharger le bilan (.csv)"}
           </button>
         </Modal>
       )}
