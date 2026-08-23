@@ -132,12 +132,37 @@ export async function fetchRapportJournalier(groupId, dateISO) {
     }));
   }
 
+  // --- FONDS (garantie, solidarité, etc.) ---
+  const { data: typesFonds, error: errTypes } = await supabase
+    .from("types_fonds")
+    .select("id, nom")
+    .eq("group_id", groupId);
+  if (errTypes) throw errTypes;
+  const idsTypesFonds = typesFonds.map((t) => t.id);
+  const nomTypeFondsParId = Object.fromEntries(typesFonds.map((t) => [t.id, t.nom]));
+
+  let mouvementsFonds = [];
+  if (idsTypesFonds.length > 0) {
+    const { data, error } = await supabase
+      .from("fonds_mouvements")
+      .select("montant, type_fonds_id, membre:group_members(profile:profiles(nom_complet))")
+      .in("type_fonds_id", idsTypesFonds)
+      .eq("date_mouvement", dateISO);
+    if (error) throw error;
+    mouvementsFonds = data.map((m) => ({
+      membre: m.membre?.profile?.nom_complet || "—",
+      montant: m.montant,
+      typeFonds: nomTypeFondsParId[m.type_fonds_id] || "—",
+    }));
+  }
+
   // --- TOTAUX ---
   const totalEncaisse =
     tontineCotisations.reduce((s, c) => s + Number(c.montant), 0) +
     mouvementsEpargne.filter((m) => m.type === "Versement").reduce((s, m) => s + Number(m.montant), 0) +
     assuranceMouvements.filter((m) => m.type === "Cotisation").reduce((s, m) => s + Number(m.montant), 0) +
-    mouvementsExternes.filter((m) => m.type === "Dépôt" || m.type === "Intérêt").reduce((s, m) => s + Number(m.montant), 0);
+    mouvementsExternes.filter((m) => m.type === "Dépôt" || m.type === "Intérêt").reduce((s, m) => s + Number(m.montant), 0) +
+    mouvementsFonds.reduce((s, m) => s + Number(m.montant), 0);
 
   const totalDecaisse =
     tontineVersements.length * 0 + // le montant du versement n'est pas systématiquement re-sommé ici, voir tontineVersements pour le détail
@@ -157,7 +182,173 @@ export async function fetchRapportJournalier(groupId, dateISO) {
       montant: m.montant,
     })),
     mouvementsExternes,
+    mouvementsFonds,
     totalEncaisse,
     totalDecaisse,
   };
+}
+
+// ============================================================
+// RAPPORT MENSUEL — totaux par module + journal chronologique
+// complet du mois choisi.
+// ============================================================
+export async function fetchRapportMensuel(groupId, anneeMoisISO) {
+  const debut = `${anneeMoisISO}-01`;
+  const dateDebut = new Date(debut);
+  const dateFin = new Date(dateDebut.getFullYear(), dateDebut.getMonth() + 1, 1);
+  const fin = dateFin.toISOString().slice(0, 10);
+
+  const mouvements = await fetchMouvementsPeriode(groupId, debut, fin);
+  return { periode: anneeMoisISO, debut, fin, ...mouvements };
+}
+
+// ============================================================
+// BILAN ANNUEL — mêmes données, sur toute une année civile.
+// ============================================================
+export async function fetchBilanAnnuel(groupId, annee) {
+  const debut = `${annee}-01-01`;
+  const fin = `${Number(annee) + 1}-01-01`;
+  const mouvements = await fetchMouvementsPeriode(groupId, debut, fin);
+  return { annee, debut, fin, ...mouvements };
+}
+
+// Récupère tous les mouvements financiers d'un groupe sur une
+// période [debut, fin), tous modules confondus, avec les totaux
+// et une liste chronologique complète (utilisée par le rapport
+// mensuel et le bilan annuel).
+async function fetchMouvementsPeriode(groupId, debut, fin) {
+  const liste = [];
+
+  // --- TONTINE ---
+  const { data: tontines } = await supabase.from("tontines").select("id, nom").eq("group_id", groupId);
+  const idsTontines = (tontines || []).map((t) => t.id);
+  const nomTontineParId = Object.fromEntries((tontines || []).map((t) => [t.id, t.nom]));
+
+  if (idsTontines.length > 0) {
+    const { data: tours } = await supabase
+      .from("tontine_tours")
+      .select("id, numero, tontine_id, verse_le, montant, beneficiaire:group_members(profile:profiles(nom_complet))")
+      .in("tontine_id", idsTontines);
+    const idsTours = (tours || []).map((t) => t.id);
+    const tourParId = Object.fromEntries((tours || []).map((t) => [t.id, t]));
+
+    if (idsTours.length > 0) {
+      const { data: cotisations } = await supabase
+        .from("tontine_cotisations")
+        .select("montant, date_paiement, membre:group_members(profile:profiles(nom_complet)), tour_id")
+        .in("tour_id", idsTours)
+        .gte("date_paiement", debut)
+        .lt("date_paiement", fin);
+      (cotisations || []).forEach((c) => liste.push({
+        module: "Tontine", type: "Cotisation", membre: c.membre?.profile?.nom_complet || "—",
+        montant: Number(c.montant), date: c.date_paiement, sens: "encaisse",
+        detail: `Tour ${tourParId[c.tour_id]?.numero} — ${nomTontineParId[tourParId[c.tour_id]?.tontine_id]}`,
+      }));
+
+      const { data: amendes } = await supabase
+        .from("tontine_amendes")
+        .select("montant_amende, motif, membre:group_members(profile:profiles(nom_complet)), created_at")
+        .in("tour_id", idsTours)
+        .gte("created_at", `${debut}T00:00:00`)
+        .lt("created_at", `${fin}T00:00:00`);
+      (amendes || []).forEach((a) => liste.push({
+        module: "Tontine", type: "Amende", membre: a.membre?.profile?.nom_complet || "—",
+        montant: Number(a.montant_amende), date: a.created_at.slice(0, 10), sens: "encaisse",
+        detail: a.motif || "—",
+      }));
+    }
+
+    (tours || [])
+      .filter((t) => t.verse_le && t.verse_le.slice(0, 10) >= debut && t.verse_le.slice(0, 10) < fin)
+      .forEach((t) => liste.push({
+        module: "Tontine", type: "Versement", membre: t.beneficiaire?.profile?.nom_complet || "—",
+        montant: Number(t.montant || 0), date: t.verse_le.slice(0, 10), sens: "decaisse",
+        detail: `Tour ${t.numero} — ${nomTontineParId[t.tontine_id]}`,
+      }));
+  }
+
+  // --- BANQUE (épargnes) ---
+  const { data: epargnes } = await supabase.from("epargnes").select("id, nom").eq("group_id", groupId);
+  const idsEpargnes = (epargnes || []).map((e) => e.id);
+  const nomEpargneParId = Object.fromEntries((epargnes || []).map((e) => [e.id, e.nom]));
+
+  if (idsEpargnes.length > 0) {
+    const { data } = await supabase
+      .from("epargne_mouvements")
+      .select("type, montant, epargne_id, date_mouvement, membre:group_members(profile:profiles(nom_complet))")
+      .in("epargne_id", idsEpargnes)
+      .gte("date_mouvement", debut)
+      .lt("date_mouvement", fin);
+    (data || []).forEach((m) => liste.push({
+      module: "Banque", type: m.type, membre: m.membre?.profile?.nom_complet || "—",
+      montant: Number(m.montant), date: m.date_mouvement, sens: m.type === "Versement" ? "encaisse" : "decaisse",
+      detail: nomEpargneParId[m.epargne_id] || "—",
+    }));
+  }
+
+  // --- ASSURANCE ---
+  const { data: assuranceMvts } = await supabase
+    .from("assurance_mouvements")
+    .select("type, montant, date_mouvement, membre:group_members(profile:profiles(nom_complet))")
+    .eq("group_id", groupId)
+    .gte("date_mouvement", debut)
+    .lt("date_mouvement", fin);
+  (assuranceMvts || []).forEach((m) => liste.push({
+    module: "Assurance", type: m.type, membre: m.membre?.profile?.nom_complet || "—",
+    montant: Number(m.montant), date: m.date_mouvement, sens: m.type === "Cotisation" ? "encaisse" : "decaisse",
+    detail: "—",
+  }));
+
+  // --- DÉPÔTS / RETRAITS EXTERNES ---
+  const { data: comptes } = await supabase.from("comptes_bancaires_externes").select("id, nom").eq("group_id", groupId);
+  const idsComptes = (comptes || []).map((c) => c.id);
+  const nomCompteParId = Object.fromEntries((comptes || []).map((c) => [c.id, c.nom]));
+
+  if (idsComptes.length > 0) {
+    const { data } = await supabase
+      .from("mouvements_bancaires_externes")
+      .select("type, montant, compte_id, date_mouvement, categorie_frais, motif")
+      .in("compte_id", idsComptes)
+      .gte("date_mouvement", debut)
+      .lt("date_mouvement", fin);
+    (data || []).forEach((m) => liste.push({
+      module: "Dépôts/Retraits", type: m.type, membre: "—",
+      montant: Number(m.montant), date: m.date_mouvement,
+      sens: (m.type === "Dépôt" || m.type === "Intérêt") ? "encaisse" : "decaisse",
+      detail: `${nomCompteParId[m.compte_id] || "—"}${m.categorie_frais ? ` (${m.categorie_frais})` : m.motif ? ` (${m.motif})` : ""}`,
+    }));
+  }
+
+  // --- FONDS ---
+  const { data: typesFonds } = await supabase.from("types_fonds").select("id, nom").eq("group_id", groupId);
+  const idsTypesFonds = (typesFonds || []).map((t) => t.id);
+  const nomTypeFondsParId = Object.fromEntries((typesFonds || []).map((t) => [t.id, t.nom]));
+
+  if (idsTypesFonds.length > 0) {
+    const { data } = await supabase
+      .from("fonds_mouvements")
+      .select("montant, type_fonds_id, date_mouvement, membre:group_members(profile:profiles(nom_complet))")
+      .in("type_fonds_id", idsTypesFonds)
+      .gte("date_mouvement", debut)
+      .lt("date_mouvement", fin);
+    (data || []).forEach((m) => liste.push({
+      module: "Fonds", type: nomTypeFondsParId[m.type_fonds_id] || "—", membre: m.membre?.profile?.nom_complet || "—",
+      montant: Number(m.montant), date: m.date_mouvement, sens: "encaisse",
+      detail: "—",
+    }));
+  }
+
+  liste.sort((a, b) => a.date.localeCompare(b.date));
+
+  const totalEncaisse = liste.filter((l) => l.sens === "encaisse").reduce((s, l) => s + l.montant, 0);
+  const totalDecaisse = liste.filter((l) => l.sens === "decaisse").reduce((s, l) => s + l.montant, 0);
+
+  const parModule = {};
+  liste.forEach((l) => {
+    if (!parModule[l.module]) parModule[l.module] = { encaisse: 0, decaisse: 0, nb: 0 };
+    parModule[l.module][l.sens] += l.montant;
+    parModule[l.module].nb += 1;
+  });
+
+  return { mouvements: liste, totalEncaisse, totalDecaisse, parModule };
 }
