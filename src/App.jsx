@@ -1648,11 +1648,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [documentEnCours, setDocumentEnCours] = useState("");
   const inputsDocumentsRef = useRef({});
   const [showHistoriqueMembre, setShowHistoriqueMembre] = useState(null);
-  const [showGererFondsMembre, setShowGererFondsMembre] = useState(null);
-  const [nouveauVersementParType, setNouveauVersementParType] = useState({});
-  const [nouvelleCibleParType, setNouvelleCibleParType] = useState({});
-  const [gererFondsErreur, setGererFondsErreur] = useState("");
-  const [gererFondsEnCours, setGererFondsEnCours] = useState("");
+  const [showCotisationFonds, setShowCotisationFonds] = useState(false);
+  const [cotisationFondsTypeId, setCotisationFondsTypeId] = useState("");
+  const [cotisationFondsDate, setCotisationFondsDate] = useState("");
+  const [cotisationFondsMontants, setCotisationFondsMontants] = useState({});
+  const [cotisationFondsErreur, setCotisationFondsErreur] = useState("");
+  const [cotisationFondsEnCours, setCotisationFondsEnCours] = useState(false);
   const [showGererTypesFonds, setShowGererTypesFonds] = useState(false);
   const [newTypeFondsNom, setNewTypeFondsNom] = useState("");
   const [newTypeFondsCible, setNewTypeFondsCible] = useState("");
@@ -2144,15 +2145,30 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               <div>
                 <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Fonds</h1>
                 <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
-                  Fonds de garantie, fonds de solidarité, ou toute autre rubrique — chaque membre cotise progressivement vers un objectif fixé.
+                  Fonds de garantie, fonds de solidarité, ou toute autre rubrique — chaque membre cotise progressivement vers un objectif commun.
                 </p>
               </div>
-              <button
-                style={btnPrimary}
-                onClick={() => { setShowGererTypesFonds(true); setNewTypeFondsNom(""); }}
-              >
-                <Plus size={15} /> Types de fonds
-              </button>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <button
+                  style={btnSecondary}
+                  onClick={() => { setShowGererTypesFonds(true); setNewTypeFondsNom(""); setNewTypeFondsCible(""); }}
+                >
+                  <Plus size={15} /> Types de fonds
+                </button>
+                <button
+                  style={btnPrimary}
+                  disabled={typesFonds.length === 0}
+                  onClick={() => {
+                    setCotisationFondsTypeId(typesFonds[0]?.id || "");
+                    setCotisationFondsDate("");
+                    setCotisationFondsMontants({});
+                    setCotisationFondsErreur("");
+                    setShowCotisationFonds(true);
+                  }}
+                >
+                  <Plus size={15} /> Enregistrer fonds
+                </button>
+              </div>
             </div>
 
             {typesFonds.length === 0 ? (
@@ -2162,8 +2178,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             ) : (
               typesFonds.map((t) => (
                 <div key={t.id} style={{ marginTop: "26px" }}>
-                  <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px" }}>{t.nom}</h2>
-                  <Table cols={["Membre", "Progression", "Statut", ""]} widths="1.3fr 1.4fr 1fr 1fr"
+                  <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px" }}>{t.nom} <span style={{ color: C.sub, fontWeight: 400, fontSize: "12px" }}>— objectif {fmtFCFA(t.cible)}</span></h2>
+                  <Table cols={["Membre", "Progression", "Statut"]} widths="1.5fr 1.6fr 1.1fr"
                     rows={membres.map((m) => {
                       const f = (fondsParMembre[m.id] || []).find((x) => x.typeFondsId === t.id) || { cible: 0, solde: 0 };
                       const atteint = f.cible > 0 && f.solde >= f.cible;
@@ -2182,12 +2198,6 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         ) : (
                           <span style={{ color: C.sub, fontSize: 11.5 }}>pas d'objectif</span>
                         ),
-                        <button
-                          onClick={() => setShowGererFondsMembre(m)}
-                          style={{ background: "transparent", color: C.vifOr, border: `1px solid ${C.vifOr}66`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
-                        >
-                          Gérer
-                        </button>,
                       ];
                     })}
                   />
@@ -3959,70 +3969,97 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         </Modal>
       )}
 
-      {showGererFondsMembre && (
-        <Modal onClose={() => { setShowGererFondsMembre(null); setNouveauVersementParType({}); setNouvelleCibleParType({}); setGererFondsErreur(""); }} title={`Fonds — ${showGererFondsMembre.nom}`} icon={<Wallet />} accentColor={C.vifOr}>
-          {typesFonds.length === 0 ? (
-            <div style={{ fontSize: "12px", color: C.sub }}>Aucun type de fonds créé pour l'instant — utilise "Types de fonds" pour en ajouter.</div>
-          ) : (
-            typesFonds.map((t) => {
-              const f = (fondsParMembre[showGererFondsMembre.id] || []).find((x) => x.typeFondsId === t.id) || { cible: 0, solde: 0 };
-              return (
-                <div key={t.id} style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                    <b style={{ fontSize: "13px" }}>{t.nom}</b>
-                    <span style={{ fontSize: "12px", fontWeight: 700, color: f.solde >= f.cible && f.cible > 0 ? C.accent2 : C.ink }}>
-                      {fmtFCFA(f.solde)} / {fmtFCFA(f.cible)}
-                    </span>
-                  </div>
-                  {f.cible > 0 && (
-                    <div style={{ width: "100%", height: "5px", background: "#EEE", borderRadius: "3px", marginBottom: "10px", overflow: "hidden" }}>
-                      <div style={{ width: `${Math.min(100, (f.solde / f.cible) * 100)}%`, height: "100%", background: f.solde >= f.cible ? C.accent2 : C.warn }} />
-                    </div>
-                  )}
-                  <div style={{ display: "flex", gap: "6px", marginTop: "6px", flexWrap: "wrap" }}>
-                    <input
-                      value={nouveauVersementParType[t.id] ?? ""}
-                      onChange={(e) => setNouveauVersementParType({ ...nouveauVersementParType, [t.id]: e.target.value })}
-                      placeholder="Montant à verser"
-                      style={{ flex: 1, boxSizing: "border-box", padding: "8px 9px", borderRadius: "7px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "11.5px", outline: "none" }}
-                    />
-                    <button
-                      disabled={gererFondsEnCours === `versement-${t.id}`}
-                      onClick={async () => {
-                        const val = parseInt((nouveauVersementParType[t.id] || "").replace(/[^\d]/g, ""), 10);
-                        if (!val) return;
-                        setGererFondsEnCours(`versement-${t.id}`);
-                        try {
-                          await enregistrerVersementFonds(showGererFondsMembre.id, t.id, val);
-                          await rechargerFonds();
-                          setNouveauVersementParType({ ...nouveauVersementParType, [t.id]: "" });
-                          if (showGererFondsMembre.telephone) {
-                            envoyerSMS({
-                              message: `Bonjour ${showGererFondsMembre.nom}, votre versement de ${fmtFCFA(val)} pour "${t.nom}" a été enregistré.`,
-                              numeros: [showGererFondsMembre.telephone],
-                            });
-                          }
-                        } catch (e) {
-                          console.error("Erreur d'enregistrement du versement", e);
-                          setGererFondsErreur(e.message || "Erreur lors de l'enregistrement.");
-                        } finally {
-                          setGererFondsEnCours("");
-                        }
-                      }}
-                      style={{ background: C.vifOr, color: "#FFFFFF", border: "none", borderRadius: "7px", padding: "0 12px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
-                    >
-                      Verser
-                    </button>
-                  </div>
+      {showCotisationFonds && (
+        <Modal onClose={() => setShowCotisationFonds(false)} title="Enregistrer fonds" icon={<Wallet />} accentColor={C.vifOr}>
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Type de fonds concerné</label>
+            <select
+              value={cotisationFondsTypeId}
+              onChange={(e) => setCotisationFondsTypeId(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+            >
+              <option value="">Sélectionner un type de fonds</option>
+              {typesFonds.map((t) => (
+                <option key={t.id} value={t.id}>{t.nom} — objectif {fmtFCFA(t.cible)}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Date du versement</label>
+            <input
+              value={cotisationFondsDate}
+              onChange={(e) => setCotisationFondsDate(e.target.value)}
+              placeholder="jj/mm/aaaa"
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Montant par membre</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {membres.map((m) => (
+                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div style={{ flex: 1, fontSize: "13px", fontWeight: 600 }}>{m.nom}</div>
+                  <input
+                    value={cotisationFondsMontants[m.id] || ""}
+                    onChange={(e) => setCotisationFondsMontants({ ...cotisationFondsMontants, [m.id]: e.target.value })}
+                    placeholder="0 FCFA"
+                    style={{ width: "130px", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none", textAlign: "right" }}
+                  />
                 </div>
-              );
-            })
-          )}
-          {gererFondsErreur && (
+              ))}
+            </div>
+          </div>
+
+          <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+            Laisse vide un membre qui n'a pas versé ce jour-là.
+          </div>
+
+          {cotisationFondsErreur && (
             <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
-              {gererFondsErreur}
+              {cotisationFondsErreur}
             </div>
           )}
+
+          <button
+            disabled={cotisationFondsEnCours}
+            style={{ marginTop: "6px", background: C.vifOr, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: cotisationFondsEnCours ? "default" : "pointer" }}
+            onClick={async () => {
+              if (!cotisationFondsTypeId) { setCotisationFondsErreur("Sélectionne un type de fonds."); return; }
+              if (!cotisationFondsDate.trim()) { setCotisationFondsErreur("La date du versement est obligatoire."); return; }
+              const dateISO = versDateISO(cotisationFondsDate);
+              if (!dateISO) { setCotisationFondsErreur("Date invalide (jj/mm/aaaa)."); return; }
+
+              const aVerser = membres.filter((m) => cotisationFondsMontants[m.id] && parseInt(cotisationFondsMontants[m.id].replace(/[^\d]/g, ""), 10) > 0);
+              if (aVerser.length === 0) { setCotisationFondsErreur("Saisis au moins un montant."); return; }
+
+              setCotisationFondsEnCours(true);
+              setCotisationFondsErreur("");
+              try {
+                const typeChoisi = typesFonds.find((t) => t.id === cotisationFondsTypeId);
+                for (const m of aVerser) {
+                  const montant = parseInt(cotisationFondsMontants[m.id].replace(/[^\d]/g, ""), 10);
+                  await enregistrerVersementFonds(m.id, cotisationFondsTypeId, montant, dateISO);
+                  if (m.telephone) {
+                    envoyerSMS({
+                      message: `Bonjour ${m.nom}, votre versement de ${fmtFCFA(montant)} pour "${typeChoisi?.nom}" a été enregistré.`,
+                      numeros: [m.telephone],
+                    });
+                  }
+                }
+                await rechargerFonds();
+                setShowCotisationFonds(false);
+              } catch (e) {
+                console.error("Erreur d'enregistrement des versements", e);
+                setCotisationFondsErreur(e.message || "Erreur lors de l'enregistrement.");
+              } finally {
+                setCotisationFondsEnCours(false);
+              }
+            }}
+          >
+            {cotisationFondsEnCours ? "Enregistrement..." : "Enregistrer les versements"}
+          </button>
         </Modal>
       )}
 
