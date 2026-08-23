@@ -1143,7 +1143,7 @@ function SuperAdminScreen() {
             >
               <option value="">{chargementAdmins ? "Chargement..." : "Sélectionner une personne"}</option>
               {adminsList.map((a, i) => (
-                <option key={i} value={i}>{a.nom} — {a.role} — {a.groupNom}</option>
+                <option key={i} value={i}>{a.nom} ({a.identifiant}) — {a.role} — {a.groupNom}</option>
               ))}
             </select>
             {!chargementAdmins && adminsList.length === 0 && (
