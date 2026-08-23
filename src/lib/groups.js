@@ -1,14 +1,17 @@
 import { supabase } from "./supabaseClient";
 
+// Génère un mot de passe temporaire lisible (ex. Tontine-4821)
 function genererMotDePasseTemp() {
   const nombre = Math.floor(1000 + Math.random() * 9000);
   return `Tontine-${nombre}`;
 }
 
+// Génère un identifiant court à partir du nom (ex. "Jean Mballa" -> "jeanmballa")
 function genererIdentifiant(nom) {
   return nom.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
 }
 
+// Liste tous les groupes (réservé au Super Admin)
 export async function fetchGroupes() {
   const { data, error } = await supabase
     .from("groups")
@@ -22,10 +25,19 @@ export async function fetchGroupes() {
   return data;
 }
 
+// Crée un nouveau groupe + un compte admin pour ce groupe.
 export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, formule = "Essai", periodicite }) {
   const motDePasseTemp = genererMotDePasseTemp();
   const identifiantBase = genererIdentifiant(adminNom);
   const identifiant = `${identifiantBase}${Math.floor(10 + Math.random() * 90)}`;
+
+  // Sauvegarde la session du Super Admin AVANT de créer le compte
+  // du nouvel admin — sans ça, la création du compte (signUp)
+  // remplace la session active par celle du nouvel admin, ce qui
+  // casse tout le reste de la création (RLS refuse les insertions
+  // suivantes puisqu'elles ne s'exécutent plus avec les droits
+  // Super Admin).
+  const { data: { session: sessionSuperAdmin } } = await supabase.auth.getSession();
 
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: adminEmail,
@@ -33,6 +45,14 @@ export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, fo
   });
   if (authError) throw authError;
   if (!authData.user) throw new Error("Impossible de créer le compte administrateur.");
+
+  // Restaure la session du Super Admin avant toute autre opération
+  if (sessionSuperAdmin) {
+    await supabase.auth.setSession({
+      access_token: sessionSuperAdmin.access_token,
+      refresh_token: sessionSuperAdmin.refresh_token,
+    });
+  }
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
