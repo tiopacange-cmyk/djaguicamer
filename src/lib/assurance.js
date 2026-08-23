@@ -82,7 +82,9 @@ export async function fetchSoldesAssurance(groupId, membres, soldeMinimum) {
 
 export async function enregistrerCotisationsAssurance(groupId, cotisations, soldeMinimum) {
   const lignes = cotisations.filter((c) => c.montant && parseFloat(c.montant) > 0);
-  if (lignes.length === 0) return;
+  if (lignes.length === 0) return {};
+
+  const soldesApres = {};
 
   for (const c of lignes) {
     const { data: actuel, error: errLecture } = await supabase
@@ -94,6 +96,7 @@ export async function enregistrerCotisationsAssurance(groupId, cotisations, sold
     if (errLecture) throw errLecture;
 
     const nouveauSolde = actuel.solde + parseFloat(c.montant);
+    soldesApres[c.membreId] = nouveauSolde;
     const { error: errMaj } = await supabase
       .from("assurance_soldes")
       .update({
@@ -114,6 +117,8 @@ export async function enregistrerCotisationsAssurance(groupId, cotisations, sold
     });
     if (errHisto) throw errHisto;
   }
+
+  return soldesApres;
 }
 
 // Récupère l'historique complet des mouvements d'assurance
@@ -232,6 +237,7 @@ export async function declarerEvenement(groupId, {
 
   // Prélèvement au prorata sur tous les membres
   const part = montantBrut / membresGroupe.length;
+  const soldesApres = {};
   for (const m of membresGroupe) {
     const { data: actuel, error: errLecture } = await supabase
       .from("assurance_soldes")
@@ -243,6 +249,7 @@ export async function declarerEvenement(groupId, {
 
     const soldeAvant = actuel.solde;
     const soldeApres = Math.max(0, soldeAvant - part);
+    soldesApres[m.id] = soldeApres;
     const delaiExpire = soldeApres < soldeMinimum
       ? (actuel.delai_expire_le || new Date(Date.now() + delaiJours * 86400000).toISOString().slice(0, 10))
       : null;
@@ -274,5 +281,5 @@ export async function declarerEvenement(groupId, {
     if (errHisto) throw errHisto;
   }
 
-  return evenement;
+  return { evenement, soldesApres, part };
 }
