@@ -118,7 +118,7 @@ export async function fetchAdminsDesGroupes() {
     .from("group_members")
     .select(`
       is_admin, is_president,
-      profile:profiles ( email, nom_complet ),
+      profile:profiles ( email, nom_complet, identifiant ),
       group:groups ( id, nom )
     `)
     .or("is_admin.eq.true,is_president.eq.true")
@@ -131,6 +131,7 @@ export async function fetchAdminsDesGroupes() {
     .map((m) => ({
       email: m.profile.email,
       nom: m.profile.nom_complet,
+      identifiant: m.profile.identifiant,
       groupId: m.group?.id,
       groupNom: m.group?.nom,
       role: m.is_president ? "Président" : "Admin",
