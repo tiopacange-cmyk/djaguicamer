@@ -544,6 +544,12 @@ function SuperAdminScreen() {
       const data = await fetchGroupes();
       setGroupes(data);
       setErreur("");
+      try {
+        const admins = await fetchAdminsDesGroupes();
+        setAdminsList(admins);
+      } catch (e2) {
+        console.error("Erreur de chargement des admins", e2);
+      }
     } catch (e) {
       console.error("Erreur de chargement des groupes", e);
       setErreur("Impossible de charger les groupes — vérifie que ton compte est bien marqué Super Admin.");
@@ -650,12 +656,19 @@ function SuperAdminScreen() {
 
             <div style={{ marginTop: "22px" }} />
             <Table
-              cols={["Groupe", "Formule", "Échéance", "Statut", ""]}
-              widths="1.8fr 1.1fr 1.2fr 1fr 1.1fr"
+              cols={["Groupe", "Admin", "Formule", "Échéance", "Statut", ""]}
+              widths="1.5fr 1.5fr 1fr 1.1fr 0.9fr 1.1fr"
               rows={groupes.map((g) => {
                 const abo = g.subscriptions?.[0];
+                const admin = adminsList.find((a) => a.groupId === g.id);
                 return [
                   <b>{g.nom}</b>,
+                  admin ? (
+                    <div>
+                      <div style={{ fontSize: "12.5px", fontWeight: 600 }}>{admin.nom}</div>
+                      <div style={{ fontSize: "11px", color: C.sub }}>{admin.identifiant} · {admin.role}</div>
+                    </div>
+                  ) : <span style={{ color: C.sub, fontSize: 12 }}>—</span>,
                   abo ? (
                     <span><span style={{ color: planColor[abo.formule] || C.sub, fontWeight: 700 }}>{abo.formule}</span> {abo.periodicite && <span style={{ color: C.sub, fontSize: 11 }}>· {abo.periodicite}</span>}</span>
                   ) : "—",
