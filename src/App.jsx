@@ -43,6 +43,19 @@ import {
 } from "lucide-react";
 
 // ---------- Palette partagée ----------
+// Format uniforme pour tous les SMS de confirmation de mouvement
+// financier : "Bonjour X, opération réussie : [opération] de
+// [montant]. Solde : [solde]." — le solde et les détails sont
+// facultatifs, certaines opérations (amende, prêt...) n'ont pas
+// de solde personnel à afficher.
+function msgOperation(nom, operation, montant, solde, details) {
+  const fmt = (n) => `${Math.round(n || 0).toLocaleString("fr-FR")} FCFA`;
+  let msg = `Bonjour ${nom}, opération réussie : ${operation} de ${fmt(montant)}.`;
+  if (details) msg += ` ${details}.`;
+  if (solde !== undefined && solde !== null) msg += ` Solde : ${fmt(solde)}.`;
+  return msg;
+}
+
 const C = {
   ink: "#1B2420", sub: "#5B6B5F", accent: "#B8860F", accent2: "#1B4332",
   border: "#E5DFCE", bg: "#FAF6ED", panel: "#FFFFFF", purple: "#6B5FA6",
@@ -2718,7 +2731,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   const membre = membres.find((m) => m.id === c.membreId);
                   if (membre?.telephone) {
                     envoyerSMS({
-                      message: `Bonjour ${membre.nom}, votre cotisation tontine de ${fmtFCFA(c.montant)} a bien été enregistrée. Merci !`,
+                      message: msgOperation(membre.nom, "cotisation tontine", c.montant),
                       numeros: [membre.telephone],
                     });
                   }
@@ -2960,7 +2973,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 return;
               }
               try {
-                await declarerEvenement(groupId, {
+                const { soldesApres, part } = await declarerEvenement(groupId, {
                   typeId: typeEvenementId,
                   beneficiaireId: evenementBeneficiaire,
                   lienAvecMembre: null,
@@ -2981,19 +2994,18 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 const beneficiaire = membresActifs.find((m) => m.id === evenementBeneficiaire);
                 if (beneficiaire?.telephone) {
                   envoyerSMS({
-                    message: `Bonjour ${beneficiaire.nom}, votre aide assurance de ${fmtFCFA(montantBrut)} a été déclarée et sera décaissée prochainement.`,
+                    message: msgOperation(beneficiaire.nom, "aide assurance", montantBrut, undefined, "Décaissement à venir prochainement"),
                     numeros: [beneficiaire.telephone],
                   });
                 }
-                const autresNumeros = membresActifs
+                membresActifs
                   .filter((m) => m.id !== evenementBeneficiaire && m.telephone)
-                  .map((m) => m.telephone);
-                if (autresNumeros.length > 0) {
-                  envoyerSMS({
-                    message: `Info assurance : une aide a été déclarée pour un membre. Un prélèvement au prorata a été appliqué sur votre solde d'assurance.`,
-                    numeros: autresNumeros,
+                  .forEach((m) => {
+                    envoyerSMS({
+                      message: msgOperation(m.nom, "prélèvement assurance (aide d'un membre)", part, soldesApres?.[m.id]),
+                      numeros: [m.telephone],
+                    });
                   });
-                }
 
                 setEvenementError("");
                 setEvenementSuccess(true);
@@ -3060,14 +3072,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 const cotisations = membres
                   .filter((m) => cotisationAssuranceMontants[m.nom])
                   .map((m) => ({ membreId: m.id, montant: cotisationAssuranceMontants[m.nom] }));
-                await enregistrerCotisationsAssurance(groupId, cotisations, soldeMinimum);
+                const soldesApres = await enregistrerCotisationsAssurance(groupId, cotisations, soldeMinimum);
                 await rechargerAssurance();
 
                 cotisations.forEach((c) => {
                   const membre = membres.find((m) => m.id === c.membreId);
                   if (membre?.telephone) {
                     envoyerSMS({
-                      message: `Bonjour ${membre.nom}, votre cotisation assurance de ${fmtFCFA(c.montant)} a bien été enregistrée.`,
+                      message: msgOperation(membre.nom, "cotisation assurance", c.montant, soldesApres?.[c.membreId]),
                       numeros: [membre.telephone],
                     });
                   }
@@ -3333,7 +3345,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 const cotisations = membres
                   .filter((m) => cotisationMontants[m.nom])
                   .map((m) => ({ membreId: m.id, montant: cotisationMontants[m.nom], date: versDateISO(cotisationDate) }));
-                await enregistrerCotisationsEpargne(cotisationEpargneId, cotisations);
+                const resultatCotisation = await enregistrerCotisationsEpargne(cotisationEpargneId, cotisations);
                 await rechargerEpargnes();
                 await rechargerHistoriqueBanque();
 
@@ -3342,7 +3354,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   const membre = membres.find((m) => m.id === c.membreId);
                   if (membre?.telephone) {
                     envoyerSMS({
-                      message: `Bonjour ${membre.nom}, votre versement de ${fmtFCFA(c.montant)} sur "${epargneNom}" a bien été enregistré.`,
+                      message: msgOperation(membre.nom, `versement "${epargneNom}"`, c.montant, resultatCotisation?.soldeFinal),
                       numeros: [membre.telephone],
                     });
                   }
@@ -3491,7 +3503,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 const emprunteur = membres.find((m) => m.id === creditMembreId);
                 if (emprunteur?.telephone) {
                   envoyerSMS({
-                    message: `Bonjour ${emprunteur.nom}, votre crédit de ${fmtFCFA(montantNum)} a été accordé. Échéance : ${creditFin}.`,
+                    message: msgOperation(emprunteur.nom, "crédit", montantNum, undefined, `Échéance : ${creditFin}`),
                     numeros: [emprunteur.telephone],
                   });
                 }
@@ -4040,10 +4052,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 const typeChoisi = typesFonds.find((t) => t.id === cotisationFondsTypeId);
                 for (const m of aVerser) {
                   const montant = parseInt(cotisationFondsMontants[m.id].replace(/[^\d]/g, ""), 10);
-                  await enregistrerVersementFonds(m.id, cotisationFondsTypeId, montant, dateISO);
+                  const nouveauSolde = await enregistrerVersementFonds(m.id, cotisationFondsTypeId, montant, dateISO);
                   if (m.telephone) {
                     envoyerSMS({
-                      message: `Bonjour ${m.nom}, votre versement de ${fmtFCFA(montant)} pour "${typeChoisi?.nom}" a été enregistré.`,
+                      message: msgOperation(m.nom, `versement "${typeChoisi?.nom}"`, montant, nouveauSolde),
                       numeros: [m.telephone],
                     });
                   }
@@ -4739,7 +4751,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 const membre = membres.find((m) => m.id === showAmende.membreId);
                 if (membre?.telephone) {
                   envoyerSMS({
-                    message: `Bonjour ${membre.nom}, une amende de ${fmtFCFA(montantNum)} vous a été appliquée${amendeMotif.trim() ? ` (${amendeMotif.trim()})` : ""}.`,
+                    message: msgOperation(membre.nom, "amende de retard", montantNum, undefined, amendeMotif.trim() ? `Motif : ${amendeMotif.trim()}` : undefined),
                     numeros: [membre.telephone],
                   });
                 }
