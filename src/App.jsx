@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre, reinitialiserMotDePasseMembre, televerserDocumentMembre, fetchDocumentsMembre } from "./lib/membres";
 import { fetchTypesFonds, creerTypeFonds, supprimerTypeFonds, fetchFondsTousMembres, fixerCibleFonds, enregistrerVersementFonds, fetchFondsMembre } from "./lib/fonds";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse } from "./lib/auth";
-import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement, televerserLogoGroupe, fetchLogoGroupe } from "./lib/groups";
+import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement, televerserLogoGroupe, fetchLogoGroupe, modifierGroupe, suspendreGroupe, reactiverGroupe } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere, fetchApercuRedistribution, redistribuerCommission } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit, fetchApercuCloture, cloturerEpargne } from "./lib/banque";
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
@@ -495,6 +495,11 @@ function SuperAdminScreen() {
   const [creationFormule, setCreationFormule] = useState("Essai");
   const [creationPeriodicite, setCreationPeriodicite] = useState("Mensuel");
   const [showRenouveler, setShowRenouveler] = useState(null);
+  const [showModifierGroupe, setShowModifierGroupe] = useState(null);
+  const [modifierGroupeNom, setModifierGroupeNom] = useState("");
+  const [modifierGroupeErreur, setModifierGroupeErreur] = useState("");
+  const [modifierGroupeEnCours, setModifierGroupeEnCours] = useState(false);
+  const [suspensionEnCours, setSuspensionEnCours] = useState("");
   const [renouvelerFormule, setRenouvelerFormule] = useState("Basic");
   const [renouvelerPeriodicite, setRenouvelerPeriodicite] = useState("Mensuel");
   const [renouvelerErreur, setRenouvelerErreur] = useState("");
@@ -653,18 +658,44 @@ function SuperAdminScreen() {
                   ) : "—",
                   abo?.date_expiration ? <span style={{ color: C.sub, fontSize: 12 }}>{new Date(abo.date_expiration).toLocaleDateString("fr-FR")}</span> : "—",
                   abo ? <Badge bg={(statusStyle[abo.statut] || statusStyle.actif).bg} fg={(statusStyle[abo.statut] || statusStyle.actif).fg}>{abo.statut}</Badge> : "—",
-                  <button
-                    onClick={() => {
-                      setShowRenouveler(g);
-                      setRenouvelerFormule(abo?.formule || "Basic");
-                      setRenouvelerPeriodicite(abo?.periodicite || "Mensuel");
-                      setRenouvelerErreur("");
-                      setRenouvelerSuccess(false);
-                    }}
-                    style={{ background: "transparent", color: C.vifVert, border: `1px solid ${C.vifVert}66`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
-                  >
-                    Renouveler
-                  </button>,
+                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => {
+                        setShowRenouveler(g);
+                        setRenouvelerFormule(abo?.formule || "Basic");
+                        setRenouvelerPeriodicite(abo?.periodicite || "Mensuel");
+                        setRenouvelerErreur("");
+                        setRenouvelerSuccess(false);
+                      }}
+                      style={{ background: "transparent", color: C.vifVert, border: `1px solid ${C.vifVert}66`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                    >
+                      Renouveler
+                    </button>
+                    <button
+                      onClick={() => { setShowModifierGroupe(g); setModifierGroupeNom(g.nom); setModifierGroupeErreur(""); }}
+                      style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}66`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                    >
+                      Modifier
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setSuspensionEnCours(g.id);
+                        try {
+                          if (abo?.statut === "suspendu") await reactiverGroupe(g.id);
+                          else await suspendreGroupe(g.id);
+                          await chargerGroupes();
+                        } catch (e) {
+                          console.error("Erreur de suspension/réactivation", e);
+                        } finally {
+                          setSuspensionEnCours("");
+                        }
+                      }}
+                      disabled={suspensionEnCours === g.id}
+                      style={{ background: "transparent", color: abo?.statut === "suspendu" ? C.accent2 : C.warn, border: `1px solid ${abo?.statut === "suspendu" ? C.accent2 : C.warn}66`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                    >
+                      {suspensionEnCours === g.id ? "..." : abo?.statut === "suspendu" ? "Réactiver" : "Suspendre"}
+                    </button>
+                  </div>,
                 ];
               })}
             />
@@ -865,6 +896,39 @@ function SuperAdminScreen() {
               {renouvelerEnCours ? "Renouvellement..." : "Renouveler l'abonnement"}
             </button>
           )}
+        </Modal>
+      )}
+
+      {showModifierGroupe && (
+        <Modal onClose={() => setShowModifierGroupe(null)} title="Modifier le groupe" icon={<Building2 />} accentColor={C.vifBleu}>
+          <FormField label="Nom du groupe" placeholder="Ex. Tontine Les Bâtisseurs" value={modifierGroupeNom} onChange={(e) => setModifierGroupeNom(e.target.value)} />
+
+          {modifierGroupeErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {modifierGroupeErreur}
+            </div>
+          )}
+
+          <button
+            disabled={modifierGroupeEnCours}
+            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: modifierGroupeEnCours ? "default" : "pointer" }}
+            onClick={async () => {
+              if (!modifierGroupeNom.trim()) { setModifierGroupeErreur("Le nom du groupe est obligatoire."); return; }
+              setModifierGroupeEnCours(true);
+              try {
+                await modifierGroupe(showModifierGroupe.id, modifierGroupeNom.trim());
+                await chargerGroupes();
+                setShowModifierGroupe(null);
+              } catch (e) {
+                console.error("Erreur de modification du groupe", e);
+                setModifierGroupeErreur(e.message || "Erreur lors de la modification.");
+              } finally {
+                setModifierGroupeEnCours(false);
+              }
+            }}
+          >
+            Enregistrer
+          </button>
         </Modal>
       )}
 
@@ -1101,7 +1165,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       .then(setStatutAbonnement)
       .catch((e) => console.error("Erreur de vérification de la licence", e));
   }, [groupId]);
-  const licenceExpiree = statutAbonnement?.expire === true;
+  const licenceExpiree = statutAbonnement?.expire === true || statutAbonnement?.statut === "suspendu";
 
   // Convertit une date saisie au format jj/mm/aaaa (celui utilisé
   // dans toute l'interface) vers le format aaaa-mm-jj attendu par
@@ -1731,7 +1795,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         </div>
         <h1 style={{ fontSize: "18px", fontWeight: 700, color: C.ink, margin: "0 0 8px" }}>Licence expirée</h1>
         <p style={{ fontSize: "13px", color: C.sub, margin: 0 }}>
-          L'abonnement de ce groupe a expiré{statutAbonnement?.dateExpiration ? ` le ${new Date(statutAbonnement.dateExpiration).toLocaleDateString("fr-FR")}` : ""}. Contacte le Super Admin de la plateforme pour le renouveler.
+          {statutAbonnement?.statut === "suspendu"
+            ? "L'accès à ce groupe a été suspendu par le Super Admin de la plateforme."
+            : `L'abonnement de ce groupe a expiré${statutAbonnement?.dateExpiration ? ` le ${new Date(statutAbonnement.dateExpiration).toLocaleDateString("fr-FR")}` : ""}.`}
+          {" "}Contacte le Super Admin de la plateforme pour le renouveler.
         </p>
       </div>
     </div>
@@ -5057,7 +5124,7 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
       .then(setLogoGroupeUrl)
       .catch((e) => console.error("Erreur de chargement du logo", e));
   }, [groupId]);
-  const licenceExpiree = statutAbonnement?.expire === true;
+  const licenceExpiree = statutAbonnement?.expire === true || statutAbonnement?.statut === "suspendu";
 
   useEffect(() => {
     if (!groupId || !profileId) return;
@@ -5112,7 +5179,10 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
         </div>
         <h1 style={{ fontSize: "18px", fontWeight: 700, color: C.ink, margin: "0 0 8px" }}>Licence expirée</h1>
         <p style={{ fontSize: "13px", color: C.sub, margin: 0 }}>
-          L'abonnement de ton groupe a expiré. Contacte l'admin de ton groupe ou le Super Admin de la plateforme.
+          {statutAbonnement?.statut === "suspendu"
+            ? "L'accès à ton groupe a été suspendu par le Super Admin de la plateforme."
+            : "L'abonnement de ton groupe a expiré."}
+          {" "}Contacte l'admin de ton groupe ou le Super Admin de la plateforme.
         </p>
       </div>
     </div>
