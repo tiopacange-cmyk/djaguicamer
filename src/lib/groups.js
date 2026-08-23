@@ -26,9 +26,12 @@ export async function fetchGroupes() {
 }
 
 // Crée un nouveau groupe + un compte admin pour ce groupe.
+// L'admin reçoit tout de suite un vrai compte de connexion, avec
+// un identifiant court (dérivé de son nom) pour se connecter facilement.
 export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, formule = "Essai", periodicite }) {
   const motDePasseTemp = genererMotDePasseTemp();
   const identifiantBase = genererIdentifiant(adminNom);
+  // Ajoute un petit suffixe aléatoire pour limiter les risques de collision
   const identifiant = `${identifiantBase}${Math.floor(10 + Math.random() * 90)}`;
 
   // Sauvegarde la session du Super Admin AVANT de créer le compte
@@ -68,6 +71,8 @@ export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, fo
     .single();
   if (groupeError) throw groupeError;
 
+  // La durée d'accès dépend du plan choisi : essai = 14 jours fixes,
+  // sinon 30 jours (mensuel) ou 365 jours (annuel).
   const dateExpiration = new Date();
   const nbJours = formule === "Essai" ? 14 : periodicite === "Annuel" ? 365 : 30;
   dateExpiration.setDate(dateExpiration.getDate() + nbJours);
@@ -100,6 +105,14 @@ export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, fo
   return { groupe, motDePasseTemp, adminEmail, identifiant };
 }
 
+// ============================================================
+// ACCÈS D'URGENCE — réinitialisation directe du mot de passe
+// (sans email, pour un accès immédiat)
+// ============================================================
+
+// Liste tous les admins/présidents de tous les groupes, pour que
+// le Super Admin les choisisse dans une liste plutôt que de taper
+// un email
 export async function fetchAdminsDesGroupes() {
   const { data, error } = await supabase
     .from("group_members")
@@ -124,6 +137,9 @@ export async function fetchAdminsDesGroupes() {
     }));
 }
 
+// Réinitialise directement le mot de passe (sans email), génère
+// un nouveau mot de passe temporaire, et marque que la personne
+// devra en choisir un nouveau à sa prochaine connexion.
 export async function reinitialiserMotDePasseDirect(email, groupId, groupNom) {
   const motDePasseTemp = genererMotDePasseTemp();
 
@@ -144,6 +160,8 @@ export async function reinitialiserMotDePasseDirect(email, groupId, groupNom) {
   return motDePasseTemp;
 }
 
+// Change son propre mot de passe (utilisé après une réinitialisation
+// d'urgence, à la prochaine connexion)
 export async function changerMotDePasse(nouveauMotDePasse) {
   const { error } = await supabase.auth.updateUser({ password: nouveauMotDePasse });
   if (error) throw error;
@@ -154,6 +172,9 @@ export async function changerMotDePasse(nouveauMotDePasse) {
   }
 }
 
+// ============================================================
+// JOURNAL D'AUDIT
+// ============================================================
 export async function fetchAuditLog() {
   const { data, error } = await supabase
     .from("audit_log")
@@ -175,6 +196,9 @@ export async function logAudit({ groupId, action, detail, type }) {
   if (error) console.error("Erreur d'écriture dans le journal d'audit", error);
 }
 
+// ============================================================
+// TARIFS / FORMULES D'ABONNEMENT
+// ============================================================
 export async function fetchPlansTarifaires() {
   const { data, error } = await supabase
     .from("plans_tarifaires")
@@ -203,6 +227,12 @@ export async function modifierPlanTarifaire(planId, { prixMensuel, prixAnnuel, l
   return data;
 }
 
+// ============================================================
+// LICENCE / ABONNEMENT — vérification d'accès et renouvellement
+// ============================================================
+
+// Récupère le statut d'abonnement le plus récent d'un groupe, avec
+// le nombre de jours restants avant expiration.
 export async function fetchStatutAbonnement(groupId) {
   const { data, error } = await supabase
     .from("subscriptions")
@@ -225,6 +255,10 @@ export async function fetchStatutAbonnement(groupId) {
   };
 }
 
+// Renouvelle l'abonnement d'un groupe : prolonge la date
+// d'expiration de 30 (mensuel) ou 365 (annuel) jours, à partir
+// d'aujourd'hui ou de la date d'expiration actuelle si elle n'est
+// pas encore dépassée.
 export async function renouvelerAbonnement(groupId, formule, periodicite) {
   const { data: actuel, error: errLecture } = await supabase
     .from("subscriptions")
@@ -271,4 +305,32 @@ export async function fetchLogoGroupe(groupId) {
   const { data, error } = await supabase.from("groups").select("logo_url").eq("id", groupId).maybeSingle();
   if (error) throw error;
   return data?.logo_url || "";
+}
+
+// ============================================================
+// MODIFIER / SUSPENDRE UN GROUPE
+// ============================================================
+
+export async function modifierGroupe(groupId, nom) {
+  const { error } = await supabase.from("groups").update({ nom }).eq("id", groupId);
+  if (error) throw error;
+}
+
+// Suspend l'accès au groupe sans rien supprimer (bloque la
+// connexion de tous ses membres, comme une licence expirée)
+export async function suspendreGroupe(groupId) {
+  const { error } = await supabase
+    .from("subscriptions")
+    .update({ statut: "suspendu" })
+    .eq("group_id", groupId);
+  if (error) throw error;
+}
+
+// Réactive un groupe précédemment suspendu
+export async function reactiverGroupe(groupId) {
+  const { error } = await supabase
+    .from("subscriptions")
+    .update({ statut: "actif" })
+    .eq("group_id", groupId);
+  if (error) throw error;
 }
