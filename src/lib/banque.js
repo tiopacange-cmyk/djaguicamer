@@ -47,6 +47,8 @@ export async function creerEpargne(groupId, { nom, type, cotisationParSeance, ta
 // MOUVEMENTS D'ÉPARGNE (versements et retraits)
 // ============================================================
 
+// Enregistre une cotisation (versement) pour plusieurs membres à la
+// fois sur une épargne donnée, et met à jour son solde en conséquence.
 export async function enregistrerCotisationsEpargne(epargneId, cotisations) {
   const lignes = cotisations.filter((c) => c.montant && parseFloat(c.montant) > 0);
   if (lignes.length === 0) return;
@@ -74,6 +76,8 @@ export async function enregistrerCotisationsEpargne(epargneId, cotisations) {
 
   const { error: errMaj } = await supabase.from("epargnes").update({ solde: soldeCourant }).eq("id", epargneId);
   if (errMaj) throw errMaj;
+
+  return { soldeFinal: soldeCourant };
 }
 
 export async function fetchHistoriqueEpargnes(groupId) {
@@ -146,6 +150,9 @@ export async function fetchPrets(groupId) {
   }));
 }
 
+// Met en place un crédit : crée le prêt, un retrait correspondant
+// sur l'épargne (le solde diminue du montant prêté), et l'avalisation
+// si un garant a été désigné.
 export async function mettreEnPlaceCredit(epargneId, { membreId, montant, fraisDossier, commission, dateDebut, dateFin, penaliteRetard, avalisteId, montantGaranti }) {
   const { data: epargne, error: errLecture } = await supabase
     .from("epargnes")
@@ -202,6 +209,9 @@ export async function mettreEnPlaceCredit(epargneId, { membreId, montant, fraisD
 // redistribution (reconduite ou récupération) vers chaque membre
 // ============================================================
 
+// Calcule, pour chaque membre ayant cotisé sur cette épargne, son
+// capital total et l'intérêt dû au prorata du montant et de la
+// durée de chaque dépôt (jusqu'à aujourd'hui).
 export async function fetchApercuCloture(epargneId) {
   const { data: epargne, error: errEp } = await supabase
     .from("epargnes")
@@ -248,6 +258,10 @@ export async function fetchApercuCloture(epargneId) {
   };
 }
 
+// Clôture l'épargne : pour chaque membre, "récupère" (retrait
+// individuel, l'argent sort réellement de la caisse) ou "reconduit"
+// (le montant est reversé dans une nouvelle épargne, pour le cycle
+// suivant). decisions = { [membreId]: "recuperer" | "reconduire" }
 export async function cloturerEpargne(epargneId, groupId, membresApercu, decisions, nomNouvelleEpargne) {
   const aReconduire = membresApercu.filter((m) => decisions[m.membreId] === "reconduire");
   const aRecuperer = membresApercu.filter((m) => decisions[m.membreId] === "recuperer");
