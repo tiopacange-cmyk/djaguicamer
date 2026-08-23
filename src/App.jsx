@@ -8,6 +8,7 @@ import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistor
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
 import { fetchComptesBancaires, creerCompteBancaire, fetchSignataires, ajouterSignataire, fetchMouvementsCompte, creerMouvementExterne, fetchCategoriesFrais, creerCategorieFrais, supprimerCategorieFrais, joindreRecu } from "./lib/depots_retrait";
 import { fetchRapportJournalier, fetchRapportMensuel, fetchBilanAnnuel } from "./lib/rapports";
+import { fetchSeances, creerSeance, enregistrerCompteRendu, supprimerSeance, fetchPresences, enregistrerPresences, fetchTauxPresence, fetchTypesAmendesSeance, creerTypeAmendeSeance, modifierTypeAmendeSeance, supprimerTypeAmendeSeance, fetchAmendesSeance, appliquerAmendeSeance } from "./lib/seances";
 import { envoyerSMS } from "./lib/sms";
 import { fetchTableauDeBordMembre } from "./lib/moncompte";
 
@@ -39,7 +40,7 @@ import {
   Users, Plus, KeyRound, Search, ShieldAlert, ChevronRight, Building2, X,
   CreditCard, ScrollText, LayoutDashboard, Wallet, Shield, FileBarChart,
   Gavel, Bell, LogOut, Moon, Sun, Lock, ChevronLeft, CheckCircle2, Clock,
-  Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat, Eye, EyeOff,
+  Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat, Eye, EyeOff, AlertTriangle,
 } from "lucide-react";
 
 // ---------- Palette partagée ----------
@@ -1862,6 +1863,43 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   };
   useEffect(() => { if (view === "assurance") rechargerTypesEvenement(); }, [groupId, view]);
 
+  const [seancesList, setSeancesList] = useState([]);
+  const [showTypesAmendesSeance, setShowTypesAmendesSeance] = useState(false);
+  const [newTypeAmendeNom, setNewTypeAmendeNom] = useState("");
+  const [newTypeAmendeMontant, setNewTypeAmendeMontant] = useState("");
+  const [montantAmendeInputs, setMontantAmendeInputs] = useState({});
+  const [showCreerSeance, setShowCreerSeance] = useState(false);
+  const [seanceDate, setSeanceDate] = useState("");
+  const [seanceLieu, setSeanceLieu] = useState("");
+  const [seanceOrdreDuJour, setSeanceOrdreDuJour] = useState("");
+  const [seanceCreationErreur, setSeanceCreationErreur] = useState("");
+  const [showDetailSeance, setShowDetailSeance] = useState(null);
+  const [presencesSeance, setPresencesSeance] = useState({});
+  const [amendesSeanceList, setAmendesSeanceList] = useState([]);
+  const [seanceCompteRendu, setSeanceCompteRendu] = useState("");
+  const [amendeSeanceMembreId, setAmendeSeanceMembreId] = useState("");
+  const [amendeSeanceTypeId, setAmendeSeanceTypeId] = useState("");
+  const [amendeSeanceMontant, setAmendeSeanceMontant] = useState("");
+  const [typesAmendesSeance, setTypesAmendesSeance] = useState([]);
+  const [tauxPresence, setTauxPresence] = useState({});
+
+  const rechargerSeances = async () => {
+    if (!groupId) return;
+    try {
+      const [s, t, tp] = await Promise.all([
+        fetchSeances(groupId),
+        fetchTypesAmendesSeance(groupId),
+        fetchTauxPresence(groupId),
+      ]);
+      setSeancesList(s);
+      setTypesAmendesSeance(t);
+      setTauxPresence(tp);
+    } catch (e) {
+      console.error("Erreur de chargement des séances", e);
+    }
+  };
+  useEffect(() => { if (view === "seances") rechargerSeances(); }, [groupId, view]);
+
   const addEventType = async () => {
     if (!newTypeName.trim()) return;
     try {
@@ -1918,6 +1956,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           { icon: <PiggyBank size={16} />, label: "Banque", key: "banque" },
           { icon: <HeartHandshake size={16} />, label: "Assurance", key: "assurance" },
           { icon: <Wallet size={16} />, label: "Fonds", key: "fonds" },
+          { icon: <Calendar size={16} />, label: "Séances", key: "seances" },
           { icon: <Building2 size={16} />, label: "Dépôt / Retrait externe", key: "depots" },
           { icon: <FileBarChart size={16} />, label: "Bilan", key: "bilan" },
           { icon: <UserCog size={16} />, label: "Membres", key: "membres" },
@@ -2231,6 +2270,81 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   />
                 </div>
               ))
+            )}
+          </>
+        )}
+
+        {view === "seances" && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+              <div>
+                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Séances</h1>
+                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
+                  Réunions générales de l'association — présence, amendes internes, procès-verbal.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <button
+                  style={btnSecondary}
+                  onClick={() => { setShowTypesAmendesSeance(true); setNewTypeAmendeNom(""); setNewTypeAmendeMontant(""); }}
+                >
+                  <Plus size={15} /> Types d'amendes
+                </button>
+                <button
+                  style={btnPrimary}
+                  onClick={() => { setSeanceDate(""); setSeanceLieu(""); setSeanceOrdreDuJour(""); setSeanceCreationErreur(""); setShowCreerSeance(true); }}
+                >
+                  <Plus size={15} /> Créer une séance
+                </button>
+              </div>
+            </div>
+
+            {seancesList.length === 0 ? (
+              <div style={{ marginTop: "22px", fontSize: "13px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
+                Aucune séance créée pour l'instant.
+              </div>
+            ) : (
+              <>
+                <div style={{ marginTop: "22px" }} />
+                <Table cols={["Date", "Lieu", "Ordre du jour", "Statut", ""]} widths="1fr 1.1fr 1.6fr 1fr 1fr"
+                  rows={seancesList.map((s) => [
+                    s.date,
+                    s.lieu || "—",
+                    <span style={{ color: C.sub, fontSize: 12 }}>{s.ordreDuJour || "—"}</span>,
+                    <Badge bg={s.statut === "terminée" ? C.ok : C.warnBg} fg={s.statut === "terminée" ? C.accent2 : C.warn}>{s.statut}</Badge>,
+                    <button
+                      onClick={async () => {
+                        setShowDetailSeance(s);
+                        setSeanceCompteRendu(s.compteRendu || "");
+                        try {
+                          const [pres, amendes] = await Promise.all([fetchPresences(s.id), fetchAmendesSeance(s.id)]);
+                          setPresencesSeance(pres);
+                          setAmendesSeanceList(amendes);
+                        } catch (e) {
+                          console.error("Erreur de chargement du détail de la séance", e);
+                        }
+                      }}
+                      style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}66`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                    >
+                      Ouvrir
+                    </button>,
+                  ])}
+                />
+
+                <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "26px 0 10px" }}>Taux de présence par membre</h2>
+                <Table cols={["Membre", "Présent(e)s", "Absent(e)s", "Excusé(e)s", "Taux"]} widths="1.5fr 1fr 1fr 1fr 1fr"
+                  rows={membres.map((m) => {
+                    const t = tauxPresence[m.id] || { present: 0, absent: 0, excuse: 0, tauxPresence: 0 };
+                    return [
+                      m.nom,
+                      t.present,
+                      t.absent,
+                      t.excuse,
+                      <Badge bg={t.tauxPresence >= 75 ? C.ok : C.warnBg} fg={t.tauxPresence >= 75 ? C.accent2 : C.warn}>{t.tauxPresence}%</Badge>,
+                    ];
+                  })}
+                />
+              </>
             )}
           </>
         )}
@@ -5182,6 +5296,251 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               )}
             </>
           )}
+        </Modal>
+      )}
+
+      {showTypesAmendesSeance && (
+        <Modal onClose={() => setShowTypesAmendesSeance(false)} title="Types d'amendes de séance" icon={<AlertTriangle />} accentColor={C.warn}>
+          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+            Chaque groupe fixe ses propres amendes selon son règlement intérieur (ex. Absence non excusée, Retard).
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {typesAmendesSeance.map((t) => (
+              <div key={t.id} style={{ padding: "10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: 600 }}>{t.nom}</span>
+                  <X
+                    size={14}
+                    color={C.sub}
+                    style={{ cursor: "pointer" }}
+                    onClick={async () => {
+                      try {
+                        await supprimerTypeAmendeSeance(t.id);
+                        await rechargerSeances();
+                      } catch (e) {
+                        console.error("Erreur de suppression du type d'amende", e);
+                      }
+                    }}
+                  />
+                </div>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <input
+                    value={montantAmendeInputs[t.id] ?? String(t.montant || "")}
+                    onChange={(e) => setMontantAmendeInputs({ ...montantAmendeInputs, [t.id]: e.target.value })}
+                    placeholder="Montant (FCFA)"
+                    style={{ flex: 1, boxSizing: "border-box", padding: "8px 9px", borderRadius: "7px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "12px", outline: "none" }}
+                  />
+                  <button
+                    onClick={async () => {
+                      const val = parseInt((montantAmendeInputs[t.id] || "").replace(/[^\d]/g, ""), 10) || 0;
+                      try {
+                        await modifierTypeAmendeSeance(t.id, val);
+                        await rechargerSeances();
+                      } catch (e) {
+                        console.error("Erreur de mise à jour du montant", e);
+                      }
+                    }}
+                    style={{ background: "transparent", border: `1px solid ${C.warn}66`, borderRadius: "7px", padding: "0 12px", fontSize: "11.5px", fontWeight: 600, color: C.warn, cursor: "pointer" }}
+                  >
+                    Fixer
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em" }}>Nouveau type d'amende</div>
+          <FormField label="Nom" placeholder="Ex. Absence non excusée" value={newTypeAmendeNom} onChange={(e) => setNewTypeAmendeNom(e.target.value)} />
+          <FormField label="Montant par défaut (FCFA)" placeholder="Ex. 1 000 FCFA" value={newTypeAmendeMontant} onChange={(e) => setNewTypeAmendeMontant(e.target.value)} />
+          <button
+            onClick={async () => {
+              if (!newTypeAmendeNom.trim()) return;
+              try {
+                await creerTypeAmendeSeance(groupId, newTypeAmendeNom.trim(), parseInt(newTypeAmendeMontant.replace(/[^\d]/g, ""), 10) || 0);
+                setNewTypeAmendeNom("");
+                setNewTypeAmendeMontant("");
+                await rechargerSeances();
+              } catch (e) {
+                console.error("Erreur de création du type d'amende", e);
+              }
+            }}
+            style={{ background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "10px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+          >
+            Ajouter ce type d'amende
+          </button>
+        </Modal>
+      )}
+
+      {showCreerSeance && (
+        <Modal onClose={() => setShowCreerSeance(false)} title="Créer une séance" icon={<Calendar />} accentColor={C.vifBleu}>
+          <FormField label="Date de la séance" placeholder="jj/mm/aaaa" value={seanceDate} onChange={(e) => setSeanceDate(e.target.value)} />
+          <FormField label="Lieu" placeholder="Ex. Domicile du président" value={seanceLieu} onChange={(e) => setSeanceLieu(e.target.value)} />
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Ordre du jour</label>
+            <textarea
+              value={seanceOrdreDuJour}
+              onChange={(e) => setSeanceOrdreDuJour(e.target.value)}
+              placeholder="Ex. Cotisations du mois, point sur les prêts en cours, questions diverses..."
+              rows={3}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none", resize: "vertical", fontFamily: "inherit" }}
+            />
+          </div>
+          {seanceCreationErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {seanceCreationErreur}
+            </div>
+          )}
+          <button
+            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}
+            onClick={async () => {
+              const dateISO = versDateISO(seanceDate);
+              if (!dateISO) { setSeanceCreationErreur("Date invalide (jj/mm/aaaa)."); return; }
+              try {
+                await creerSeance(groupId, { date: dateISO, lieu: seanceLieu.trim(), ordreDuJour: seanceOrdreDuJour.trim() });
+                await rechargerSeances();
+                setShowCreerSeance(false);
+              } catch (e) {
+                console.error("Erreur de création de la séance", e);
+                setSeanceCreationErreur(e.message || "Erreur lors de la création.");
+              }
+            }}
+          >
+            Créer la séance
+          </button>
+        </Modal>
+      )}
+
+      {showDetailSeance && (
+        <Modal onClose={() => { setShowDetailSeance(null); setPresencesSeance({}); setAmendesSeanceList([]); }} title={`Séance du ${showDetailSeance.date}`} icon={<Calendar />} accentColor={C.vifBleu}>
+          {showDetailSeance.lieu && (
+            <div style={{ fontSize: "12px", color: C.sub }}>Lieu : {showDetailSeance.lieu}</div>
+          )}
+          {showDetailSeance.ordreDuJour && (
+            <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+              <b>Ordre du jour :</b> {showDetailSeance.ordreDuJour}
+            </div>
+          )}
+
+          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em" }}>Présence</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {membres.map((m) => (
+              <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                <span style={{ flex: 1, fontSize: "12.5px", fontWeight: 600 }}>{m.nom}</span>
+                <div style={{ display: "flex", gap: "4px" }}>
+                  {["présent", "absent", "excusé"].map((opt) => (
+                    <div
+                      key={opt}
+                      onClick={() => setPresencesSeance({ ...presencesSeance, [m.id]: opt })}
+                      style={{ padding: "5px 9px", borderRadius: "6px", border: `1px solid ${presencesSeance[m.id] === opt ? C.vifBleu : C.border}`, background: presencesSeance[m.id] === opt ? `${C.vifBleu}14` : "#FBFAF6", fontSize: "10.5px", fontWeight: 600, color: presencesSeance[m.id] === opt ? C.vifBleu : C.sub, cursor: "pointer" }}
+                    >
+                      {opt}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={async () => {
+              try {
+                await enregistrerPresences(showDetailSeance.id, presencesSeance);
+                await rechargerSeances();
+              } catch (e) {
+                console.error("Erreur d'enregistrement des présences", e);
+              }
+            }}
+            style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "9px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+          >
+            Enregistrer la présence
+          </button>
+
+          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: "6px" }}>Amendes</div>
+          {amendesSeanceList.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              {amendesSeanceList.map((a) => {
+                const membre = membres.find((m) => m.id === a.membreId);
+                return (
+                  <RapportLigne key={a.id} gauche={`${membre?.nom || "—"} — ${a.typeNom}`} droite={fmtFCFA(a.montant)} />
+                );
+              })}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            <select
+              value={amendeSeanceMembreId}
+              onChange={(e) => setAmendeSeanceMembreId(e.target.value)}
+              style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12px", outline: "none" }}
+            >
+              <option value="">Membre</option>
+              {membres.map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
+            </select>
+            <select
+              value={amendeSeanceTypeId}
+              onChange={(e) => {
+                setAmendeSeanceTypeId(e.target.value);
+                const type = typesAmendesSeance.find((t) => t.id === e.target.value);
+                if (type) setAmendeSeanceMontant(String(type.montant));
+              }}
+              style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12px", outline: "none" }}
+            >
+              <option value="">Type d'amende</option>
+              {typesAmendesSeance.map((t) => <option key={t.id} value={t.id}>{t.nom} ({fmtFCFA(t.montant)})</option>)}
+            </select>
+          </div>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <input
+              value={amendeSeanceMontant}
+              onChange={(e) => setAmendeSeanceMontant(e.target.value)}
+              placeholder="Montant"
+              style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12px", outline: "none" }}
+            />
+            <button
+              onClick={async () => {
+                const montant = parseInt(amendeSeanceMontant.replace(/[^\d]/g, ""), 10);
+                if (!amendeSeanceMembreId || !montant) return;
+                try {
+                  await appliquerAmendeSeance(showDetailSeance.id, amendeSeanceMembreId, amendeSeanceTypeId || null, montant);
+                  const amendes = await fetchAmendesSeance(showDetailSeance.id);
+                  setAmendesSeanceList(amendes);
+                  const membre = membres.find((m) => m.id === amendeSeanceMembreId);
+                  if (membre?.telephone) {
+                    envoyerSMS({
+                      message: msgOperation(membre.nom, "amende de séance", montant, undefined, typesAmendesSeance.find((t) => t.id === amendeSeanceTypeId)?.nom),
+                      numeros: [membre.telephone],
+                    });
+                  }
+                  setAmendeSeanceMembreId(""); setAmendeSeanceTypeId(""); setAmendeSeanceMontant("");
+                } catch (e) {
+                  console.error("Erreur d'application de l'amende", e);
+                }
+              }}
+              style={{ background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+            >
+              Appliquer
+            </button>
+          </div>
+
+          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: "6px" }}>Procès-verbal / compte-rendu</div>
+          <textarea
+            value={seanceCompteRendu}
+            onChange={(e) => setSeanceCompteRendu(e.target.value)}
+            placeholder="Résumé des décisions prises, points discutés..."
+            rows={4}
+            style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none", resize: "vertical", fontFamily: "inherit" }}
+          />
+          <button
+            onClick={async () => {
+              try {
+                await enregistrerCompteRendu(showDetailSeance.id, seanceCompteRendu.trim());
+                await rechargerSeances();
+                setShowDetailSeance(null);
+              } catch (e) {
+                console.error("Erreur d'enregistrement du compte-rendu", e);
+              }
+            }}
+            style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "10px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+          >
+            Enregistrer et clôturer la séance
+          </button>
         </Modal>
       )}
 
