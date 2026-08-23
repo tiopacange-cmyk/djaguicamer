@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre, reinitialiserMotDePasseMembre, televerserDocumentMembre, fetchDocumentsMembre } from "./lib/membres";
-import { fetchTypesFonds, creerTypeFonds, supprimerTypeFonds, fetchFondsTousMembres, fixerCibleFonds, enregistrerVersementFonds, fetchFondsMembre } from "./lib/fonds";
+import { fetchTypesFonds, creerTypeFonds, supprimerTypeFonds, fetchFondsTousMembres, fixerCibleTypeFonds, enregistrerVersementFonds, fetchFondsMembre } from "./lib/fonds";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement, televerserLogoGroupe, fetchLogoGroupe, modifierGroupe, suspendreGroupe, reactiverGroupe } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere, fetchApercuRedistribution, redistribuerCommission } from "./lib/tontine";
@@ -1234,6 +1234,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   }, [groupId]);
   const licenceExpiree = statutAbonnement?.expire === true || statutAbonnement?.statut === "suspendu";
 
+  const [logoGroupeUrlSidebar, setLogoGroupeUrlSidebar] = useState("");
+  useEffect(() => {
+    if (!groupId) return;
+    fetchLogoGroupe(groupId)
+      .then(setLogoGroupeUrlSidebar)
+      .catch((e) => console.error("Erreur de chargement du logo", e));
+  }, [groupId]);
+
   // Convertit une date saisie au format jj/mm/aaaa (celui utilisé
   // dans toute l'interface) vers le format aaaa-mm-jj attendu par
   // la base de données. Retourne null si le format est invalide.
@@ -1427,7 +1435,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       tousFonds.forEach((f) => {
         if (!parMembre[f.membreId]) parMembre[f.membreId] = [];
         const type = types.find((t) => t.id === f.typeFondsId);
-        parMembre[f.membreId].push({ typeFondsId: f.typeFondsId, nom: type?.nom || "—", cible: f.cible, solde: f.solde });
+        parMembre[f.membreId].push({ typeFondsId: f.typeFondsId, nom: type?.nom || "—", cible: type?.cible || 0, solde: f.solde });
       });
       setFondsParMembre(parMembre);
     } catch (e) {
@@ -1647,6 +1655,9 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [gererFondsEnCours, setGererFondsEnCours] = useState("");
   const [showGererTypesFonds, setShowGererTypesFonds] = useState(false);
   const [newTypeFondsNom, setNewTypeFondsNom] = useState("");
+  const [newTypeFondsCible, setNewTypeFondsCible] = useState("");
+  const [cibleTypeInputs, setCibleTypeInputs] = useState({});
+  const [cibleTypeEnCours, setCibleTypeEnCours] = useState("");
   const [inviteVersementInitial, setInviteVersementInitial] = useState("");
   const [historiqueMembreData, setHistoriqueMembreData] = useState(null);
   const [chargementHistoriqueMembre, setChargementHistoriqueMembre] = useState(false);
@@ -1872,7 +1883,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   ) : (
     <div className="app-layout" style={{ minHeight: "680px", background: C.bg, display: "flex", color: C.ink }}>
       <Sidebar
-        role="Admin Groupe" sub={nomGroupe || "—"}
+        role="Admin Groupe" sub={nomGroupe || "—"} logoUrl={logoGroupeUrlSidebar}
         items={[
           { icon: <Banknote size={16} />, label: "Tontine", key: "tontine" },
           { icon: <PiggyBank size={16} />, label: "Banque", key: "banque" },
@@ -3789,10 +3800,9 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
           )}
 
-          <FormField label="Objectif du fonds de garantie (FCFA)" placeholder="Ex. 100 000 FCFA" value={inviteCaution} onChange={(e) => setInviteCaution(e.target.value)} />
-          <FormField label="Versement immédiat (optionnel)" placeholder="Ex. 20 000 FCFA — si prêt à verser tout de suite" value={inviteVersementInitial} onChange={(e) => setInviteVersementInitial(e.target.value)} />
+          <FormField label="Versement immédiat au fonds de garantie (optionnel)" placeholder="Ex. 20 000 FCFA — si prêt à verser tout de suite" value={inviteVersementInitial} onChange={(e) => setInviteVersementInitial(e.target.value)} />
           <div style={{ fontSize: "11px", color: C.sub, marginTop: "-6px" }}>
-            Si le membre n'est pas prêt à verser maintenant, laisse ce champ vide — il cotisera plus tard, en séance, dans la rubrique "Fonds".
+            L'objectif du fonds est commun à tout le groupe (voir l'écran "Fonds"). Si le membre n'est pas prêt à verser maintenant, laisse ce champ vide — il cotisera plus tard.
           </div>
 
           <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
@@ -3834,16 +3844,15 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   posteId: null, // ⚠️ à relier au vrai id du poste choisi (table postes_bureau) une fois les postes créés en base
                 });
 
-                // Lie le nouveau membre au type "Fonds de garantie" (le crée
-                // pour le groupe s'il n'existe pas encore), avec son objectif
-                // et un éventuel versement immédiat.
-                const cibleNum = parseInt(inviteCaution.replace(/[^\d]/g, ""), 10) || 0;
+                // Enregistre un éventuel versement immédiat vers le
+                // "Fonds de garantie" (l'objectif, lui, est commun à
+                // tous les membres et se fixe une fois pour toutes
+                // dans l'écran Fonds → Types de fonds).
                 const versementNum = parseInt(inviteVersementInitial.replace(/[^\d]/g, ""), 10) || 0;
-                if (cibleNum > 0 || versementNum > 0) {
+                if (versementNum > 0) {
                   let typeGarantie = typesFonds.find((t) => t.nom === "Fonds de garantie");
-                  if (!typeGarantie) typeGarantie = await creerTypeFonds(groupId, "Fonds de garantie");
-                  if (cibleNum > 0) await fixerCibleFonds(resultat.membre.id, typeGarantie.id, cibleNum);
-                  if (versementNum > 0) await enregistrerVersementFonds(resultat.membre.id, typeGarantie.id, versementNum);
+                  if (!typeGarantie) typeGarantie = await creerTypeFonds(groupId, "Fonds de garantie", 0);
+                  await enregistrerVersementFonds(resultat.membre.id, typeGarantie.id, versementNum);
                   await rechargerFonds();
                 }
 
@@ -3878,51 +3887,75 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showGererTypesFonds && (
         <Modal onClose={() => setShowGererTypesFonds(false)} title="Types de fonds" icon={<PiggyBank />} accentColor={C.vifOr}>
           <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
-            Crée les rubriques de fonds propres à ton groupe (Fonds de garantie, Fonds de solidarité, etc.).
+            Crée les rubriques de fonds propres à ton groupe (Fonds de garantie, Fonds de solidarité, etc.). L'objectif fixé s'applique à tous les membres.
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {typesFonds.map((t) => (
-              <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
-                <span style={{ fontSize: "13px", fontWeight: 600 }}>{t.nom}</span>
-                <X
-                  size={14}
-                  color={C.sub}
-                  style={{ cursor: "pointer" }}
-                  onClick={async () => {
-                    try {
-                      await supprimerTypeFonds(t.id);
-                      await rechargerFonds();
-                    } catch (e) {
-                      console.error("Erreur de suppression du type de fonds", e);
-                    }
-                  }}
-                />
+              <div key={t.id} style={{ padding: "10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: 600 }}>{t.nom}</span>
+                  <X
+                    size={14}
+                    color={C.sub}
+                    style={{ cursor: "pointer" }}
+                    onClick={async () => {
+                      try {
+                        await supprimerTypeFonds(t.id);
+                        await rechargerFonds();
+                      } catch (e) {
+                        console.error("Erreur de suppression du type de fonds", e);
+                      }
+                    }}
+                  />
+                </div>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <input
+                    value={cibleTypeInputs[t.id] ?? String(t.cible || "")}
+                    onChange={(e) => setCibleTypeInputs({ ...cibleTypeInputs, [t.id]: e.target.value })}
+                    placeholder="Objectif commun (FCFA)"
+                    style={{ flex: 1, boxSizing: "border-box", padding: "8px 9px", borderRadius: "7px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "12px", outline: "none" }}
+                  />
+                  <button
+                    disabled={cibleTypeEnCours === t.id}
+                    onClick={async () => {
+                      const val = parseInt((cibleTypeInputs[t.id] || "").replace(/[^\d]/g, ""), 10) || 0;
+                      setCibleTypeEnCours(t.id);
+                      try {
+                        await fixerCibleTypeFonds(t.id, val);
+                        await rechargerFonds();
+                      } catch (e) {
+                        console.error("Erreur de mise à jour de l'objectif", e);
+                      } finally {
+                        setCibleTypeEnCours("");
+                      }
+                    }}
+                    style={{ background: "transparent", border: `1px solid ${C.vifOr}66`, borderRadius: "7px", padding: "0 12px", fontSize: "11.5px", fontWeight: 600, color: C.vifOr, cursor: "pointer" }}
+                  >
+                    {cibleTypeEnCours === t.id ? "..." : "Fixer"}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
-          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-            <input
-              value={newTypeFondsNom}
-              onChange={(e) => setNewTypeFondsNom(e.target.value)}
-              placeholder="Ex. Fonds de solidarité"
-              style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
-            />
-            <button
-              onClick={async () => {
-                if (!newTypeFondsNom.trim()) return;
-                try {
-                  await creerTypeFonds(groupId, newTypeFondsNom.trim());
-                  setNewTypeFondsNom("");
-                  await rechargerFonds();
-                } catch (e) {
-                  console.error("Erreur de création du type de fonds", e);
-                }
-              }}
-              style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
-            >
-              Ajouter
-            </button>
-          </div>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em" }}>Nouveau type de fonds</div>
+          <FormField label="Nom" placeholder="Ex. Fonds de solidarité" value={newTypeFondsNom} onChange={(e) => setNewTypeFondsNom(e.target.value)} />
+          <FormField label="Objectif commun (FCFA)" placeholder="Ex. 50 000 FCFA" value={newTypeFondsCible} onChange={(e) => setNewTypeFondsCible(e.target.value)} />
+          <button
+            onClick={async () => {
+              if (!newTypeFondsNom.trim()) return;
+              try {
+                await creerTypeFonds(groupId, newTypeFondsNom.trim(), parseInt(newTypeFondsCible.replace(/[^\d]/g, ""), 10) || 0);
+                setNewTypeFondsNom("");
+                setNewTypeFondsCible("");
+                await rechargerFonds();
+              } catch (e) {
+                console.error("Erreur de création du type de fonds", e);
+              }
+            }}
+            style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "10px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+          >
+            Ajouter ce type de fonds
+          </button>
         </Modal>
       )}
 
@@ -3946,34 +3979,6 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       <div style={{ width: `${Math.min(100, (f.solde / f.cible) * 100)}%`, height: "100%", background: f.solde >= f.cible ? C.accent2 : C.warn }} />
                     </div>
                   )}
-                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                    <input
-                      value={nouvelleCibleParType[t.id] ?? ""}
-                      onChange={(e) => setNouvelleCibleParType({ ...nouvelleCibleParType, [t.id]: e.target.value })}
-                      placeholder={`Objectif (${fmtFCFA(f.cible)})`}
-                      style={{ flex: 1, boxSizing: "border-box", padding: "8px 9px", borderRadius: "7px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "11.5px", outline: "none" }}
-                    />
-                    <button
-                      disabled={gererFondsEnCours === `cible-${t.id}`}
-                      onClick={async () => {
-                        const val = parseInt((nouvelleCibleParType[t.id] || "").replace(/[^\d]/g, ""), 10);
-                        if (!val) return;
-                        setGererFondsEnCours(`cible-${t.id}`);
-                        try {
-                          await fixerCibleFonds(showGererFondsMembre.id, t.id, val);
-                          await rechargerFonds();
-                          setNouvelleCibleParType({ ...nouvelleCibleParType, [t.id]: "" });
-                        } catch (e) {
-                          console.error("Erreur de mise à jour de l'objectif", e);
-                        } finally {
-                          setGererFondsEnCours("");
-                        }
-                      }}
-                      style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "7px", padding: "0 10px", fontSize: "11px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
-                    >
-                      Fixer
-                    </button>
-                  </div>
                   <div style={{ display: "flex", gap: "6px", marginTop: "6px", flexWrap: "wrap" }}>
                     <input
                       value={nouveauVersementParType[t.id] ?? ""}
@@ -5414,13 +5419,17 @@ function MiniCard({ icon, label, value, note, ok, warn }) {
 // ============================================================
 // COMPOSANTS PARTAGÉS
 // ============================================================
-function Sidebar({ role, sub, items, active, onSelect }) {
+function Sidebar({ role, sub, items, active, onSelect, logoUrl }) {
   return (
     <div className="app-sidebar" style={{ width: "210px", background: C.accent2, padding: "26px 16px", display: "flex", flexDirection: "column", gap: "6px" }}>
       <div className="sidebar-header" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "30px", paddingLeft: "6px" }}>
-        <div style={{ width: "32px", height: "32px", borderRadius: "9px", background: C.accent, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <LayoutDashboard size={16} color={C.accent2} />
-        </div>
+        {logoUrl ? (
+          <img src={logoUrl} alt="Logo" style={{ width: "32px", height: "32px", borderRadius: "9px", objectFit: "cover", flexShrink: 0 }} />
+        ) : (
+          <div style={{ width: "32px", height: "32px", borderRadius: "9px", background: C.accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <LayoutDashboard size={16} color={C.accent2} />
+          </div>
+        )}
         <div>
           <div style={{ color: "#FAF6ED", fontWeight: 700, fontSize: "13px", lineHeight: 1.1 }}>{role}</div>
           <div style={{ color: "#9DB3A6", fontSize: "10.5px" }}>{sub}</div>
