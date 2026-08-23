@@ -499,6 +499,9 @@ function SuperAdminScreen() {
   const [modifierGroupeNom, setModifierGroupeNom] = useState("");
   const [modifierGroupeErreur, setModifierGroupeErreur] = useState("");
   const [modifierGroupeEnCours, setModifierGroupeEnCours] = useState(false);
+  const [modifierGroupeLogo, setModifierGroupeLogo] = useState("");
+  const [modifierLogoEnCours, setModifierLogoEnCours] = useState(false);
+  const modifierLogoInputRef = useRef(null);
   const [suspensionEnCours, setSuspensionEnCours] = useState("");
   const [renouvelerFormule, setRenouvelerFormule] = useState("Basic");
   const [renouvelerPeriodicite, setRenouvelerPeriodicite] = useState("Mensuel");
@@ -672,7 +675,18 @@ function SuperAdminScreen() {
                       Renouveler
                     </button>
                     <button
-                      onClick={() => { setShowModifierGroupe(g); setModifierGroupeNom(g.nom); setModifierGroupeErreur(""); }}
+                      onClick={async () => {
+                        setShowModifierGroupe(g);
+                        setModifierGroupeNom(g.nom);
+                        setModifierGroupeErreur("");
+                        setModifierGroupeLogo("");
+                        try {
+                          const logo = await fetchLogoGroupe(g.id);
+                          setModifierGroupeLogo(logo);
+                        } catch (e) {
+                          console.error("Erreur de chargement du logo", e);
+                        }
+                      }}
                       style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}66`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
                     >
                       Modifier
@@ -902,6 +916,46 @@ function SuperAdminScreen() {
       {showModifierGroupe && (
         <Modal onClose={() => setShowModifierGroupe(null)} title="Modifier le groupe" icon={<Building2 />} accentColor={C.vifBleu}>
           <FormField label="Nom du groupe" placeholder="Ex. Tontine Les Bâtisseurs" value={modifierGroupeNom} onChange={(e) => setModifierGroupeNom(e.target.value)} />
+
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Logo du groupe</label>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {modifierGroupeLogo ? (
+                <img src={modifierGroupeLogo} alt="Logo" style={{ width: "44px", height: "44px", borderRadius: "9px", objectFit: "cover", border: `1px solid ${C.border}` }} />
+              ) : (
+                <div style={{ width: "44px", height: "44px", borderRadius: "9px", background: "#FBFAF6", border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Building2 size={18} color={C.sub} />
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                ref={modifierLogoInputRef}
+                style={{ display: "none" }}
+                onChange={async (e) => {
+                  const fichier = e.target.files[0];
+                  if (!fichier || !showModifierGroupe) return;
+                  setModifierLogoEnCours(true);
+                  try {
+                    const url = await televerserLogoGroupe(showModifierGroupe.id, fichier);
+                    setModifierGroupeLogo(url);
+                  } catch (err) {
+                    console.error("Erreur de téléversement du logo", err);
+                  } finally {
+                    setModifierLogoEnCours(false);
+                    e.target.value = "";
+                  }
+                }}
+              />
+              <button
+                disabled={modifierLogoEnCours}
+                onClick={() => modifierLogoInputRef.current?.click()}
+                style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}55`, borderRadius: "7px", padding: "7px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+              >
+                {modifierLogoEnCours ? "Envoi..." : modifierGroupeLogo ? "Remplacer" : "Ajouter"}
+              </button>
+            </div>
+          </div>
 
           {modifierGroupeErreur && (
             <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
