@@ -2118,7 +2118,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
     }
   };
 
-  useEffect(() => { if (view === "banque" || view === "bilan" || view === "seances") rechargerEpargnes(); }, [groupId, view]);
+  useEffect(() => { if (view === "banque" || view === "bilan" || view === "seances" || view === "sms") rechargerEpargnes(); }, [groupId, view]);
   const [showCotisationBanque, setShowCotisationBanque] = useState(false);
   const [showCreditForm, setShowCreditForm] = useState(false);
   const CAUTION_DEFAUT = 100000;
