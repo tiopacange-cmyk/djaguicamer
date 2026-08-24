@@ -398,6 +398,17 @@ export async function fetchStatsPlateforme() {
 // CRÉDITS SMS — vendus par le Super Admin à chaque groupe
 // ============================================================
 
+export async function fetchSmsSenderId(groupId) {
+  const { data, error } = await supabase.from("groups").select("sms_sender_id").eq("id", groupId).single();
+  if (error) throw error;
+  return data?.sms_sender_id || "";
+}
+
+export async function definirSmsSenderId(groupId, senderId) {
+  const { error } = await supabase.from("groups").update({ sms_sender_id: senderId || null }).eq("id", groupId);
+  if (error) throw error;
+}
+
 export async function fetchSoldeSms(groupId) {
   const { data, error } = await supabase.from("groups").select("sms_credits, sms_bloquer_si_epuise").eq("id", groupId).single();
   if (error) throw error;
