@@ -9,6 +9,7 @@ import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance,
 import { fetchComptesBancaires, creerCompteBancaire, fetchSignataires, ajouterSignataire, fetchMouvementsCompte, creerMouvementExterne, fetchCategoriesFrais, creerCategorieFrais, supprimerCategorieFrais, joindreRecu } from "./lib/depots_retrait";
 import { fetchRapportJournalier, fetchRapportMensuel, fetchBilanAnnuel } from "./lib/rapports";
 import { fetchSeances, creerSeance, enregistrerCompteRendu, supprimerSeance, fetchPresences, enregistrerPresences, fetchTauxPresence, fetchTypesAmendesSeance, creerTypeAmendeSeance, modifierTypeAmendeSeance, supprimerTypeAmendeSeance, fetchAmendesSeance, appliquerAmendeSeance, fetchCaisseAmendes, payerAmendeSeance } from "./lib/seances";
+import { fetchCaisseRafraichissement, fetchRafraichissements, creerRafraichissement, fetchTypesDepenses, creerTypeDepense, supprimerTypeDepense, fetchDepenses, creerDepense, libelleSourceDepense } from "./lib/depenses";
 import { envoyerSMS } from "./lib/sms";
 import { fetchTableauDeBordMembre } from "./lib/moncompte";
 
@@ -40,7 +41,7 @@ import {
   Users, Plus, KeyRound, Search, ShieldAlert, ChevronRight, Building2, X,
   CreditCard, ScrollText, LayoutDashboard, Wallet, Shield, FileBarChart,
   Gavel, Bell, LogOut, Moon, Sun, Lock, ChevronLeft, CheckCircle2, Clock,
-  Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat, Eye, EyeOff, AlertTriangle,
+  Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat, Eye, EyeOff, AlertTriangle, ShoppingCart,
 } from "lucide-react";
 
 // ---------- Palette partagée ----------
@@ -1907,6 +1908,50 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   };
   useEffect(() => { if (view === "seances" || view === "bilan") rechargerSeances(); }, [groupId, view]);
 
+  const [rafraichissementsList, setRafraichissementsList] = useState([]);
+  const [soldeCaisseRafraichissement, setSoldeCaisseRafraichissement] = useState(0);
+  const [showCreerRafraichissement, setShowCreerRafraichissement] = useState(false);
+  const [rafraDate, setRafraDate] = useState("");
+  const [rafraSeanceId, setRafraSeanceId] = useState("");
+  const [rafraMontantParMembre, setRafraMontantParMembre] = useState("1000");
+  const [rafraParticipants, setRafraParticipants] = useState({});
+  const [rafraFacture, setRafraFacture] = useState("");
+  const [rafraResponsableId, setRafraResponsableId] = useState("");
+  const [rafraErreur, setRafraErreur] = useState("");
+  const [rafraEnCours, setRafraEnCours] = useState(false);
+  const [typesDepenses, setTypesDepenses] = useState([]);
+  const [depensesList, setDepensesList] = useState([]);
+  const [showTypesDepenses, setShowTypesDepenses] = useState(false);
+  const [newTypeDepenseNom, setNewTypeDepenseNom] = useState("");
+  const [showCreerDepense, setShowCreerDepense] = useState(false);
+  const [depenseTypeId, setDepenseTypeId] = useState("");
+  const [depenseMontant, setDepenseMontant] = useState("");
+  const [depenseDate, setDepenseDate] = useState("");
+  const [depenseMotif, setDepenseMotif] = useState("");
+  const [depenseSourceType, setDepenseSourceType] = useState("");
+  const [depenseSourceId, setDepenseSourceId] = useState("");
+  const [depenseErreur, setDepenseErreur] = useState("");
+  const [depenseEnCours, setDepenseEnCours] = useState(false);
+
+  const rechargerDepenses = async () => {
+    if (!groupId) return;
+    try {
+      const [r, caisse, types, dep] = await Promise.all([
+        fetchRafraichissements(groupId),
+        fetchCaisseRafraichissement(groupId),
+        fetchTypesDepenses(groupId),
+        fetchDepenses(groupId),
+      ]);
+      setRafraichissementsList(r);
+      setSoldeCaisseRafraichissement(caisse);
+      setTypesDepenses(types);
+      setDepensesList(dep);
+    } catch (e) {
+      console.error("Erreur de chargement des dépenses", e);
+    }
+  };
+  useEffect(() => { if (view === "depenses" || view === "bilan") rechargerDepenses(); }, [groupId, view]);
+
   const addEventType = async () => {
     if (!newTypeName.trim()) return;
     try {
@@ -1964,6 +2009,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           { icon: <HeartHandshake size={16} />, label: "Assurance", key: "assurance" },
           { icon: <Wallet size={16} />, label: "Fonds", key: "fonds" },
           { icon: <Calendar size={16} />, label: "Séances", key: "seances" },
+          { icon: <ShoppingCart size={16} />, label: "Dépenses", key: "depenses" },
           { icon: <Building2 size={16} />, label: "Dépôt / Retrait externe", key: "depots" },
           { icon: <FileBarChart size={16} />, label: "Bilan", key: "bilan" },
           { icon: <UserCog size={16} />, label: "Membres", key: "membres" },
@@ -2337,7 +2383,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       }}
                       style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}66`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
                     >
-                      Ouvrir
+                      Gestion de séance
                     </button>,
                   ])}
                 />
@@ -2356,6 +2402,94 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   })}
                 />
               </>
+            )}
+          </>
+        )}
+
+        {view === "depenses" && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+              <div>
+                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Dépenses</h1>
+                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
+                  Rafraîchissement de séance — collecte, facture, reliquat conservé dans la caisse.
+                </p>
+              </div>
+              <button
+                style={btnPrimary}
+                onClick={() => {
+                  setRafraDate(""); setRafraSeanceId(""); setRafraMontantParMembre("1000");
+                  setRafraParticipants({}); setRafraFacture(""); setRafraResponsableId(""); setRafraErreur("");
+                  setShowCreerRafraichissement(true);
+                }}
+              >
+                <Plus size={15} /> Enregistrer un rafraîchissement
+              </button>
+            </div>
+
+            <div style={{ margin: "18px 0", maxWidth: "280px" }}>
+              <StatCard
+                label="Caisse — Reliquat boisson"
+                value={fmtFCFA(soldeCaisseRafraichissement)}
+                sub={soldeCaisseRafraichissement < 0 ? "En débit — à rééquilibrer" : undefined}
+                icon={<ShoppingCart size={16} />}
+              />
+            </div>
+
+            {rafraichissementsList.length === 0 ? (
+              <div style={{ fontSize: "13px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
+                Aucun rafraîchissement enregistré pour l'instant.
+              </div>
+            ) : (
+              <Table cols={["Date", "Responsable", "Collecté", "Facture", "Reliquat"]} widths="1fr 1.2fr 1fr 1fr 1fr"
+                rows={rafraichissementsList.map((r) => [
+                  r.date,
+                  r.responsable,
+                  fmtFCFA(r.montantCollecte),
+                  fmtFCFA(r.montantFacture),
+                  <span style={{ fontWeight: 700, color: r.reliquat >= 0 ? C.accent2 : C.warn }}>{r.reliquat >= 0 ? "+" : ""}{fmtFCFA(r.reliquat)}</span>,
+                ])}
+              />
+            )}
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px", marginTop: "34px" }}>
+              <h2 style={{ fontSize: "17px", fontWeight: 700, margin: 0 }}>Autres dépenses</h2>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <button
+                  style={btnSecondary}
+                  onClick={() => { setShowTypesDepenses(true); setNewTypeDepenseNom(""); }}
+                >
+                  <Plus size={15} /> Types de dépenses
+                </button>
+                <button
+                  style={btnPrimary}
+                  onClick={() => {
+                    setDepenseTypeId(""); setDepenseMontant(""); setDepenseDate(""); setDepenseMotif("");
+                    setDepenseSourceType(""); setDepenseSourceId(""); setDepenseErreur("");
+                    setShowCreerDepense(true);
+                  }}
+                >
+                  <Plus size={15} /> Enregistrer une dépense
+                </button>
+              </div>
+            </div>
+
+            {depensesList.length === 0 ? (
+              <div style={{ marginTop: "14px", fontSize: "13px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
+                Aucune dépense enregistrée pour l'instant.
+              </div>
+            ) : (
+              <div style={{ marginTop: "14px" }}>
+                <Table cols={["Date", "Catégorie", "Motif", "Source débitée", "Montant"]} widths="0.9fr 1fr 1.3fr 1.3fr 0.9fr"
+                  rows={depensesList.map((d) => [
+                    d.date,
+                    d.typeNom,
+                    <span style={{ color: C.sub, fontSize: 12 }}>{d.motif || "—"}</span>,
+                    libelleSourceDepense(d.sourceType),
+                    <b style={{ color: C.warn }}>− {fmtFCFA(d.montant)}</b>,
+                  ])}
+                />
+              </div>
             )}
           </>
         )}
@@ -2622,6 +2756,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               <StatCard label="Solde assurance cumulé" value={fmtFCFA(Object.values(assuranceSoldes).reduce((s, a) => s + (a.solde || 0), 0))} icon={<HeartHandshake size={16} />} />
               <StatCard label="Total en fonds" value={fmtFCFA(Object.values(fondsParMembre).flat().reduce((s, f) => s + (f.solde || 0), 0))} icon={<PiggyBank size={16} />} />
               <StatCard label="Caisse des amendes" value={fmtFCFA(soldeCaisseAmendes)} icon={<AlertTriangle size={16} />} />
+              <StatCard label="Caisse reliquat boisson" value={fmtFCFA(soldeCaisseRafraichissement)} icon={<ShoppingCart size={16} />} />
               <StatCard label="Tours effectués" value={`${tours.filter((t) => t.statut === "clôturé").length} / ${tours.length}`} icon={<CheckCircle2 size={16} />} />
               <StatCard label="Membres" value={`${membres.filter((m) => m.statut === "actif").length} actif(s)`} icon={<Users size={16} />} />
             </div>
@@ -3733,7 +3868,9 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
               {rapportJour.tontineCotisations.length === 0 && rapportJour.tontineVersements.length === 0 && rapportJour.tontineAmendes.length === 0 &&
                rapportJour.mouvementsEpargne.length === 0 && rapportJour.assuranceMouvements.length === 0 && rapportJour.mouvementsExternes.length === 0 &&
-               (!rapportJour.mouvementsFonds || rapportJour.mouvementsFonds.length === 0) && (
+               (!rapportJour.mouvementsFonds || rapportJour.mouvementsFonds.length === 0) &&
+               (!rapportJour.amendesSeanceDeclarees || rapportJour.amendesSeanceDeclarees.length === 0) &&
+               (!rapportJour.paiementsAmendesJour || rapportJour.paiementsAmendesJour.length === 0) && (
                 <div style={{ fontSize: "12.5px", color: C.sub, textAlign: "center", padding: "10px 0" }}>Aucune activité enregistrée à cette date.</div>
               )}
 
@@ -3783,6 +3920,20 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 <RapportSection titre="Fonds">
                   {rapportJour.mouvementsFonds.map((m, i) => (
                     <RapportLigne key={i} gauche={`${m.membre} — ${m.typeFonds}`} droite={fmtFCFA(m.montant)} positif />
+                  ))}
+                </RapportSection>
+              )}
+              {rapportJour.amendesSeanceDeclarees?.length > 0 && (
+                <RapportSection titre="Séances — Amendes déclarées">
+                  {rapportJour.amendesSeanceDeclarees.map((a, i) => (
+                    <RapportLigne key={i} gauche={`${a.membre} — ${a.typeAmende}`} droite={fmtFCFA(a.montant)} />
+                  ))}
+                </RapportSection>
+              )}
+              {rapportJour.paiementsAmendesJour?.length > 0 && (
+                <RapportSection titre="Séances — Amendes payées (caisse)">
+                  {rapportJour.paiementsAmendesJour.map((p, i) => (
+                    <RapportLigne key={i} gauche={`${p.membre} — ${p.mode}`} droite={fmtFCFA(p.montant)} positif />
                   ))}
                 </RapportSection>
               )}
@@ -5636,6 +5787,273 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "10px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
           >
             Enregistrer et clôturer la séance
+          </button>
+        </Modal>
+      )}
+
+      {showCreerRafraichissement && (
+        <Modal onClose={() => setShowCreerRafraichissement(false)} title="Enregistrer un rafraîchissement" icon={<ShoppingCart />} accentColor={C.vifOr}>
+          <FormField label="Date" placeholder="jj/mm/aaaa" value={rafraDate} onChange={(e) => setRafraDate(e.target.value)} />
+
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Séance liée (optionnel)</label>
+            <select
+              value={rafraSeanceId}
+              onChange={(e) => setRafraSeanceId(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+            >
+              <option value="">Aucune</option>
+              {seancesList.map((s) => <option key={s.id} value={s.id}>{s.date}{s.lieu ? ` — ${s.lieu}` : ""}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Responsable de l'achat</label>
+            <select
+              value={rafraResponsableId}
+              onChange={(e) => setRafraResponsableId(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+            >
+              <option value="">Sélectionner un membre</option>
+              {membres.map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
+            </select>
+          </div>
+
+          <FormField label="Montant par membre participant (FCFA)" placeholder="Ex. 1 000" value={rafraMontantParMembre} onChange={(e) => setRafraMontantParMembre(e.target.value)} />
+
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Membres participants</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "180px", overflowY: "auto" }}>
+              {membres.filter((m) => m.statut === "actif").map((m) => (
+                <label key={m.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={!!rafraParticipants[m.id]}
+                    onChange={(e) => {
+                      const val = parseInt(rafraMontantParMembre.replace(/[^\d]/g, ""), 10) || 0;
+                      setRafraParticipants((prev) => {
+                        const copie = { ...prev };
+                        if (e.target.checked) copie[m.id] = val;
+                        else delete copie[m.id];
+                        return copie;
+                      });
+                    }}
+                  />
+                  {m.nom}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <FormField label="Montant de la facture réelle (FCFA)" placeholder="Ex. 8 500" value={rafraFacture} onChange={(e) => setRafraFacture(e.target.value)} />
+
+          {(() => {
+            const collecte = Object.values(rafraParticipants).reduce((s, v) => s + v, 0);
+            const facture = parseInt(rafraFacture.replace(/[^\d]/g, ""), 10) || 0;
+            const reliquat = collecte - facture;
+            return (
+              <div style={{ fontSize: "12px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><span>Collecté</span><b>{fmtFCFA(collecte)}</b></div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><span>Facture</span><b>{fmtFCFA(facture)}</b></div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", paddingTop: "4px", borderTop: `1px solid ${C.border}` }}>
+                  <span>Reliquat {reliquat < 0 ? "(caisse en débit)" : "(vers la caisse)"}</span>
+                  <b style={{ color: reliquat >= 0 ? C.accent2 : C.warn }}>{reliquat >= 0 ? "+" : ""}{fmtFCFA(reliquat)}</b>
+                </div>
+              </div>
+            );
+          })()}
+
+          {rafraErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {rafraErreur}
+            </div>
+          )}
+
+          <button
+            disabled={rafraEnCours}
+            style={{ marginTop: "6px", background: C.vifOr, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: rafraEnCours ? "default" : "pointer" }}
+            onClick={async () => {
+              const dateISO = versDateISO(rafraDate);
+              if (!dateISO) { setRafraErreur("Date invalide (jj/mm/aaaa)."); return; }
+              const participants = Object.entries(rafraParticipants).map(([membreId, montant]) => ({ membreId, montant }));
+              if (participants.length === 0) { setRafraErreur("Sélectionne au moins un participant."); return; }
+              const facture = parseInt(rafraFacture.replace(/[^\d]/g, ""), 10);
+              if (!facture) { setRafraErreur("Saisis le montant de la facture."); return; }
+
+              setRafraEnCours(true);
+              setRafraErreur("");
+              try {
+                await creerRafraichissement(groupId, {
+                  seanceId: rafraSeanceId || null,
+                  montantParMembre: parseInt(rafraMontantParMembre.replace(/[^\d]/g, ""), 10) || 1000,
+                  participants,
+                  montantFacture: facture,
+                  responsableId: rafraResponsableId || null,
+                  date: dateISO,
+                });
+                await rechargerDepenses();
+                setShowCreerRafraichissement(false);
+              } catch (e) {
+                console.error("Erreur d'enregistrement du rafraîchissement", e);
+                setRafraErreur(e.message || "Erreur lors de l'enregistrement.");
+              } finally {
+                setRafraEnCours(false);
+              }
+            }}
+          >
+            {rafraEnCours ? "Enregistrement..." : "Enregistrer"}
+          </button>
+        </Modal>
+      )}
+
+      {showTypesDepenses && (
+        <Modal onClose={() => setShowTypesDepenses(false)} title="Types de dépenses" icon={<ShoppingCart />} accentColor={C.vifBleu}>
+          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+            Crée les catégories de dépenses propres à ton groupe (ex. Fournitures, Transport, Communication).
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {typesDepenses.map((t) => (
+              <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
+                <span style={{ fontSize: "13px", fontWeight: 600 }}>{t.nom}</span>
+                <X
+                  size={14}
+                  color={C.sub}
+                  style={{ cursor: "pointer" }}
+                  onClick={async () => {
+                    try {
+                      await supprimerTypeDepense(t.id);
+                      await rechargerDepenses();
+                    } catch (e) {
+                      console.error("Erreur de suppression du type de dépense", e);
+                    }
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <input
+              value={newTypeDepenseNom}
+              onChange={(e) => setNewTypeDepenseNom(e.target.value)}
+              placeholder="Ex. Fournitures de bureau"
+              style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
+            />
+            <button
+              onClick={async () => {
+                if (!newTypeDepenseNom.trim()) return;
+                try {
+                  await creerTypeDepense(groupId, newTypeDepenseNom.trim());
+                  setNewTypeDepenseNom("");
+                  await rechargerDepenses();
+                } catch (e) {
+                  console.error("Erreur de création du type de dépense", e);
+                }
+              }}
+              style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+            >
+              Ajouter
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showCreerDepense && (
+        <Modal onClose={() => setShowCreerDepense(false)} title="Enregistrer une dépense" icon={<ShoppingCart />} accentColor={C.warn}>
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Catégorie</label>
+            <select
+              value={depenseTypeId}
+              onChange={(e) => setDepenseTypeId(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+            >
+              <option value="">Sélectionner une catégorie</option>
+              {typesDepenses.map((t) => <option key={t.id} value={t.id}>{t.nom}</option>)}
+            </select>
+          </div>
+
+          <FormField label="Montant (FCFA)" placeholder="Ex. 5 000" value={depenseMontant} onChange={(e) => setDepenseMontant(e.target.value)} />
+          <FormField label="Date" placeholder="jj/mm/aaaa" value={depenseDate} onChange={(e) => setDepenseDate(e.target.value)} />
+          <FormField label="Motif" placeholder="Ex. Achat de cahiers de compte" value={depenseMotif} onChange={(e) => setDepenseMotif(e.target.value)} />
+
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Source à débiter</label>
+            <select
+              value={depenseSourceType}
+              onChange={(e) => { setDepenseSourceType(e.target.value); setDepenseSourceId(""); }}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+            >
+              <option value="">Sélectionner une source</option>
+              <option value="epargne">Épargne (banque)</option>
+              <option value="compte_externe">Compte bancaire externe</option>
+              <option value="caisse_amendes">Caisse des amendes ({fmtFCFA(soldeCaisseAmendes)})</option>
+              <option value="caisse_rafraichissement">Caisse reliquat boisson ({fmtFCFA(soldeCaisseRafraichissement)})</option>
+            </select>
+          </div>
+
+          {depenseSourceType === "epargne" && (
+            <select
+              value={depenseSourceId}
+              onChange={(e) => setDepenseSourceId(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+            >
+              <option value="">Sélectionner l'épargne</option>
+              {epargnes.map((ep) => <option key={ep.id} value={ep.id}>{ep.nom} ({fmtFCFA(ep.solde)})</option>)}
+            </select>
+          )}
+          {depenseSourceType === "compte_externe" && (
+            <select
+              value={depenseSourceId}
+              onChange={(e) => setDepenseSourceId(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+            >
+              <option value="">Sélectionner le compte</option>
+              {comptesBancaires.map((c) => <option key={c.id} value={c.id}>{c.nom} ({fmtFCFA(c.solde)})</option>)}
+            </select>
+          )}
+
+          {depenseErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {depenseErreur}
+            </div>
+          )}
+
+          <button
+            disabled={depenseEnCours}
+            style={{ marginTop: "6px", background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: depenseEnCours ? "default" : "pointer" }}
+            onClick={async () => {
+              const montant = parseInt(depenseMontant.replace(/[^\d]/g, ""), 10);
+              const dateISO = versDateISO(depenseDate);
+              if (!montant) { setDepenseErreur("Saisis un montant valide."); return; }
+              if (!dateISO) { setDepenseErreur("Date invalide (jj/mm/aaaa)."); return; }
+              if (!depenseSourceType) { setDepenseErreur("Sélectionne la source à débiter."); return; }
+              if ((depenseSourceType === "epargne" || depenseSourceType === "compte_externe") && !depenseSourceId) {
+                setDepenseErreur("Sélectionne le compte précis à débiter.");
+                return;
+              }
+              setDepenseEnCours(true);
+              setDepenseErreur("");
+              try {
+                await creerDepense(groupId, {
+                  typeDepenseId: depenseTypeId || null,
+                  montant,
+                  date: dateISO,
+                  motif: depenseMotif.trim(),
+                  sourceType: depenseSourceType,
+                  sourceId: depenseSourceId || null,
+                });
+                await rechargerDepenses();
+                if (depenseSourceType === "epargne") await rechargerEpargnes();
+                if (depenseSourceType === "compte_externe") await rechargerComptes();
+                setShowCreerDepense(false);
+              } catch (e) {
+                console.error("Erreur d'enregistrement de la dépense", e);
+                setDepenseErreur(e.message || "Erreur lors de l'enregistrement.");
+              } finally {
+                setDepenseEnCours(false);
+              }
+            }}
+          >
+            {depenseEnCours ? "Enregistrement..." : "Enregistrer la dépense"}
           </button>
         </Modal>
       )}
