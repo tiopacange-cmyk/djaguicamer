@@ -1,10 +1,3 @@
-routeur maison
-admin
-pass wifi 3ts@2026
-
-
-
-
 import { supabase } from "./supabaseClient";
 
 // Génère un mot de passe temporaire lisible (ex. Tontine-4821)
@@ -23,7 +16,7 @@ export async function fetchGroupes() {
   const { data, error } = await supabase
     .from("groups")
     .select(`
-      id, nom, created_at,
+      id, nom, created_at, sms_credits,
       subscriptions ( formule, periodicite, statut, date_expiration )
     `)
     .order("created_at", { ascending: false });
@@ -35,7 +28,7 @@ export async function fetchGroupes() {
 // Crée un nouveau groupe + un compte admin pour ce groupe.
 // L'admin reçoit tout de suite un vrai compte de connexion, avec
 // un identifiant court (dérivé de son nom) pour se connecter facilement.
-export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, formule = "Essai", periodicite }) {
+export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, formule = "Essai", periodicite, creditSms = 0 }) {
   const motDePasseTemp = genererMotDePasseTemp();
   const identifiantBase = genererIdentifiant(adminNom);
   // Ajoute un petit suffixe aléatoire pour limiter les risques de collision
@@ -73,7 +66,7 @@ export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, fo
 
   const { data: groupe, error: groupeError } = await supabase
     .from("groups")
-    .insert({ nom: nomGroupe })
+    .insert({ nom: nomGroupe, sms_credits: creditSms })
     .select()
     .single();
   if (groupeError) throw groupeError;
@@ -399,4 +392,41 @@ export async function fetchStatsPlateforme() {
       .slice(0, 5)
       .map((g) => ({ nom: g.nom, date: g.created_at })),
   };
+}
+
+// ============================================================
+// CRÉDITS SMS — vendus par le Super Admin à chaque groupe
+// ============================================================
+
+export async function fetchSoldeSms(groupId) {
+  const { data, error } = await supabase.from("groups").select("sms_credits, sms_bloquer_si_epuise").eq("id", groupId).single();
+  if (error) throw error;
+  return { solde: data.sms_credits, bloquerSiEpuise: data.sms_bloquer_si_epuise };
+}
+
+export async function vendreCreditsSms(groupId, quantite, prix, modePaiement, note) {
+  const { data, error } = await supabase.rpc("vendre_credits_sms", {
+    p_group_id: groupId,
+    p_quantite: quantite,
+    p_prix: prix || null,
+    p_mode: modePaiement || null,
+    p_note: note || null,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function definirBlocageSms(groupId, bloquer) {
+  const { error } = await supabase.from("groups").update({ sms_bloquer_si_epuise: bloquer }).eq("id", groupId);
+  if (error) throw error;
+}
+
+export async function fetchHistoriqueSms(groupId) {
+  const { data, error } = await supabase
+    .from("sms_credits_mouvements")
+    .select("*")
+    .eq("group_id", groupId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
 }
