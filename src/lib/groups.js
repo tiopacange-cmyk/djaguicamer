@@ -16,7 +16,7 @@ export async function fetchGroupes() {
   const { data, error } = await supabase
     .from("groups")
     .select(`
-      id, nom, created_at, sms_credits,
+      id, nom, created_at, sms_credits, sms_sender_id, sms_bloquer_si_epuise,
       subscriptions ( formule, periodicite, statut, date_expiration )
     `)
     .order("created_at", { ascending: false });
