@@ -96,8 +96,31 @@ export async function effectuerPrelevementSms(groupId, membreId, mois, montant, 
   });
   if (errPrelevement) throw errPrelevement;
 
+  // L'argent atterrit réellement dans la caisse SMS, quel que soit
+  // le mode de paiement (comme la caisse des amendes).
+  const { data: caisse, error: errCaisse } = await supabase
+    .from("caisse_sms")
+    .select("id, solde")
+    .eq("group_id", groupId)
+    .maybeSingle();
+  if (errCaisse) throw errCaisse;
+
+  if (caisse) {
+    const { error } = await supabase.from("caisse_sms").update({ solde: caisse.solde + montant }).eq("id", caisse.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("caisse_sms").insert({ group_id: groupId, solde: montant });
+    if (error) throw error;
+  }
+
   const { data: groupe, error: errLectureGroupe } = await supabase.from("groups").select("sms_credits").eq("id", groupId).single();
   if (errLectureGroupe) throw errLectureGroupe;
   const { error: errCredits } = await supabase.from("groups").update({ sms_credits: groupe.sms_credits + credits }).eq("id", groupId);
   if (errCredits) throw errCredits;
+}
+
+export async function fetchCaisseSms(groupId) {
+  const { data, error } = await supabase.from("caisse_sms").select("solde").eq("group_id", groupId).maybeSingle();
+  if (error) throw error;
+  return data?.solde || 0;
 }
