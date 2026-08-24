@@ -6536,13 +6536,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         checked={estAbonne}
                         disabled={toggleEnCours}
                         onChange={async (e) => {
+                          const coche = e.target.checked;
                           setAbonnementToggleMembreId(m.id);
                           try {
-                            await toggleAbonnementSms(m.id, e.target.checked);
-                            setAbonnesSmsListe(
-                              e.target.checked
-                                ? [...abonnesSmsListe, m.id]
-                                : abonnesSmsListe.filter((id) => id !== m.id)
+                            await toggleAbonnementSms(m.id, coche);
+                            setAbonnesSmsListe((prev) =>
+                              coche
+                                ? (prev.includes(m.id) ? prev : [...prev, m.id])
+                                : prev.filter((id) => id !== m.id)
                             );
                           } catch (err) {
                             console.error("Erreur de mise à jour de l'abonnement", err);
