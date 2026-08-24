@@ -1,3 +1,10 @@
+routeur maison
+admin
+pass wifi 3ts@2026
+
+
+
+
 import { supabase } from "./supabaseClient";
 
 // Génère un mot de passe temporaire lisible (ex. Tontine-4821)
