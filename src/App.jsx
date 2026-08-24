@@ -7,6 +7,7 @@ import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTon
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit, fetchApercuCloture, cloturerEpargne } from "./lib/banque";
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
 import { fetchComptesBancaires, creerCompteBancaire, fetchSignataires, ajouterSignataire, fetchMouvementsCompte, creerMouvementExterne, fetchCategoriesFrais, creerCategorieFrais, supprimerCategorieFrais, joindreRecu } from "./lib/depots_retrait";
+import { fetchThemeActuel, definirTheme } from "./lib/theme";
 import { fetchRapportJournalier, fetchRapportMensuel, fetchBilanAnnuel } from "./lib/rapports";
 import { fetchSeances, creerSeance, enregistrerCompteRendu, supprimerSeance, fetchPresences, enregistrerPresences, fetchTauxPresence, fetchTypesAmendesSeance, creerTypeAmendeSeance, modifierTypeAmendeSeance, supprimerTypeAmendeSeance, fetchAmendesSeance, appliquerAmendeSeance, fetchCaisseAmendes, payerAmendeSeance } from "./lib/seances";
 import { fetchCaisseRafraichissement, fetchRafraichissements, creerRafraichissement, fetchTypesDepenses, creerTypeDepense, supprimerTypeDepense, fetchDepenses, creerDepense, libelleSourceDepense } from "./lib/depenses";
@@ -41,7 +42,7 @@ import {
   Users, Plus, KeyRound, Search, ShieldAlert, ChevronRight, Building2, X,
   CreditCard, ScrollText, LayoutDashboard, Wallet, Shield, FileBarChart,
   Gavel, Bell, LogOut, Moon, Sun, Lock, ChevronLeft, CheckCircle2, Clock,
-  Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat, Eye, EyeOff, AlertTriangle, ShoppingCart,
+  Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat, Eye, EyeOff, AlertTriangle, ShoppingCart, Palette,
 } from "lucide-react";
 
 // ---------- Palette partagée ----------
@@ -66,6 +67,16 @@ const C = {
   vifOr: "#E8A317", vifVert: "#16A34A", vifBleu: "#2563EB", vifRose: "#DB2777", vifViolet: "#7C3AED", vifCorail: "#EA580C",
 };
 
+// Les 3 thèmes disponibles ne changent que les couleurs de marque
+// (accent, accent2, purple) — les couleurs neutres et sémantiques
+// (texte, fond, succès, alerte) restent identiques pour garder une
+// bonne lisibilité quel que soit le thème choisi.
+const THEMES = {
+  vert: { nom: "Vert profond", accent: "#C9971D", accent2: "#0F5132", purple: "#6B5FA6" },
+  bleu: { nom: "Bleu dynamique", accent: "#F59E0B", accent2: "#1E40AF", purple: "#6B5FA6" },
+  violet: { nom: "Violet moderne", accent: "#D97706", accent2: "#5B21B6", purple: "#9333EA" },
+};
+
 export default function AppPrototype() {
   const [chargementSession, setChargementSession] = useState(true);
   const [connecte, setConnecte] = useState(false);
@@ -78,6 +89,16 @@ export default function AppPrototype() {
   const chargerSessionEtRole = async () => {
     setChargementSession(true);
     try {
+      // Applique le thème choisi par le Super Admin AVANT le tout
+      // premier affichage — jamais de bascule en direct pendant que
+      // l'application tourne, donc aucun risque lié aux couleurs.
+      try {
+        const theme = await fetchThemeActuel();
+        Object.assign(C, THEMES[theme] || THEMES.vert);
+      } catch (eTheme) {
+        console.error("Erreur de chargement du thème", eTheme);
+      }
+
       const session = await getSession();
       if (!session) {
         setConnecte(false);
@@ -501,6 +522,7 @@ function SuperAdminScreen() {
   const [groupes, setGroupes] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
+  const [themeEnCours, setThemeEnCours] = useState("");
 
   const [showCreateGroupe, setShowCreateGroupe] = useState(false);
   const [nomGroupe, setNomGroupe] = useState("");
@@ -617,6 +639,7 @@ function SuperAdminScreen() {
           { icon: <Building2 size={16} />, label: "Groupes", key: "groupes" },
           { icon: <CreditCard size={16} />, label: "Tarifs", key: "tarifs" },
           { icon: <ScrollText size={16} />, label: "Journal d'audit", key: "audit" },
+          { icon: <Palette size={16} />, label: "Thème", key: "theme" },
         ]}
         active={view} onSelect={setView}
       />
@@ -870,6 +893,43 @@ function SuperAdminScreen() {
             {!chargementAudit && auditLog.length === 0 && (
               <div style={{ fontSize: "12.5px", color: C.sub, marginTop: "12px" }}>Aucune action enregistrée pour l'instant.</div>
             )}
+          </>
+        )}
+
+        {view === "theme" && (
+          <>
+            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Thème de la plateforme</h1>
+            <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>
+              S'applique à toute l'application, pour tous les groupes. La page se recharge après le choix pour appliquer le nouveau thème.
+            </p>
+
+            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+              {Object.entries(THEMES).map(([key, t]) => (
+                <div
+                  key={key}
+                  onClick={async () => {
+                    if (themeEnCours) return;
+                    setThemeEnCours(key);
+                    try {
+                      await definirTheme(key);
+                      window.location.reload();
+                    } catch (e) {
+                      console.error("Erreur de changement de thème", e);
+                      setThemeEnCours("");
+                    }
+                  }}
+                  style={{ width: "180px", borderRadius: "14px", border: `2px solid ${C.border}`, overflow: "hidden", cursor: themeEnCours ? "default" : "pointer", background: C.panel, opacity: themeEnCours && themeEnCours !== key ? 0.5 : 1 }}
+                >
+                  <div style={{ height: "70px", background: `linear-gradient(135deg, ${t.accent2}, ${t.accent})` }} />
+                  <div style={{ padding: "12px" }}>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: C.ink }}>{t.nom}</div>
+                    <div style={{ fontSize: "11px", color: C.sub, marginTop: "4px" }}>
+                      {themeEnCours === key ? "Application..." : "Cliquer pour appliquer"}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </>
         )}
       </div>
@@ -2004,11 +2064,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       <Sidebar
         role="Admin Groupe" sub={nomGroupe || "—"} logoUrl={logoGroupeUrlSidebar}
         items={[
+          { icon: <Calendar size={16} />, label: "Séances", key: "seances" },
           { icon: <Banknote size={16} />, label: "Tontine", key: "tontine" },
           { icon: <PiggyBank size={16} />, label: "Banque", key: "banque" },
           { icon: <HeartHandshake size={16} />, label: "Assurance", key: "assurance" },
           { icon: <Wallet size={16} />, label: "Fonds", key: "fonds" },
-          { icon: <Calendar size={16} />, label: "Séances", key: "seances" },
           { icon: <ShoppingCart size={16} />, label: "Dépenses", key: "depenses" },
           { icon: <Building2 size={16} />, label: "Dépôt / Retrait externe", key: "depots" },
           { icon: <FileBarChart size={16} />, label: "Bilan", key: "bilan" },
@@ -6638,5 +6698,5 @@ function StatCard({ label, value, sub, icon }) {
   );
 }
 
-const btnPrimary = { background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "11px 18px", fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", whiteSpace: "nowrap" };
-const btnSecondary = { background: "transparent", color: C.accent2, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "11px 18px", fontSize: "13px", fontWeight: 600, cursor: "pointer" };
+const btnPrimary = { background: `linear-gradient(135deg, ${C.accent2}, ${C.accent})`, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "11px 18px", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", whiteSpace: "nowrap", boxShadow: `0 4px 12px ${C.accent2}40`, transition: "transform 0.12s ease, box-shadow 0.12s ease" };
+const btnSecondary = { background: "#FFFFFF", color: C.accent2, border: `1.5px solid ${C.accent2}55`, borderRadius: "10px", padding: "11px 18px", fontSize: "13px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap", boxShadow: "0 2px 6px rgba(27,67,50,0.08)", transition: "transform 0.12s ease" };
