@@ -156,13 +156,46 @@ export async function fetchRapportJournalier(groupId, dateISO) {
     }));
   }
 
+  // --- SÉANCES : amendes déclarées et paiements reçus ce jour ---
+  const { data: seancesGroupe } = await supabase.from("seances").select("id").eq("group_id", groupId);
+  const idsSeances = (seancesGroupe || []).map((s) => s.id);
+
+  let amendesSeanceDeclarees = [];
+  if (idsSeances.length > 0) {
+    const { data, error } = await supabase
+      .from("seance_amendes")
+      .select("montant, membre:group_members(profile:profiles(nom_complet)), type_amende:types_amendes_seance(nom), created_at")
+      .in("seance_id", idsSeances)
+      .gte("created_at", debut)
+      .lt("created_at", fin);
+    if (error) throw error;
+    amendesSeanceDeclarees = data.map((a) => ({
+      membre: a.membre?.profile?.nom_complet || "—",
+      montant: a.montant,
+      typeAmende: a.type_amende?.nom || "—",
+    }));
+  }
+
+  const { data: paiementsAmendes, error: errPaie } = await supabase
+    .from("caisse_amendes_mouvements")
+    .select("montant, mode_paiement, membre:group_members(profile:profiles(nom_complet))")
+    .eq("group_id", groupId)
+    .eq("date_mouvement", dateISO);
+  if (errPaie) throw errPaie;
+  const paiementsAmendesJour = (paiementsAmendes || []).map((p) => ({
+    membre: p.membre?.profile?.nom_complet || "—",
+    montant: p.montant,
+    mode: p.mode_paiement,
+  }));
+
   // --- TOTAUX ---
   const totalEncaisse =
     tontineCotisations.reduce((s, c) => s + Number(c.montant), 0) +
     mouvementsEpargne.filter((m) => m.type === "Versement").reduce((s, m) => s + Number(m.montant), 0) +
     assuranceMouvements.filter((m) => m.type === "Cotisation").reduce((s, m) => s + Number(m.montant), 0) +
     mouvementsExternes.filter((m) => m.type === "Dépôt" || m.type === "Intérêt").reduce((s, m) => s + Number(m.montant), 0) +
-    mouvementsFonds.reduce((s, m) => s + Number(m.montant), 0);
+    mouvementsFonds.reduce((s, m) => s + Number(m.montant), 0) +
+    paiementsAmendesJour.reduce((s, p) => s + Number(p.montant), 0);
 
   const totalDecaisse =
     tontineVersements.length * 0 + // le montant du versement n'est pas systématiquement re-sommé ici, voir tontineVersements pour le détail
@@ -183,6 +216,8 @@ export async function fetchRapportJournalier(groupId, dateISO) {
     })),
     mouvementsExternes,
     mouvementsFonds,
+    amendesSeanceDeclarees,
+    paiementsAmendesJour,
     totalEncaisse,
     totalDecaisse,
   };
@@ -337,6 +372,19 @@ async function fetchMouvementsPeriode(groupId, debut, fin) {
       detail: "—",
     }));
   }
+
+  // --- SÉANCES (paiements d'amendes reçus dans la caisse) ---
+  const { data: paiementsAmendes } = await supabase
+    .from("caisse_amendes_mouvements")
+    .select("montant, mode_paiement, date_mouvement, membre:group_members(profile:profiles(nom_complet))")
+    .eq("group_id", groupId)
+    .gte("date_mouvement", debut)
+    .lt("date_mouvement", fin);
+  (paiementsAmendes || []).forEach((p) => liste.push({
+    module: "Séances", type: "Amende payée", membre: p.membre?.profile?.nom_complet || "—",
+    montant: Number(p.montant), date: p.date_mouvement, sens: "encaisse",
+    detail: p.mode_paiement,
+  }));
 
   liste.sort((a, b) => a.date.localeCompare(b.date));
 
