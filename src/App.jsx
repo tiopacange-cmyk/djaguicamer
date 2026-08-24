@@ -8,7 +8,7 @@ import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistor
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
 import { fetchComptesBancaires, creerCompteBancaire, fetchSignataires, ajouterSignataire, fetchMouvementsCompte, creerMouvementExterne, fetchCategoriesFrais, creerCategorieFrais, supprimerCategorieFrais, joindreRecu } from "./lib/depots_retrait";
 import { fetchThemeActuel, definirTheme } from "./lib/theme";
-import { fetchConfigAbonnementSms, definirConfigAbonnementSms, fetchMonAbonnementSms, toggleAbonnementSms, fetchAbonnesSms, fetchDejaPreleves, effectuerPrelevementSms } from "./lib/smsAbonnement";
+import { fetchConfigAbonnementSms, definirConfigAbonnementSms, fetchMonAbonnementSms, toggleAbonnementSms, fetchAbonnesSms, fetchDejaPreleves, effectuerPrelevementSms, fetchCaisseSms } from "./lib/smsAbonnement";
 import { fetchRapportJournalier, fetchRapportMensuel, fetchBilanAnnuel } from "./lib/rapports";
 import { fetchSeances, creerSeance, enregistrerCompteRendu, supprimerSeance, fetchPresences, enregistrerPresences, fetchTauxPresence, fetchTypesAmendesSeance, creerTypeAmendeSeance, modifierTypeAmendeSeance, supprimerTypeAmendeSeance, fetchAmendesSeance, appliquerAmendeSeance, fetchCaisseAmendes, payerAmendeSeance } from "./lib/seances";
 import { fetchCaisseRafraichissement, fetchRafraichissements, creerRafraichissement, fetchTypesDepenses, creerTypeDepense, supprimerTypeDepense, fetchDepenses, creerDepense, libelleSourceDepense } from "./lib/depenses";
@@ -1607,6 +1607,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
     fetchLogoGroupe(groupId)
       .then(setLogoGroupeUrlSidebar)
       .catch((e) => console.error("Erreur de chargement du logo", e));
+    fetchSoldeSms(groupId)
+      .then((s) => setSmsSolde(s.solde))
+      .catch((e) => console.error("Erreur de chargement du solde SMS", e));
+    fetchCaisseSms(groupId)
+      .then(setSoldeCaisseSms)
+      .catch((e) => console.error("Erreur de chargement de la caisse SMS", e));
   }, [groupId]);
 
   // Convertit une date saisie au format jj/mm/aaaa (celui utilisé
@@ -2240,6 +2246,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [typesAmendesSeance, setTypesAmendesSeance] = useState([]);
   const [tauxPresence, setTauxPresence] = useState({});
   const [soldeCaisseAmendes, setSoldeCaisseAmendes] = useState(0);
+  const [soldeCaisseSms, setSoldeCaisseSms] = useState(0);
 
   const rechargerSeances = async () => {
     if (!groupId) return;
@@ -3110,6 +3117,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               <StatCard label="Caisse des amendes" value={fmtFCFA(soldeCaisseAmendes)} icon={<AlertTriangle size={16} />} />
               <StatCard label="Caisse reliquat boisson" value={fmtFCFA(soldeCaisseRafraichissement)} icon={<ShoppingCart size={16} />} />
               <StatCard label="Crédits SMS restants" value={`${smsSolde} SMS`} icon={<Repeat size={16} />} />
+              <StatCard label="Caisse SMS (argent collecté)" value={fmtFCFA(soldeCaisseSms)} icon={<Repeat size={16} />} />
               <StatCard label="Tours effectués" value={`${tours.filter((t) => t.statut === "clôturé").length} / ${tours.length}`} icon={<CheckCircle2 size={16} />} />
               <StatCard label="Membres" value={`${membres.filter((m) => m.statut === "actif").length} actif(s)`} icon={<Users size={16} />} />
             </div>
@@ -6609,6 +6617,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                               if (prelevementSmsMode === "déduit banque") await rechargerEpargnes();
                               const nouveauSolde = await fetchSoldeSms(groupId);
                               setSmsSolde(nouveauSolde.solde);
+                              const nouvelleCaisse = await fetchCaisseSms(groupId);
+                              setSoldeCaisseSms(nouvelleCaisse);
                               if (m.telephone) {
                                 envoyerSMS({
                                   message: msgOperation(m.nom, "abonnement SMS mensuel", abonnementSmsConfig.prixMensuel, undefined, prelevementSmsMode === "espèces" ? "Réglé en espèces" : "Déduit de votre épargne"),
