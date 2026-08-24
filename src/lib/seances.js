@@ -1,4 +1,3 @@
-
 import { supabase } from "./supabaseClient";
 
 // ============================================================
@@ -146,7 +145,7 @@ export async function supprimerTypeAmendeSeance(typeAmendeId) {
 export async function fetchAmendesSeance(seanceId) {
   const { data, error } = await supabase
     .from("seance_amendes")
-    .select("id, membre_id, montant, motif, type_amende:types_amendes_seance(nom)")
+    .select("id, membre_id, montant, motif, statut, mode_paiement, date_paiement, type_amende:types_amendes_seance(nom)")
     .eq("seance_id", seanceId);
   if (error) throw error;
   return data.map((a) => ({
@@ -155,6 +154,9 @@ export async function fetchAmendesSeance(seanceId) {
     montant: a.montant,
     motif: a.motif,
     typeNom: a.type_amende?.nom || "—",
+    statut: a.statut,
+    modePaiement: a.mode_paiement,
+    datePaiement: a.date_paiement,
   }));
 }
 
@@ -167,4 +169,91 @@ export async function appliquerAmendeSeance(seanceId, membreId, typeAmendeId, mo
     motif: motif || null,
   });
   if (error) throw error;
+}
+
+// ============================================================
+// CAISSE DES AMENDES — suit le paiement de chaque amende, en
+// espèces ou déduit de la banque du membre, dans une caisse
+// commune trackée.
+// ============================================================
+
+export async function fetchCaisseAmendes(groupId) {
+  const { data, error } = await supabase
+    .from("caisse_amendes")
+    .select("solde")
+    .eq("group_id", groupId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.solde || 0;
+}
+
+// Marque une amende comme payée. En espèces, la caisse des amendes
+// augmente directement. Déduit de la banque, le montant sort de
+// l'épargne choisie du membre ET vient quand même alimenter la
+// caisse des amendes (transfert interne, pas de perte).
+export async function payerAmendeSeance(groupId, amendeId, membreId, montant, modePaiement, epargneId) {
+  if (modePaiement === "déduit banque") {
+    if (!epargneId) throw new Error("Choisis l'épargne à débiter.");
+    const { data: epargne, error: errLecture } = await supabase
+      .from("epargnes")
+      .select("solde")
+      .eq("id", epargneId)
+      .single();
+    if (errLecture) throw errLecture;
+
+    const nouveauSolde = epargne.solde - montant;
+    const { error: errMouvement } = await supabase.from("epargne_mouvements").insert({
+      epargne_id: epargneId,
+      membre_id: membreId,
+      type: "Retrait",
+      montant,
+      date_mouvement: new Date().toISOString().slice(0, 10),
+      solde_apres: nouveauSolde,
+    });
+    if (errMouvement) throw errMouvement;
+
+    const { error: errMaj } = await supabase.from("epargnes").update({ solde: nouveauSolde }).eq("id", epargneId);
+    if (errMaj) throw errMaj;
+  }
+
+  const { data: caisse, error: errCaisse } = await supabase
+    .from("caisse_amendes")
+    .select("id, solde")
+    .eq("group_id", groupId)
+    .maybeSingle();
+  if (errCaisse) throw errCaisse;
+
+  let nouveauSoldeCaisse;
+  if (caisse) {
+    nouveauSoldeCaisse = caisse.solde + montant;
+    const { error } = await supabase.from("caisse_amendes").update({ solde: nouveauSoldeCaisse }).eq("id", caisse.id);
+    if (error) throw error;
+  } else {
+    nouveauSoldeCaisse = montant;
+    const { error } = await supabase.from("caisse_amendes").insert({ group_id: groupId, solde: nouveauSoldeCaisse });
+    if (error) throw error;
+  }
+
+  const { error: errHisto } = await supabase.from("caisse_amendes_mouvements").insert({
+    group_id: groupId,
+    seance_amende_id: amendeId,
+    membre_id: membreId,
+    montant,
+    mode_paiement: modePaiement,
+    date_mouvement: new Date().toISOString().slice(0, 10),
+  });
+  if (errHisto) throw errHisto;
+
+  const { error: errAmende } = await supabase
+    .from("seance_amendes")
+    .update({
+      statut: "payée",
+      mode_paiement: modePaiement,
+      date_paiement: new Date().toISOString().slice(0, 10),
+      epargne_id: modePaiement === "déduit banque" ? epargneId : null,
+    })
+    .eq("id", amendeId);
+  if (errAmende) throw errAmende;
+
+  return nouveauSoldeCaisse;
 }
