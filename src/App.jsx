@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre, reinitialiserMotDePasseMembre, televerserDocumentMembre, fetchDocumentsMembre } from "./lib/membres";
 import { fetchTypesFonds, creerTypeFonds, supprimerTypeFonds, fetchFondsTousMembres, fixerCibleTypeFonds, enregistrerVersementFonds, fetchFondsMembre } from "./lib/fonds";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse } from "./lib/auth";
-import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement, televerserLogoGroupe, fetchLogoGroupe, modifierGroupe, suspendreGroupe, reactiverGroupe } from "./lib/groups";
+import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement, televerserLogoGroupe, fetchLogoGroupe, modifierGroupe, suspendreGroupe, reactiverGroupe, fetchStatsPlateforme, fetchSoldeSms, vendreCreditsSms, definirBlocageSms, fetchHistoriqueSms } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere, fetchApercuRedistribution, redistribuerCommission, fetchTotalRedistributions } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit, fetchApercuCloture, cloturerEpargne } from "./lib/banque";
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
@@ -518,11 +518,31 @@ function ChangerMotDePasseScreen({ onDone }) {
 // ÉCRAN 2 — SUPER ADMIN
 // ============================================================
 function SuperAdminScreen() {
-  const [view, setView] = useState("groupes");
+  const [view, setView] = useState("dashboard");
   const [groupes, setGroupes] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
   const [themeEnCours, setThemeEnCours] = useState("");
+  const [statsPlateforme, setStatsPlateforme] = useState(null);
+  const [chargementStats, setChargementStats] = useState(true);
+  const [showGererSms, setShowGererSms] = useState(null);
+  const [smsSoldeActuel, setSmsSoldeActuel] = useState(null);
+  const [smsHistorique, setSmsHistorique] = useState([]);
+  const [smsVenteQuantite, setSmsVenteQuantite] = useState("");
+  const [smsVentePrix, setSmsVentePrix] = useState("");
+  const [smsVenteMode, setSmsVenteMode] = useState("Espèces");
+  const [smsVenteNote, setSmsVenteNote] = useState("");
+  const [smsVenteErreur, setSmsVenteErreur] = useState("");
+  const [smsVenteEnCours, setSmsVenteEnCours] = useState(false);
+
+  useEffect(() => {
+    if (view !== "dashboard") return;
+    setChargementStats(true);
+    fetchStatsPlateforme()
+      .then(setStatsPlateforme)
+      .catch((e) => console.error("Erreur de chargement des statistiques", e))
+      .finally(() => setChargementStats(false));
+  }, [view]);
 
   const [showCreateGroupe, setShowCreateGroupe] = useState(false);
   const [nomGroupe, setNomGroupe] = useState("");
@@ -530,6 +550,7 @@ function SuperAdminScreen() {
   const [adminEmail, setAdminEmail] = useState("");
   const [creationEnCours, setCreationEnCours] = useState(false);
   const [creationFormule, setCreationFormule] = useState("Essai");
+  const [creationCreditSms, setCreationCreditSms] = useState("");
   const [creationPeriodicite, setCreationPeriodicite] = useState("Mensuel");
   const [showRenouveler, setShowRenouveler] = useState(null);
   const [showModifierGroupe, setShowModifierGroupe] = useState(null);
@@ -636,6 +657,7 @@ function SuperAdminScreen() {
       <Sidebar
         role="Super Admin" sub="Plateforme"
         items={[
+          { icon: <LayoutDashboard size={16} />, label: "Tableau de bord", key: "dashboard" },
           { icon: <Building2 size={16} />, label: "Groupes", key: "groupes" },
           { icon: <CreditCard size={16} />, label: "Tarifs", key: "tarifs" },
           { icon: <ScrollText size={16} />, label: "Journal d'audit", key: "audit" },
@@ -644,6 +666,72 @@ function SuperAdminScreen() {
         active={view} onSelect={setView}
       />
       <div className="app-main" style={{ flex: 1, padding: "32px 40px", minWidth: 0 }}>
+        {view === "dashboard" && (
+          <>
+            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Tableau de bord</h1>
+            <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>Vue d'ensemble de toute la plateforme, tous groupes confondus.</p>
+
+            {chargementStats ? (
+              <div style={{ fontSize: "13px", color: C.sub, textAlign: "center", padding: "30px 0" }}>Chargement...</div>
+            ) : !statsPlateforme ? (
+              <div style={{ fontSize: "12.5px", color: C.warn }}>Erreur de chargement des statistiques.</div>
+            ) : (
+              <>
+                <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
+                  <StatCard label="Groupes" value={statsPlateforme.totalGroupes} icon={<Building2 size={16} />} />
+                  <StatCard label="Membres actifs" value={statsPlateforme.totalMembres} icon={<Users size={16} />} />
+                  <StatCard label="Abonnements actifs" value={statsPlateforme.actifs} icon={<CheckCircle2 size={16} />} />
+                  <StatCard label="En période d'essai" value={statsPlateforme.essais} icon={<Calendar size={16} />} />
+                  <StatCard label="Expirés" value={statsPlateforme.expires} icon={<AlertTriangle size={16} />} />
+                  <StatCard label="Suspendus" value={statsPlateforme.suspendus} icon={<ShieldAlert size={16} />} />
+                </div>
+
+                <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "26px 0 10px" }}>Répartition par formule</h2>
+                <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
+                  {Object.entries(statsPlateforme.parFormule).map(([formule, nb]) => (
+                    <StatCard key={formule} label={formule} value={nb} icon={<CreditCard size={16} />} />
+                  ))}
+                  {Object.keys(statsPlateforme.parFormule).length === 0 && (
+                    <div style={{ fontSize: "12.5px", color: C.sub }}>Aucun groupe pour l'instant.</div>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", marginTop: "26px" }}>
+                  <div style={{ flex: "1 1 320px" }}>
+                    <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px" }}>Expirent bientôt (7 jours)</h2>
+                    {statsPlateforme.expirentBientot.length === 0 ? (
+                      <div style={{ fontSize: "12.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "14px", textAlign: "center" }}>
+                        Aucun groupe n'expire dans les 7 prochains jours.
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        {statsPlateforme.expirentBientot.map((g, i) => (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", background: C.warnBg, border: `1px solid ${C.warn}33`, borderRadius: "8px", padding: "8px 12px", fontSize: "12.5px" }}>
+                            <span><b>{g.nom}</b> — {g.formule}</span>
+                            <span style={{ color: C.warn, fontWeight: 600 }}>{new Date(g.dateExpiration).toLocaleDateString("fr-FR")}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ flex: "1 1 320px" }}>
+                    <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px" }}>Groupes récents</h2>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {statsPlateforme.groupesRecents.map((g, i) => (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 12px", fontSize: "12.5px" }}>
+                          <span>{g.nom}</span>
+                          <span style={{ color: C.sub }}>{new Date(g.date).toLocaleDateString("fr-FR")}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </>
+        )}
+
         {view === "groupes" && (
           <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
@@ -694,8 +782,8 @@ function SuperAdminScreen() {
 
             <div style={{ marginTop: "22px" }} />
             <Table
-              cols={["Groupe", "Admin", "Formule", "Échéance", "Statut", ""]}
-              widths="1.5fr 1.5fr 1fr 1.1fr 0.9fr 1.1fr"
+              cols={["Groupe", "Admin", "Formule", "Échéance", "SMS", "Statut", ""]}
+              widths="1.3fr 1.3fr 0.9fr 1fr 0.7fr 0.9fr 1.1fr"
               rows={groupes.map((g) => {
                 const abo = g.subscriptions?.[0];
                 const admin = adminsList.find((a) => a.groupId === g.id);
@@ -711,6 +799,22 @@ function SuperAdminScreen() {
                     <span><span style={{ color: planColor[abo.formule] || C.sub, fontWeight: 700 }}>{abo.formule}</span> {abo.periodicite && <span style={{ color: C.sub, fontSize: 11 }}>· {abo.periodicite}</span>}</span>
                   ) : "—",
                   abo?.date_expiration ? <span style={{ color: C.sub, fontSize: 12 }}>{new Date(abo.date_expiration).toLocaleDateString("fr-FR")}</span> : "—",
+                  <span
+                    onClick={async () => {
+                      setShowGererSms(g);
+                      setSmsVenteQuantite(""); setSmsVentePrix(""); setSmsVenteMode("Espèces"); setSmsVenteNote(""); setSmsVenteErreur("");
+                      try {
+                        const [solde, histo] = await Promise.all([fetchSoldeSms(g.id), fetchHistoriqueSms(g.id)]);
+                        setSmsSoldeActuel(solde);
+                        setSmsHistorique(histo);
+                      } catch (e) {
+                        console.error("Erreur de chargement des crédits SMS", e);
+                      }
+                    }}
+                    style={{ fontWeight: 700, color: C.vifBleu, cursor: "pointer", textDecoration: "underline", fontSize: "12px" }}
+                  >
+                    {g.sms_credits ?? 0}
+                  </span>,
                   abo ? <Badge bg={(statusStyle[abo.statut] || statusStyle.actif).bg} fg={(statusStyle[abo.statut] || statusStyle.actif).fg}>{abo.statut}</Badge> : "—",
                   <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                     <button
@@ -1001,6 +1105,97 @@ function SuperAdminScreen() {
         </Modal>
       )}
 
+      {showGererSms && (
+        <Modal onClose={() => setShowGererSms(null)} title={`Crédits SMS — ${showGererSms.nom}`} icon={<Repeat />} accentColor={C.vifBleu}>
+          <div style={{ background: C.ok, borderRadius: "10px", padding: "12px" }}>
+            <div style={{ fontSize: "10.5px", color: C.accent2 }}>Solde actuel</div>
+            <div style={{ fontSize: "20px", fontWeight: 700, color: C.accent2 }}>{smsSoldeActuel?.solde ?? 0} SMS</div>
+          </div>
+
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: C.sub, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={smsSoldeActuel?.bloquerSiEpuise ?? true}
+              onChange={async (e) => {
+                try {
+                  await definirBlocageSms(showGererSms.id, e.target.checked);
+                  setSmsSoldeActuel({ ...smsSoldeActuel, bloquerSiEpuise: e.target.checked });
+                } catch (err) {
+                  console.error("Erreur de mise à jour du blocage SMS", err);
+                }
+              }}
+            />
+            Bloquer l'envoi de SMS quand le solde est épuisé (sinon, laisse passer en avertissant seulement)
+          </label>
+
+          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: "6px" }}>Vendre des crédits</div>
+          <FormField label="Quantité de SMS" placeholder="Ex. 100" value={smsVenteQuantite} onChange={(e) => setSmsVenteQuantite(e.target.value)} />
+          <FormField label="Prix payé (FCFA, optionnel)" placeholder="Ex. 5 000" value={smsVentePrix} onChange={(e) => setSmsVentePrix(e.target.value)} />
+          <div>
+            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Mode de paiement</label>
+            <div style={{ display: "flex", gap: "6px" }}>
+              {["Espèces", "Mobile Money", "Virement"].map((mode) => (
+                <div
+                  key={mode}
+                  onClick={() => setSmsVenteMode(mode)}
+                  style={{ flex: 1, textAlign: "center", padding: "7px 4px", borderRadius: "7px", border: `1px solid ${smsVenteMode === mode ? C.vifBleu : C.border}`, background: smsVenteMode === mode ? `${C.vifBleu}14` : "#FBFAF6", fontSize: "10.5px", fontWeight: 600, color: smsVenteMode === mode ? C.vifBleu : C.sub, cursor: "pointer" }}
+                >
+                  {mode}
+                </div>
+              ))}
+            </div>
+          </div>
+          <FormField label="Note (optionnel)" placeholder="Ex. Payé par le président" value={smsVenteNote} onChange={(e) => setSmsVenteNote(e.target.value)} />
+
+          {smsVenteErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {smsVenteErreur}
+            </div>
+          )}
+
+          <button
+            disabled={smsVenteEnCours}
+            style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: smsVenteEnCours ? "default" : "pointer" }}
+            onClick={async () => {
+              const quantite = parseInt(smsVenteQuantite.replace(/[^\d]/g, ""), 10);
+              if (!quantite || quantite <= 0) { setSmsVenteErreur("Saisis une quantité valide."); return; }
+              setSmsVenteEnCours(true);
+              setSmsVenteErreur("");
+              try {
+                const prix = parseInt(smsVentePrix.replace(/[^\d]/g, ""), 10) || null;
+                const nouveauSolde = await vendreCreditsSms(showGererSms.id, quantite, prix, smsVenteMode, smsVenteNote.trim());
+                setSmsSoldeActuel({ ...smsSoldeActuel, solde: nouveauSolde });
+                const histo = await fetchHistoriqueSms(showGererSms.id);
+                setSmsHistorique(histo);
+                await chargerGroupes();
+                setSmsVenteQuantite(""); setSmsVentePrix(""); setSmsVenteNote("");
+              } catch (e) {
+                console.error("Erreur de vente de crédits SMS", e);
+                setSmsVenteErreur(e.message || "Erreur lors de la vente.");
+              } finally {
+                setSmsVenteEnCours(false);
+              }
+            }}
+          >
+            {smsVenteEnCours ? "Enregistrement..." : "Vendre ces crédits"}
+          </button>
+
+          {smsHistorique.length > 0 && (
+            <>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: "6px" }}>Historique</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "180px", overflowY: "auto" }}>
+                {smsHistorique.map((h) => (
+                  <div key={h.id} style={{ display: "flex", justifyContent: "space-between", background: "#FBFAF6", borderRadius: "7px", padding: "6px 10px", fontSize: "11.5px" }}>
+                    <span>{h.type === "achat" ? `Achat${h.mode_paiement ? ` (${h.mode_paiement})` : ""}` : "Envoi SMS"}</span>
+                    <b style={{ color: h.quantite >= 0 ? C.accent2 : C.warn }}>{h.quantite >= 0 ? "+" : ""}{h.quantite}</b>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </Modal>
+      )}
+
       {showModifierGroupe && (
         <Modal onClose={() => setShowModifierGroupe(null)} title="Modifier le groupe" icon={<Building2 />} accentColor={C.vifBleu}>
           <FormField label="Nom du groupe" placeholder="Ex. Tontine Les Bâtisseurs" value={modifierGroupeNom} onChange={(e) => setModifierGroupeNom(e.target.value)} />
@@ -1117,6 +1312,8 @@ function SuperAdminScreen() {
                   : `Accès activé pour ${creationPeriodicite === "Annuel" ? "365 jours (1 an)" : "30 jours (1 mois)"} à partir d'aujourd'hui.`}
               </div>
 
+              <FormField label="Crédit SMS offert au départ (optionnel)" placeholder="Ex. 20 — laisse vide pour 0" value={creationCreditSms} onChange={(e) => setCreationCreditSms(e.target.value)} />
+
               {creationErreur && (
                 <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
                   {creationErreur}
@@ -1140,6 +1337,7 @@ function SuperAdminScreen() {
                       adminEmail: adminEmail.trim(),
                       formule: creationFormule,
                       periodicite: creationPeriodicite,
+                      creditSms: parseInt(creationCreditSms.replace(/[^\d]/g, ""), 10) || 0,
                     });
                     setResultatCreation(resultat);
                     await chargerGroupes();
@@ -1310,6 +1508,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const licenceExpiree = statutAbonnement?.expire === true || statutAbonnement?.statut === "suspendu";
 
   const [logoGroupeUrlSidebar, setLogoGroupeUrlSidebar] = useState("");
+  const [smsSolde, setSmsSolde] = useState(0);
   useEffect(() => {
     if (!groupId) return;
     fetchLogoGroupe(groupId)
@@ -2106,7 +2305,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         const actifs = membres.filter((m) => m.statut === "actif" && m.telephone);
                         const message = `Rappel : séance de tontine "${tontineActive.nom}" (Tour ${tourEnCours.numero}) prochainement. Merci de préparer votre cotisation.`;
                         const numeros = actifs.map((m) => m.telephone);
-                        await envoyerSMS({ message, numeros });
+                        await envoyerSMS({ message, numeros, groupId });
                         setRappelMessage(`Rappel envoyé à ${actifs.length} membre(s).`);
                       } catch (e) {
                         console.error("Erreur d'envoi du rappel", e);
@@ -2817,6 +3016,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               <StatCard label="Total en fonds" value={fmtFCFA(Object.values(fondsParMembre).flat().reduce((s, f) => s + (f.solde || 0), 0))} icon={<PiggyBank size={16} />} />
               <StatCard label="Caisse des amendes" value={fmtFCFA(soldeCaisseAmendes)} icon={<AlertTriangle size={16} />} />
               <StatCard label="Caisse reliquat boisson" value={fmtFCFA(soldeCaisseRafraichissement)} icon={<ShoppingCart size={16} />} />
+              <StatCard label="Crédits SMS restants" value={`${smsSolde} SMS`} icon={<Repeat size={16} />} />
               <StatCard label="Tours effectués" value={`${tours.filter((t) => t.statut === "clôturé").length} / ${tours.length}`} icon={<CheckCircle2 size={16} />} />
               <StatCard label="Membres" value={`${membres.filter((m) => m.statut === "actif").length} actif(s)`} icon={<Users size={16} />} />
             </div>
@@ -3100,7 +3300,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     envoyerSMS({
                       message: msgOperation(membre.nom, "cotisation tontine", c.montant),
                       numeros: [membre.telephone],
-                    });
+                      groupId,
+                      });
                   }
                 });
 
@@ -3363,7 +3564,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   envoyerSMS({
                     message: msgOperation(beneficiaire.nom, "aide assurance", montantBrut, undefined, "Décaissement à venir prochainement"),
                     numeros: [beneficiaire.telephone],
-                  });
+                    groupId,
+                    });
                 }
                 membresActifs
                   .filter((m) => m.id !== evenementBeneficiaire && m.telephone)
@@ -3371,7 +3573,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     envoyerSMS({
                       message: msgOperation(m.nom, "prélèvement assurance (aide d'un membre)", part, soldesApres?.[m.id]),
                       numeros: [m.telephone],
-                    });
+                      groupId,
+                      });
                   });
 
                 setEvenementError("");
@@ -3448,7 +3651,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     envoyerSMS({
                       message: msgOperation(membre.nom, "cotisation assurance", c.montant, soldesApres?.[c.membreId]),
                       numeros: [membre.telephone],
-                    });
+                      groupId,
+                      });
                   }
                 });
 
@@ -3558,7 +3762,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                           envoyerSMS({
                             message: `Bonjour ${m.nom}, votre cycle "${clotureApercu.epargneNom}" est clôturé. Capital ${fmtFCFA(m.capital)} + intérêt ${fmtFCFA(m.interet)} = ${fmtFCFA(m.total)}, ${decision === "recuperer" ? "à récupérer" : "reconduit pour le cycle suivant"}.`,
                             numeros: [m.telephone],
-                          });
+                            groupId,
+                            });
                         }
                       });
                       await rechargerEpargnes();
@@ -3723,7 +3928,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     envoyerSMS({
                       message: msgOperation(membre.nom, `versement "${epargneNom}"`, c.montant, resultatCotisation?.soldeFinal),
                       numeros: [membre.telephone],
-                    });
+                      groupId,
+                      });
                   }
                 });
 
@@ -3872,7 +4078,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   envoyerSMS({
                     message: msgOperation(emprunteur.nom, "crédit", montantNum, undefined, `Échéance : ${creditFin}`),
                     numeros: [emprunteur.telephone],
-                  });
+                    groupId,
+                    });
                 }
 
                 setCreditError("");
@@ -4581,7 +4788,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     envoyerSMS({
                       message: msgOperation(m.nom, `versement "${typeChoisi?.nom}"`, montant, nouveauSolde),
                       numeros: [m.telephone],
-                    });
+                      groupId,
+                      });
                   }
                 }
                 await rechargerFonds();
@@ -5277,7 +5485,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   envoyerSMS({
                     message: msgOperation(membre.nom, "amende de retard", montantNum, undefined, amendeMotif.trim() ? `Motif : ${amendeMotif.trim()}` : undefined),
                     numeros: [membre.telephone],
-                  });
+                    groupId,
+                    });
                 }
 
                 setAmendeMontant(""); setAmendeMotif(""); setAmendeError("");
@@ -5382,7 +5591,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   envoyerSMS({
                     message: `Félicitations ${beneficiaire.nom} ! Votre cagnotte tontine du tour ${showPayout.tour} (${showPayout.montant}) vous a été versée.`,
                     numeros: [beneficiaire.telephone],
-                  });
+                    groupId,
+                    });
                 }
 
                 setShowPayout(null);
@@ -5522,7 +5732,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                           envoyerSMS({
                             message: `Bonjour ${m.nom}, votre part de la commission d'enchères "${tontineActive.nom}" est de ${fmtFCFA(m.part)} (${m.nbCotisations} tour(s) cotisé(s)).`,
                             numeros: [m.telephone],
-                          });
+                            groupId,
+                            });
                         }
                       });
                       setRedistributionSuccess(true);
@@ -5770,7 +5981,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                                   envoyerSMS({
                                     message: msgOperation(membre.nom, "paiement d'amende", a.montant, undefined, paiementMode === "espèces" ? "Réglé en espèces" : "Déduit de votre épargne"),
                                     numeros: [membre.telephone],
-                                  });
+                                    groupId,
+                                    });
                                 }
                                 setPaiementAmendeId(null);
                               } catch (e) {
@@ -5833,7 +6045,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     envoyerSMS({
                       message: msgOperation(membre.nom, "amende de séance", montant, undefined, typesAmendesSeance.find((t) => t.id === amendeSeanceTypeId)?.nom),
                       numeros: [membre.telephone],
-                    });
+                      groupId,
+                      });
                   }
                   setAmendeSeanceMembreId(""); setAmendeSeanceTypeId(""); setAmendeSeanceMontant("");
                 } catch (e) {
@@ -6364,6 +6577,9 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
     fetchLogoGroupe(groupId)
       .then(setLogoGroupeUrl)
       .catch((e) => console.error("Erreur de chargement du logo", e));
+    fetchSoldeSms(groupId)
+      .then((s) => setSmsSolde(s.solde))
+      .catch((e) => console.error("Erreur de chargement du solde SMS", e));
   }, [groupId]);
   const licenceExpiree = statutAbonnement?.expire === true || statutAbonnement?.statut === "suspendu";
 
