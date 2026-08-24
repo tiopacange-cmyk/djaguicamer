@@ -28,8 +28,6 @@ export async function envoyerSMS({ message, numeros, senderId, groupId }) {
       }
     } catch (e) {
       console.error("Erreur de vérification du crédit SMS", e);
-      // En cas d'erreur de vérification, on laisse passer plutôt
-      // que de bloquer toute l'application pour ça.
     }
   }
 
