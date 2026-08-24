@@ -661,6 +661,7 @@ function SuperAdminScreen() {
         items={[
           { icon: <LayoutDashboard size={16} />, label: "Tableau de bord", key: "dashboard" },
           { icon: <Building2 size={16} />, label: "Groupes", key: "groupes" },
+          { icon: <Repeat size={16} />, label: "SMS", key: "sms" },
           { icon: <CreditCard size={16} />, label: "Tarifs", key: "tarifs" },
           { icon: <ScrollText size={16} />, label: "Journal d'audit", key: "audit" },
           { icon: <Palette size={16} />, label: "Thème", key: "theme" },
@@ -871,6 +872,50 @@ function SuperAdminScreen() {
                   </div>,
                 ];
               })}
+            />
+          </>
+        )}
+
+        {view === "sms" && (
+          <>
+            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>SMS</h1>
+            <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>
+              Gère les crédits SMS, le nom d'expéditeur, et le comportement à solde épuisé, pour chaque groupe.
+            </p>
+
+            <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginBottom: "22px" }}>
+              <StatCard label="Total crédits restants" value={`${groupes.reduce((s, g) => s + (g.sms_credits || 0), 0)} SMS`} icon={<Repeat size={16} />} />
+              <StatCard label="Groupes sans crédit" value={groupes.filter((g) => (g.sms_credits || 0) <= 0).length} icon={<AlertTriangle size={16} />} />
+              <StatCard label="Groupes avec Sender ID personnalisé" value={groupes.filter((g) => g.sms_sender_id).length} icon={<Palette size={16} />} />
+            </div>
+
+            <Table cols={["Groupe", "Solde", "Sender ID", "Si épuisé", ""]} widths="1.6fr 0.8fr 1.2fr 1.1fr 1fr"
+              rows={groupes.map((g) => [
+                <b>{g.nom}</b>,
+                <span style={{ fontWeight: 700, color: (g.sms_credits || 0) <= 0 ? C.warn : C.accent2 }}>{g.sms_credits ?? 0}</span>,
+                g.sms_sender_id ? <span style={{ fontSize: 12 }}>{g.sms_sender_id}</span> : <span style={{ color: C.sub, fontSize: 12 }}>Par défaut</span>,
+                <Badge bg={g.sms_bloquer_si_epuise === false ? C.warnBg : C.ok} fg={g.sms_bloquer_si_epuise === false ? C.warn : C.accent2}>
+                  {g.sms_bloquer_si_epuise === false ? "Avertit seulement" : "Bloque"}
+                </Badge>,
+                <button
+                  onClick={async () => {
+                    setShowGererSms(g);
+                    setSmsVenteQuantite(""); setSmsVentePrix(""); setSmsVenteMode("Espèces"); setSmsVenteNote(""); setSmsVenteErreur("");
+                    setSmsSenderIdInput("");
+                    try {
+                      const [solde, histo, senderId] = await Promise.all([fetchSoldeSms(g.id), fetchHistoriqueSms(g.id), fetchSmsSenderId(g.id)]);
+                      setSmsSoldeActuel(solde);
+                      setSmsHistorique(histo);
+                      setSmsSenderIdInput(senderId);
+                    } catch (e) {
+                      console.error("Erreur de chargement des crédits SMS", e);
+                    }
+                  }}
+                  style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}66`, borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                >
+                  Gérer
+                </button>,
+              ])}
             />
           </>
         )}
