@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre, reinitialiserMotDePasseMembre, televerserDocumentMembre, fetchDocumentsMembre } from "./lib/membres";
 import { fetchTypesFonds, creerTypeFonds, supprimerTypeFonds, fetchFondsTousMembres, fixerCibleTypeFonds, enregistrerVersementFonds, fetchFondsMembre } from "./lib/fonds";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse } from "./lib/auth";
-import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement, televerserLogoGroupe, fetchLogoGroupe, modifierGroupe, suspendreGroupe, reactiverGroupe, fetchStatsPlateforme, fetchSoldeSms, vendreCreditsSms, definirBlocageSms, fetchHistoriqueSms } from "./lib/groups";
+import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement, televerserLogoGroupe, fetchLogoGroupe, modifierGroupe, suspendreGroupe, reactiverGroupe, fetchStatsPlateforme, fetchSoldeSms, vendreCreditsSms, definirBlocageSms, fetchHistoriqueSms, fetchSmsSenderId, definirSmsSenderId } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere, fetchApercuRedistribution, redistribuerCommission, fetchTotalRedistributions } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit, fetchApercuCloture, cloturerEpargne } from "./lib/banque";
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
@@ -534,6 +534,8 @@ function SuperAdminScreen() {
   const [smsVenteNote, setSmsVenteNote] = useState("");
   const [smsVenteErreur, setSmsVenteErreur] = useState("");
   const [smsVenteEnCours, setSmsVenteEnCours] = useState(false);
+  const [smsSenderIdInput, setSmsSenderIdInput] = useState("");
+  const [smsSenderIdEnCours, setSmsSenderIdEnCours] = useState(false);
 
   useEffect(() => {
     if (view !== "dashboard") return;
@@ -803,10 +805,12 @@ function SuperAdminScreen() {
                     onClick={async () => {
                       setShowGererSms(g);
                       setSmsVenteQuantite(""); setSmsVentePrix(""); setSmsVenteMode("Espèces"); setSmsVenteNote(""); setSmsVenteErreur("");
+                      setSmsSenderIdInput("");
                       try {
-                        const [solde, histo] = await Promise.all([fetchSoldeSms(g.id), fetchHistoriqueSms(g.id)]);
+                        const [solde, histo, senderId] = await Promise.all([fetchSoldeSms(g.id), fetchHistoriqueSms(g.id), fetchSmsSenderId(g.id)]);
                         setSmsSoldeActuel(solde);
                         setSmsHistorique(histo);
+                        setSmsSenderIdInput(senderId);
                       } catch (e) {
                         console.error("Erreur de chargement des crédits SMS", e);
                       }
@@ -1127,6 +1131,36 @@ function SuperAdminScreen() {
             />
             Bloquer l'envoi de SMS quand le solde est épuisé (sinon, laisse passer en avertissant seulement)
           </label>
+
+          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: "6px" }}>Nom d'expéditeur (Sender ID)</div>
+          <div style={{ fontSize: "10.5px", color: C.sub, marginTop: "-8px" }}>
+            Doit être validé au préalable auprès de LMT Group pour fonctionner. Laisse vide pour utiliser le nom par défaut de la plateforme.
+          </div>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <input
+              value={smsSenderIdInput}
+              onChange={(e) => setSmsSenderIdInput(e.target.value)}
+              placeholder="Ex. TONTINE1 (11 caractères max)"
+              maxLength={11}
+              style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
+            />
+            <button
+              disabled={smsSenderIdEnCours}
+              onClick={async () => {
+                setSmsSenderIdEnCours(true);
+                try {
+                  await definirSmsSenderId(showGererSms.id, smsSenderIdInput.trim());
+                } catch (e) {
+                  console.error("Erreur de mise à jour du sender ID", e);
+                } finally {
+                  setSmsSenderIdEnCours(false);
+                }
+              }}
+              style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+            >
+              {smsSenderIdEnCours ? "..." : "Enregistrer"}
+            </button>
+          </div>
 
           <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: "6px" }}>Vendre des crédits</div>
           <FormField label="Quantité de SMS" placeholder="Ex. 100" value={smsVenteQuantite} onChange={(e) => setSmsVenteQuantite(e.target.value)} />
