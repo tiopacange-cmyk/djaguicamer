@@ -335,3 +335,61 @@ export async function reactiverGroupe(groupId) {
     .eq("group_id", groupId);
   if (error) throw error;
 }
+
+// ============================================================
+// TABLEAU DE BORD SUPER ADMIN — statistiques globales de la
+// plateforme, tous groupes confondus.
+// ============================================================
+export async function fetchStatsPlateforme() {
+  const { data: groupes, error: errG } = await supabase
+    .from("groups")
+    .select("id, nom, created_at, subscriptions(formule, statut, date_expiration)");
+  if (errG) throw errG;
+
+  const { count: totalMembres, error: errM } = await supabase
+    .from("group_members")
+    .select("id", { count: "exact", head: true })
+    .eq("statut", "actif");
+  if (errM) throw errM;
+
+  const aujourdHui = new Date();
+  const dansSeptJours = new Date(aujourdHui.getTime() + 7 * 86400000);
+
+  const parFormule = {};
+  let expirentBientot = [];
+  let expires = 0;
+  let actifs = 0;
+  let essais = 0;
+  let suspendus = 0;
+
+  groupes.forEach((g) => {
+    const abo = g.subscriptions?.[0];
+    if (!abo) return;
+    parFormule[abo.formule] = (parFormule[abo.formule] || 0) + 1;
+
+    const dateExp = new Date(abo.date_expiration);
+    if (abo.statut === "suspendu") suspendus += 1;
+    else if (dateExp < aujourdHui) expires += 1;
+    else if (abo.statut === "essai") essais += 1;
+    else actifs += 1;
+
+    if (dateExp >= aujourdHui && dateExp <= dansSeptJours && abo.statut !== "suspendu") {
+      expirentBientot.push({ nom: g.nom, dateExpiration: abo.date_expiration, formule: abo.formule });
+    }
+  });
+
+  return {
+    totalGroupes: groupes.length,
+    totalMembres: totalMembres || 0,
+    parFormule,
+    actifs,
+    essais,
+    expires,
+    suspendus,
+    expirentBientot: expirentBientot.sort((a, b) => a.dateExpiration.localeCompare(b.dateExpiration)),
+    groupesRecents: groupes
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .slice(0, 5)
+      .map((g) => ({ nom: g.nom, date: g.created_at })),
+  };
+}
