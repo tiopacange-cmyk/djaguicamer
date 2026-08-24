@@ -1594,6 +1594,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [abonnementSmsPrixInput, setAbonnementSmsPrixInput] = useState("");
   const [abonnementSmsCreditsInput, setAbonnementSmsCreditsInput] = useState("");
   const [abonnementSmsErreur, setAbonnementSmsErreur] = useState("");
+  const [abonnementSmsTarifEnCours, setAbonnementSmsTarifEnCours] = useState(false);
+  const [abonnementToggleMembreId, setAbonnementToggleMembreId] = useState(null);
   const [abonnesSmsListe, setAbonnesSmsListe] = useState([]);
   const [smsDejaPreleves, setSmsDejaPreleves] = useState([]);
   const [prelevementSmsMembreId, setPrelevementSmsMembreId] = useState(null);
@@ -6466,7 +6468,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showAbonnementSms && (
         <Modal onClose={() => setShowAbonnementSms(false)} title="Abonnement SMS mensuel" icon={<Repeat />} accentColor={C.vifBleu}>
           <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
-            Chaque membre choisit lui-même s'il souscrit, depuis son propre tableau de bord. Le paiement alimente le pool de crédits SMS du groupe.
+            C'est toi (l'admin) qui coches les membres ayant accepté par contrat manuel. Le paiement alimente le pool de crédits SMS du groupe.
           </div>
 
           <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em" }}>Tarif</div>
@@ -6484,38 +6486,75 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12px", outline: "none" }}
             />
             <button
+              disabled={abonnementSmsTarifEnCours}
               onClick={async () => {
                 const prix = parseInt(abonnementSmsPrixInput.replace(/[^\d]/g, ""), 10) || 0;
                 const credits = parseInt(abonnementSmsCreditsInput.replace(/[^\d]/g, ""), 10) || 0;
+                setAbonnementSmsTarifEnCours(true);
+                setAbonnementSmsErreur("");
                 try {
                   await definirConfigAbonnementSms(groupId, prix, credits);
                   setAbonnementSmsConfig({ prixMensuel: prix, credits });
                 } catch (e) {
                   console.error("Erreur de mise à jour du tarif", e);
+                  setAbonnementSmsErreur(e.message || "Erreur lors de la mise à jour du tarif.");
+                } finally {
+                  setAbonnementSmsTarifEnCours(false);
                 }
               }}
-              style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+              style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "12px", fontWeight: 600, cursor: abonnementSmsTarifEnCours ? "default" : "pointer" }}
             >
-              Fixer
+              {abonnementSmsTarifEnCours ? "..." : "Fixer"}
             </button>
           </div>
-
-          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: "6px" }}>
-            Prélèvements du mois — {membres.filter((m) => abonnesSmsListe.includes(m.id)).length} abonné(s)
+          <div style={{ fontSize: "11px", color: C.sub }}>
+            Tarif actuel : <b>{fmtFCFA(abonnementSmsConfig.prixMensuel)}</b> pour <b>{abonnementSmsConfig.credits} SMS</b>.
           </div>
 
-          {membres.filter((m) => abonnesSmsListe.includes(m.id)).length === 0 ? (
-            <div style={{ fontSize: "12px", color: C.sub, textAlign: "center", padding: "10px 0" }}>Aucun membre abonné pour l'instant.</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              {membres.filter((m) => abonnesSmsListe.includes(m.id)).map((m) => {
-                const dejaPreleve = smsDejaPreleves.includes(m.id);
-                const enCours = prelevementSmsMembreId === m.id;
-                return (
-                  <div key={m.id} style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "12.5px", fontWeight: 600 }}>{m.nom}</span>
-                      {dejaPreleve ? (
+          {abonnementSmsErreur && (
+            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              {abonnementSmsErreur}
+            </div>
+          )}
+
+          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: "6px" }}>
+            Membres — coche ceux ayant un contrat signé
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {membres.filter((m) => m.statut === "actif").map((m) => {
+              const estAbonne = abonnesSmsListe.includes(m.id);
+              const dejaPreleve = smsDejaPreleves.includes(m.id);
+              const enCours = prelevementSmsMembreId === m.id;
+              const toggleEnCours = abonnementToggleMembreId === m.id;
+              return (
+                <div key={m.id} style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", fontWeight: 600, cursor: toggleEnCours ? "default" : "pointer", flex: 1 }}>
+                      <input
+                        type="checkbox"
+                        checked={estAbonne}
+                        disabled={toggleEnCours}
+                        onChange={async (e) => {
+                          setAbonnementToggleMembreId(m.id);
+                          try {
+                            await toggleAbonnementSms(m.id, e.target.checked);
+                            setAbonnesSmsListe(
+                              e.target.checked
+                                ? [...abonnesSmsListe, m.id]
+                                : abonnesSmsListe.filter((id) => id !== m.id)
+                            );
+                          } catch (err) {
+                            console.error("Erreur de mise à jour de l'abonnement", err);
+                          } finally {
+                            setAbonnementToggleMembreId(null);
+                          }
+                        }}
+                      />
+                      {m.nom}
+                    </label>
+                    {estAbonne && (
+                      dejaPreleve ? (
                         <Badge bg={C.ok} fg={C.accent2}>Prélevé ce mois</Badge>
                       ) : !enCours ? (
                         <button
@@ -6524,76 +6563,76 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         >
                           Prélever
                         </button>
-                      ) : null}
-                    </div>
-                    {enCours && (
-                      <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
-                        <div style={{ display: "flex", gap: "6px" }}>
-                          {["espèces", "déduit banque"].map((mode) => (
-                            <div
-                              key={mode}
-                              onClick={() => setPrelevementSmsMode(mode)}
-                              style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "6px", border: `1px solid ${prelevementSmsMode === mode ? C.vifBleu : C.border}`, background: prelevementSmsMode === mode ? `${C.vifBleu}14` : "#FFFFFF", fontSize: "10.5px", fontWeight: 600, color: prelevementSmsMode === mode ? C.vifBleu : C.sub, cursor: "pointer" }}
-                            >
-                              {mode === "espèces" ? "Espèces" : "Déduit banque"}
-                            </div>
-                          ))}
-                        </div>
-                        {prelevementSmsMode === "déduit banque" && (
-                          <select
-                            value={prelevementSmsEpargneId}
-                            onChange={(e) => setPrelevementSmsEpargneId(e.target.value)}
-                            style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "11px", outline: "none" }}
-                          >
-                            <option value="">Sélectionner l'épargne</option>
-                            {epargnes.map((ep) => <option key={ep.id} value={ep.id}>{ep.nom} ({fmtFCFA(ep.solde)})</option>)}
-                          </select>
-                        )}
-                        <div style={{ display: "flex", gap: "6px" }}>
-                          <button
-                            onClick={() => setPrelevementSmsMembreId(null)}
-                            style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "7px", fontSize: "11px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
-                          >
-                            Annuler
-                          </button>
-                          <button
-                            disabled={prelevementSmsEnCours}
-                            onClick={async () => {
-                              if (prelevementSmsMode === "déduit banque" && !prelevementSmsEpargneId) return;
-                              setPrelevementSmsEnCours(true);
-                              try {
-                                const moisActuel = new Date().toISOString().slice(0, 7);
-                                await effectuerPrelevementSms(groupId, m.id, moisActuel, abonnementSmsConfig.prixMensuel, abonnementSmsConfig.credits, prelevementSmsMode, prelevementSmsEpargneId || null);
-                                setSmsDejaPreleves([...smsDejaPreleves, m.id]);
-                                if (prelevementSmsMode === "déduit banque") await rechargerEpargnes();
-                                const nouveauSolde = await fetchSoldeSms(groupId);
-                                setSmsSolde(nouveauSolde.solde);
-                                if (m.telephone) {
-                                  envoyerSMS({
-                                    message: msgOperation(m.nom, "abonnement SMS mensuel", abonnementSmsConfig.prixMensuel, undefined, prelevementSmsMode === "espèces" ? "Réglé en espèces" : "Déduit de votre épargne"),
-                                    numeros: [m.telephone],
-                                    groupId,
-                                  });
-                                }
-                                setPrelevementSmsMembreId(null);
-                              } catch (e) {
-                                console.error("Erreur de prélèvement SMS", e);
-                              } finally {
-                                setPrelevementSmsEnCours(false);
-                              }
-                            }}
-                            style={{ flex: 1, background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "6px", padding: "7px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
-                          >
-                            {prelevementSmsEnCours ? "..." : "Confirmer"}
-                          </button>
-                        </div>
-                      </div>
+                      ) : null
                     )}
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  {enCours && (
+                    <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        {["espèces", "déduit banque"].map((mode) => (
+                          <div
+                            key={mode}
+                            onClick={() => setPrelevementSmsMode(mode)}
+                            style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "6px", border: `1px solid ${prelevementSmsMode === mode ? C.vifBleu : C.border}`, background: prelevementSmsMode === mode ? `${C.vifBleu}14` : "#FFFFFF", fontSize: "10.5px", fontWeight: 600, color: prelevementSmsMode === mode ? C.vifBleu : C.sub, cursor: "pointer" }}
+                          >
+                            {mode === "espèces" ? "Espèces" : "Déduit banque"}
+                          </div>
+                        ))}
+                      </div>
+                      {prelevementSmsMode === "déduit banque" && (
+                        <select
+                          value={prelevementSmsEpargneId}
+                          onChange={(e) => setPrelevementSmsEpargneId(e.target.value)}
+                          style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "11px", outline: "none" }}
+                        >
+                          <option value="">Sélectionner l'épargne</option>
+                          {epargnes.map((ep) => <option key={ep.id} value={ep.id}>{ep.nom} ({fmtFCFA(ep.solde)})</option>)}
+                        </select>
+                      )}
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        <button
+                          onClick={() => setPrelevementSmsMembreId(null)}
+                          style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "7px", fontSize: "11px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          disabled={prelevementSmsEnCours}
+                          onClick={async () => {
+                            if (prelevementSmsMode === "déduit banque" && !prelevementSmsEpargneId) return;
+                            setPrelevementSmsEnCours(true);
+                            try {
+                              const moisActuel = new Date().toISOString().slice(0, 7);
+                              await effectuerPrelevementSms(groupId, m.id, moisActuel, abonnementSmsConfig.prixMensuel, abonnementSmsConfig.credits, prelevementSmsMode, prelevementSmsEpargneId || null);
+                              setSmsDejaPreleves([...smsDejaPreleves, m.id]);
+                              if (prelevementSmsMode === "déduit banque") await rechargerEpargnes();
+                              const nouveauSolde = await fetchSoldeSms(groupId);
+                              setSmsSolde(nouveauSolde.solde);
+                              if (m.telephone) {
+                                envoyerSMS({
+                                  message: msgOperation(m.nom, "abonnement SMS mensuel", abonnementSmsConfig.prixMensuel, undefined, prelevementSmsMode === "espèces" ? "Réglé en espèces" : "Déduit de votre épargne"),
+                                  numeros: [m.telephone],
+                                  groupId,
+                                });
+                              }
+                              setPrelevementSmsMembreId(null);
+                            } catch (e) {
+                              console.error("Erreur de prélèvement SMS", e);
+                            } finally {
+                              setPrelevementSmsEnCours(false);
+                            }
+                          }}
+                          style={{ flex: 1, background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "6px", padding: "7px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                        >
+                          {prelevementSmsEnCours ? "..." : "Confirmer"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </Modal>
       )}
 
@@ -6999,34 +7038,16 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
                   />
                 ))}
 
-                {configAbonnementSms.prixMensuel > 0 && (
+                {configAbonnementSms.prixMensuel > 0 && monAbonnementSmsActif && (
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", borderRadius: "12px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
-                    <div style={{ width: "34px", height: "34px", borderRadius: "9px", background: monAbonnementSmsActif ? C.ok : "#F9E4D8", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <div style={{ width: "34px", height: "34px", borderRadius: "9px", background: C.ok, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <Repeat size={16} color={C.accent2} />
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: "11px", color: C.sub }}>Abonnement SMS mensuel</div>
-                      <div style={{ fontSize: "13px", fontWeight: 700 }}>{fmtFCFA(configAbonnementSms.prixMensuel)}/mois — {configAbonnementSms.credits} SMS pour le groupe</div>
+                      <div style={{ fontSize: "13px", fontWeight: 700 }}>{fmtFCFA(configAbonnementSms.prixMensuel)}/mois</div>
                     </div>
-                    <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: C.sub, cursor: abonnementSmsEnCours ? "default" : "pointer" }}>
-                      <input
-                        type="checkbox"
-                        checked={monAbonnementSmsActif}
-                        disabled={abonnementSmsEnCours}
-                        onChange={async (e) => {
-                          setAbonnementSmsEnCours(true);
-                          try {
-                            await toggleAbonnementSms(monCompte.id, e.target.checked);
-                            setMonAbonnementSmsActif(e.target.checked);
-                          } catch (err) {
-                            console.error("Erreur de mise à jour de l'abonnement SMS", err);
-                          } finally {
-                            setAbonnementSmsEnCours(false);
-                          }
-                        }}
-                      />
-                      {monAbonnementSmsActif ? "Abonné" : "S'abonner"}
-                    </label>
+                    <Badge bg={C.ok} fg={C.accent2}>Abonné</Badge>
                   </div>
                 )}
               </div>
