@@ -8,7 +8,7 @@ import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistor
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
 import { fetchComptesBancaires, creerCompteBancaire, fetchSignataires, ajouterSignataire, fetchMouvementsCompte, creerMouvementExterne, fetchCategoriesFrais, creerCategorieFrais, supprimerCategorieFrais, joindreRecu } from "./lib/depots_retrait";
 import { fetchRapportJournalier, fetchRapportMensuel, fetchBilanAnnuel } from "./lib/rapports";
-import { fetchSeances, creerSeance, enregistrerCompteRendu, supprimerSeance, fetchPresences, enregistrerPresences, fetchTauxPresence, fetchTypesAmendesSeance, creerTypeAmendeSeance, modifierTypeAmendeSeance, supprimerTypeAmendeSeance, fetchAmendesSeance, appliquerAmendeSeance } from "./lib/seances";
+import { fetchSeances, creerSeance, enregistrerCompteRendu, supprimerSeance, fetchPresences, enregistrerPresences, fetchTauxPresence, fetchTypesAmendesSeance, creerTypeAmendeSeance, modifierTypeAmendeSeance, supprimerTypeAmendeSeance, fetchAmendesSeance, appliquerAmendeSeance, fetchCaisseAmendes, payerAmendeSeance } from "./lib/seances";
 import { envoyerSMS } from "./lib/sms";
 import { fetchTableauDeBordMembre } from "./lib/moncompte";
 
@@ -1880,25 +1880,32 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
   const [amendeSeanceMembreId, setAmendeSeanceMembreId] = useState("");
   const [amendeSeanceTypeId, setAmendeSeanceTypeId] = useState("");
   const [amendeSeanceMontant, setAmendeSeanceMontant] = useState("");
+  const [paiementAmendeId, setPaiementAmendeId] = useState(null);
+  const [paiementMode, setPaiementMode] = useState("espèces");
+  const [paiementEpargneId, setPaiementEpargneId] = useState("");
+  const [paiementEnCours, setPaiementEnCours] = useState(false);
   const [typesAmendesSeance, setTypesAmendesSeance] = useState([]);
   const [tauxPresence, setTauxPresence] = useState({});
+  const [soldeCaisseAmendes, setSoldeCaisseAmendes] = useState(0);
 
   const rechargerSeances = async () => {
     if (!groupId) return;
     try {
-      const [s, t, tp] = await Promise.all([
+      const [s, t, tp, caisse] = await Promise.all([
         fetchSeances(groupId),
         fetchTypesAmendesSeance(groupId),
         fetchTauxPresence(groupId),
+        fetchCaisseAmendes(groupId),
       ]);
       setSeancesList(s);
       setTypesAmendesSeance(t);
       setTauxPresence(tp);
+      setSoldeCaisseAmendes(caisse);
     } catch (e) {
       console.error("Erreur de chargement des séances", e);
     }
   };
-  useEffect(() => { if (view === "seances") rechargerSeances(); }, [groupId, view]);
+  useEffect(() => { if (view === "seances" || view === "bilan") rechargerSeances(); }, [groupId, view]);
 
   const addEventType = async () => {
     if (!newTypeName.trim()) return;
@@ -2299,6 +2306,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               </div>
             </div>
 
+            <div style={{ margin: "18px 0", maxWidth: "260px" }}>
+              <StatCard label="Caisse des amendes" value={fmtFCFA(soldeCaisseAmendes)} icon={<AlertTriangle size={16} />} />
+            </div>
+
             {seancesList.length === 0 ? (
               <div style={{ marginTop: "22px", fontSize: "13px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
                 Aucune séance créée pour l'instant.
@@ -2610,6 +2621,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               <StatCard label="Total comptes bancaires" value={fmtFCFA(comptesBancaires.reduce((s, c) => s + (c.solde || 0), 0))} icon={<Building2 size={16} />} />
               <StatCard label="Solde assurance cumulé" value={fmtFCFA(Object.values(assuranceSoldes).reduce((s, a) => s + (a.solde || 0), 0))} icon={<HeartHandshake size={16} />} />
               <StatCard label="Total en fonds" value={fmtFCFA(Object.values(fondsParMembre).flat().reduce((s, f) => s + (f.solde || 0), 0))} icon={<PiggyBank size={16} />} />
+              <StatCard label="Caisse des amendes" value={fmtFCFA(soldeCaisseAmendes)} icon={<AlertTriangle size={16} />} />
               <StatCard label="Tours effectués" value={`${tours.filter((t) => t.statut === "clôturé").length} / ${tours.length}`} icon={<CheckCircle2 size={16} />} />
               <StatCard label="Membres" value={`${membres.filter((m) => m.statut === "actif").length} actif(s)`} icon={<Users size={16} />} />
             </div>
@@ -5455,11 +5467,95 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: "6px" }}>Amendes</div>
           {amendesSeanceList.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               {amendesSeanceList.map((a) => {
                 const membre = membres.find((m) => m.id === a.membreId);
+                const enPaiement = paiementAmendeId === a.id;
                 return (
-                  <RapportLigne key={a.id} gauche={`${membre?.nom || "—"} — ${a.typeNom}`} droite={fmtFCFA(a.montant)} />
+                  <div key={a.id} style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
+                      <span>{membre?.nom || "—"} — {a.typeNom}</span>
+                      <b>{fmtFCFA(a.montant)}</b>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
+                      {a.statut === "payée" ? (
+                        <Badge bg={C.ok} fg={C.accent2}>Payée ({a.modePaiement}, {a.datePaiement})</Badge>
+                      ) : (
+                        <>
+                          <Badge bg={C.warnBg} fg={C.warn}>Non payée</Badge>
+                          {!enPaiement && (
+                            <button
+                              onClick={() => { setPaiementAmendeId(a.id); setPaiementMode("espèces"); setPaiementEpargneId(""); }}
+                              style={{ background: "transparent", color: C.accent2, border: `1px solid ${C.accent2}66`, borderRadius: "6px", padding: "4px 8px", fontSize: "10.5px", fontWeight: 600, cursor: "pointer" }}
+                            >
+                              Marquer payée
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    {enPaiement && (
+                      <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          {["espèces", "déduit banque"].map((mode) => (
+                            <div
+                              key={mode}
+                              onClick={() => setPaiementMode(mode)}
+                              style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "6px", border: `1px solid ${paiementMode === mode ? C.accent2 : C.border}`, background: paiementMode === mode ? C.ok : "#FFFFFF", fontSize: "10.5px", fontWeight: 600, color: paiementMode === mode ? C.accent2 : C.sub, cursor: "pointer" }}
+                            >
+                              {mode === "espèces" ? "Espèces" : "Déduit banque"}
+                            </div>
+                          ))}
+                        </div>
+                        {paiementMode === "déduit banque" && (
+                          <select
+                            value={paiementEpargneId}
+                            onChange={(e) => setPaiementEpargneId(e.target.value)}
+                            style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "11px", outline: "none" }}
+                          >
+                            <option value="">Sélectionner l'épargne à débiter</option>
+                            {epargnes.map((ep) => <option key={ep.id} value={ep.id}>{ep.nom} ({fmtFCFA(ep.solde)})</option>)}
+                          </select>
+                        )}
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          <button
+                            onClick={() => setPaiementAmendeId(null)}
+                            style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "7px", fontSize: "11px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+                          >
+                            Annuler
+                          </button>
+                          <button
+                            disabled={paiementEnCours}
+                            onClick={async () => {
+                              if (paiementMode === "déduit banque" && !paiementEpargneId) return;
+                              setPaiementEnCours(true);
+                              try {
+                                await payerAmendeSeance(groupId, a.id, a.membreId, a.montant, paiementMode, paiementEpargneId || null);
+                                const amendes = await fetchAmendesSeance(showDetailSeance.id);
+                                setAmendesSeanceList(amendes);
+                                await rechargerSeances();
+                                if (paiementMode === "déduit banque") await rechargerEpargnes();
+                                if (membre?.telephone) {
+                                  envoyerSMS({
+                                    message: msgOperation(membre.nom, "paiement d'amende", a.montant, undefined, paiementMode === "espèces" ? "Réglé en espèces" : "Déduit de votre épargne"),
+                                    numeros: [membre.telephone],
+                                  });
+                                }
+                                setPaiementAmendeId(null);
+                              } catch (e) {
+                                console.error("Erreur d'enregistrement du paiement", e);
+                              } finally {
+                                setPaiementEnCours(false);
+                              }
+                            }}
+                            style={{ flex: 1, background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "6px", padding: "7px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                          >
+                            {paiementEnCours ? "..." : "Confirmer"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
