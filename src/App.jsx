@@ -2371,6 +2371,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           { icon: <ShoppingCart size={16} />, label: "Dépenses", key: "depenses" },
           { icon: <Building2 size={16} />, label: "Dépôt / Retrait externe", key: "depots" },
           { icon: <FileBarChart size={16} />, label: "Bilan", key: "bilan" },
+          { icon: <Repeat size={16} />, label: "SMS", key: "sms" },
           { icon: <UserCog size={16} />, label: "Membres", key: "membres" },
         ]}
         active={view} onSelect={setView}
@@ -2850,6 +2851,49 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 />
               </div>
             )}
+          </>
+        )}
+
+        {view === "sms" && (
+          <>
+            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>SMS</h1>
+            <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>
+              Crédits SMS, caisse collectée, et abonnement mensuel optionnel des membres.
+            </p>
+
+            <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginBottom: "22px" }}>
+              <StatCard label="Crédits SMS restants" value={`${smsSolde} SMS`} icon={<Repeat size={16} />} />
+              <StatCard label="Caisse SMS (argent collecté)" value={fmtFCFA(soldeCaisseSms)} icon={<Repeat size={16} />} />
+              <StatCard label="Tarif abonnement" value={abonnementSmsConfig.prixMensuel > 0 ? `${fmtFCFA(abonnementSmsConfig.prixMensuel)}/mois` : "Non fixé"} icon={<CreditCard size={16} />} />
+            </div>
+
+            {smsSolde <= 0 && (
+              <div style={{ fontSize: "12.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "10px", padding: "12px 14px", marginBottom: "18px" }}>
+                Le solde de crédits SMS de ton groupe est épuisé — les prochains SMS pourraient ne pas partir. Contacte le Super Admin de la plateforme pour en acheter, ou effectue les prélèvements d'abonnement du mois.
+              </div>
+            )}
+
+            <button
+              style={btnPrimary}
+              onClick={async () => {
+                setShowAbonnementSms(true);
+                setAbonnementSmsErreur("");
+                try {
+                  const [config, abonnes] = await Promise.all([fetchConfigAbonnementSms(groupId), fetchAbonnesSms(groupId)]);
+                  setAbonnementSmsConfig(config);
+                  setAbonnementSmsPrixInput(String(config.prixMensuel));
+                  setAbonnementSmsCreditsInput(String(config.credits));
+                  setAbonnesSmsListe(abonnes);
+                  const moisActuel = new Date().toISOString().slice(0, 7);
+                  const dejaPreleves = await fetchDejaPreleves(groupId, moisActuel);
+                  setSmsDejaPreleves(dejaPreleves);
+                } catch (e) {
+                  console.error("Erreur de chargement de l'abonnement SMS", e);
+                }
+              }}
+            >
+              <Repeat size={15} /> Gérer l'abonnement SMS
+            </button>
           </>
         )}
 
