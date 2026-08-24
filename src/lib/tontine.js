@@ -4,6 +4,8 @@ import { supabase } from "./supabaseClient";
 // TONTINE
 // ============================================================
 
+// Récupère la tontine active du groupe (statut "en cours"), avec
+// tous ses tours et le nom du bénéficiaire de chacun.
 export async function fetchTontineActive(groupId) {
   const { data: tontine, error: errTontine } = await supabase
     .from("tontines")
@@ -229,4 +231,24 @@ export async function redistribuerCommission(tontineId, membresApercu) {
 
   const { error } = await supabase.from("tontine_redistributions").insert(lignes);
   if (error) throw error;
+}
+
+// Total des commissions d'enchères déjà redistribuées aux membres,
+// toutes tontines du groupe confondues — utilisé dans le Bilan.
+export async function fetchTotalRedistributions(groupId) {
+  const { data: tontines, error: errTontines } = await supabase
+    .from("tontines")
+    .select("id")
+    .eq("group_id", groupId);
+  if (errTontines) throw errTontines;
+  const idsTontines = tontines.map((t) => t.id);
+  if (idsTontines.length === 0) return 0;
+
+  const { data, error } = await supabase
+    .from("tontine_redistributions")
+    .select("montant")
+    .in("tontine_id", idsTontines);
+  if (error) throw error;
+
+  return data.reduce((s, r) => s + Number(r.montant), 0);
 }
