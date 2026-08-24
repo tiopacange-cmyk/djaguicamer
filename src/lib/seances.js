@@ -54,8 +54,6 @@ export async function fetchPresences(seanceId) {
   return Object.fromEntries(data.map((p) => [p.membre_id, p.statut]));
 }
 
-// Enregistre la présence de tous les membres en une fois
-// (present/absent/excusé), pour une séance donnée.
 export async function enregistrerPresences(seanceId, presences) {
   const lignes = Object.entries(presences)
     .filter(([, statut]) => statut)
@@ -68,8 +66,6 @@ export async function enregistrerPresences(seanceId, presences) {
   if (error) throw error;
 }
 
-// Taux de présence de chaque membre, sur toutes les séances
-// "terminée" du groupe — utilisé pour l'historique.
 export async function fetchTauxPresence(groupId) {
   const { data: seances, error: errS } = await supabase
     .from("seances")
@@ -187,10 +183,6 @@ export async function fetchCaisseAmendes(groupId) {
   return data?.solde || 0;
 }
 
-// Marque une amende comme payée. En espèces, la caisse des amendes
-// augmente directement. Déduit de la banque, le montant sort de
-// l'épargne choisie du membre ET vient quand même alimenter la
-// caisse des amendes (transfert interne, pas de perte).
 export async function payerAmendeSeance(groupId, amendeId, membreId, montant, modePaiement, epargneId) {
   if (modePaiement === "déduit banque") {
     if (!epargneId) throw new Error("Choisis l'épargne à débiter.");
