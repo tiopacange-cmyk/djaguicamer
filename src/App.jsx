@@ -1906,7 +1906,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       console.error("Erreur de chargement des séances", e);
     }
   };
-  useEffect(() => { if (view === "seances" || view === "bilan") rechargerSeances(); }, [groupId, view]);
+  useEffect(() => { if (view === "seances" || view === "bilan" || view === "depenses") rechargerSeances(); }, [groupId, view]);
 
   const [rafraichissementsList, setRafraichissementsList] = useState([]);
   const [soldeCaisseRafraichissement, setSoldeCaisseRafraichissement] = useState(0);
@@ -2801,6 +2801,26 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   "Membres",
                   `${membres.filter((m) => m.statut === "actif").length} actif(s)`,
                   <span style={{ color: C.sub, fontSize: 12 }}>{membres.filter((m) => m.statut === "en attente").length} en attente de validation</span>,
+                ],
+                [
+                  "Caisse des amendes",
+                  fmtFCFA(soldeCaisseAmendes),
+                  <span style={{ color: C.sub, fontSize: 12 }}>Amendes de séance payées (espèces ou déduit banque)</span>,
+                ],
+                [
+                  "Caisse reliquat boisson",
+                  fmtFCFA(soldeCaisseRafraichissement),
+                  <span style={{ color: soldeCaisseRafraichissement < 0 ? C.warn : C.sub, fontSize: 12 }}>{soldeCaisseRafraichissement < 0 ? "En débit — à rééquilibrer" : `${rafraichissementsList.length} rafraîchissement(s) enregistré(s)`}</span>,
+                ],
+                [
+                  "Séances",
+                  `${seancesList.filter((s) => s.statut === "terminée").length} terminée(s)`,
+                  <span style={{ color: C.sub, fontSize: 12 }}>{seancesList.length} séance(s) au total</span>,
+                ],
+                [
+                  "Dépenses",
+                  fmtFCFA(depensesList.reduce((s, d) => s + Number(d.montant), 0)),
+                  <span style={{ color: C.sub, fontSize: 12 }}>{depensesList.length} dépense(s) enregistrée(s)</span>,
                 ],
               ]}
             />
