@@ -519,6 +519,7 @@ function ChangerMotDePasseScreen({ onDone }) {
 // ÉCRAN 2 — SUPER ADMIN
 // ============================================================
 function SuperAdminScreen() {
+  const fmtFCFA = (n) => `${Math.round(n || 0).toLocaleString("fr-FR")} FCFA`;
   const [view, setView] = useState("dashboard");
   const [groupes, setGroupes] = useState([]);
   const [chargement, setChargement] = useState(true);
@@ -681,6 +682,15 @@ function SuperAdminScreen() {
               <div style={{ fontSize: "12.5px", color: C.warn }}>Erreur de chargement des statistiques.</div>
             ) : (
               <>
+                <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginBottom: "22px" }}>
+                  <div style={{ flex: "1 1 220px", background: `linear-gradient(135deg, ${C.accent2}, ${C.accent})`, borderRadius: "14px", padding: "18px 20px", color: "#FFFFFF" }}>
+                    <div style={{ fontSize: "11px", opacity: 0.85 }}>Revenu total encaissé</div>
+                    <div style={{ fontSize: "24px", fontWeight: 700, marginTop: "4px" }}>{fmtFCFA(statsPlateforme.revenuTotal)}</div>
+                  </div>
+                  <StatCard label="Abonnements plateforme" value={fmtFCFA(statsPlateforme.revenuAbonnements)} icon={<CreditCard size={16} />} />
+                  <StatCard label="Ventes de SMS" value={fmtFCFA(statsPlateforme.revenuSms)} icon={<Repeat size={16} />} />
+                </div>
+
                 <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
                   <StatCard label="Groupes" value={statsPlateforme.totalGroupes} icon={<Building2 size={16} />} />
                   <StatCard label="Membres actifs" value={statsPlateforme.totalMembres} icon={<Users size={16} />} />
