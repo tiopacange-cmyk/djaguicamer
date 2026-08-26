@@ -77,12 +77,21 @@ export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, fo
   const nbJours = formule === "Essai" ? 14 : periodicite === "Annuel" ? 365 : 30;
   dateExpiration.setDate(dateExpiration.getDate() + nbJours);
 
+  // Calcule le montant réellement payé, d'après le tarif actuel du
+  // plan choisi (0 pour l'essai gratuit).
+  let montantPaye = 0;
+  if (formule !== "Essai") {
+    const { data: plan } = await supabase.from("plans_tarifaires").select("prix_mensuel, prix_annuel").eq("formule", formule).maybeSingle();
+    montantPaye = periodicite === "Annuel" ? (plan?.prix_annuel || 0) : (plan?.prix_mensuel || 0);
+  }
+
   const { error: subError } = await supabase.from("subscriptions").insert({
     group_id: groupe.id,
     formule,
     periodicite: formule === "Essai" ? null : periodicite,
     statut: formule === "Essai" ? "essai" : "actif",
     date_expiration: dateExpiration.toISOString(),
+    montant_paye: montantPaye,
   });
   if (subError) throw subError;
 
@@ -274,12 +283,16 @@ export async function renouvelerAbonnement(groupId, formule, periodicite) {
   const nbJours = periodicite === "Annuel" ? 365 : 30;
   base.setDate(base.getDate() + nbJours);
 
+  const { data: plan } = await supabase.from("plans_tarifaires").select("prix_mensuel, prix_annuel").eq("formule", formule).maybeSingle();
+  const montantPaye = periodicite === "Annuel" ? (plan?.prix_annuel || 0) : (plan?.prix_mensuel || 0);
+
   const { error } = await supabase.from("subscriptions").insert({
     group_id: groupId,
     formule,
     periodicite,
     statut: "actif",
     date_expiration: base.toISOString(),
+    montant_paye: montantPaye,
   });
   if (error) throw error;
 }
@@ -352,6 +365,21 @@ export async function fetchStatsPlateforme() {
     .eq("statut", "actif");
   if (errM) throw errM;
 
+  // Revenus : total encaissé via les abonnements plateforme, et via
+  // la vente de crédits SMS aux groupes.
+  const { data: abonnementsPayes, error: errRevAbo } = await supabase
+    .from("subscriptions")
+    .select("montant_paye");
+  if (errRevAbo) throw errRevAbo;
+  const revenuAbonnements = abonnementsPayes.reduce((s, a) => s + Number(a.montant_paye || 0), 0);
+
+  const { data: ventesSms, error: errRevSms } = await supabase
+    .from("sms_credits_mouvements")
+    .select("prix_paye")
+    .eq("type", "achat");
+  if (errRevSms) throw errRevSms;
+  const revenuSms = ventesSms.reduce((s, v) => s + Number(v.prix_paye || 0), 0);
+
   const aujourdHui = new Date();
   const dansSeptJours = new Date(aujourdHui.getTime() + 7 * 86400000);
 
@@ -386,6 +414,9 @@ export async function fetchStatsPlateforme() {
     essais,
     expires,
     suspendus,
+    revenuAbonnements,
+    revenuSms,
+    revenuTotal: revenuAbonnements + revenuSms,
     expirentBientot: expirentBientot.sort((a, b) => a.dateExpiration.localeCompare(b.dateExpiration)),
     groupesRecents: groupes
       .sort((a, b) => b.created_at.localeCompare(a.created_at))
