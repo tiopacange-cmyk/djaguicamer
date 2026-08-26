@@ -115,7 +115,7 @@ export async function effectuerPrelevementSms(groupId, membreId, mois, montant, 
 
   const { data: groupe, error: errLectureGroupe } = await supabase.from("groups").select("sms_credits").eq("id", groupId).single();
   if (errLectureGroupe) throw errLectureGroupe;
-  const { error: errCredits } = await supabase.from("groups").update({ sms_credits: groupe.sms_credits + credits }).eq("id", groupId);
+  const { error: errCredits } = await supabase.from("groups").update({ sms_credits: groupe.sms_credits - credits }).eq("id", groupId);
   if (errCredits) throw errCredits;
 }
 
