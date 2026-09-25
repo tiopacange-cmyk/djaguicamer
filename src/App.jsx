@@ -61,12 +61,16 @@ function msgOperation(nom, operation, montant, solde, details) {
   return msg;
 }
 
+// Valeurs alignées sur les tokens du design system (src/index.css,
+// design-system/djangui/MASTER.md). Restent en hexadécimal car le code
+// y concatène des suffixes d'opacité (ex. `${C.warn}44`).
 const C = {
-  ink: "#1B2420", sub: "#5B6B5F", accent: "#B8860F", accent2: "#1B4332",
-  border: "#E5DFCE", bg: "#FAF6ED", panel: "#FFFFFF", purple: "#6B5FA6",
-  warn: "#A44A1F", warnBg: "#F9E4D8", ok: "#E4EFE6",
-  // Couleurs vives par module, pour distinguer les formulaires d'un coup d'œil
-  vifOr: "#E8A317", vifVert: "#16A34A", vifBleu: "#2563EB", vifRose: "#DB2777", vifViolet: "#7C3AED", vifCorail: "#EA580C",
+  ink: "#14201A", sub: "#56645B", accent: "#C9971D", accent2: "#0F5132",
+  border: "#E3DED0", borderFort: "#858F87", bg: "#F7F5EF", panel: "#FFFFFF", purple: "#5B4B9A",
+  warn: "#A4331F", warnBg: "#FBE9E4", ok: "#E4EFE6",
+  // Couleur par module, pour distinguer les formulaires d'un coup d'œil.
+  // Toutes lisibles en texte sur blanc et sur leur teinte claire (AA).
+  vifOr: "#8A6410", vifVert: "#166534", vifBleu: "#1D4ED8", vifRose: "#BE185D", vifViolet: "#6D28D9", vifCorail: "#B43C0B",
 };
 
 // Les 3 thèmes disponibles ne changent que les couleurs de marque
@@ -770,7 +774,7 @@ function SuperAdminScreen() {
         ]}
         active={view} onSelect={setView}
       />
-      <div className="app-main" style={{ flex: 1, padding: "32px 40px", minWidth: 0 }}>
+      <div className="app-main" style={{ flex: 1, minWidth: 0 }}>
         {view === "dashboard" && (
           <>
             <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Tableau de bord</h1>
@@ -2013,7 +2017,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
   useEffect(() => { if (view === "banque" || view === "bilan") rechargerPrets(); }, [groupId, view]);
 
-  const tourStatus = { "clôturé": { bg: C.ok, fg: C.accent2 }, "en cours": { bg: "#FBF1DC", fg: C.accent }, "à venir": { bg: "#EEE", fg: C.sub } };
+  const tourStatus = { "clôturé": { bg: C.ok, fg: C.accent2 }, "en cours": { bg: "#FBF1DC", fg: C.vifOr }, "à venir": { bg: "#EFECE4", fg: C.sub } };
 
   const [showAmende, setShowAmende] = useState(null);
   const [amendeMontant, setAmendeMontant] = useState("");
@@ -2460,7 +2464,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <ShieldAlert size={26} color={C.warn} />
         </div>
         <h1 style={{ fontSize: "18px", fontWeight: 700, color: C.ink, margin: "0 0 8px" }}>Licence expirée</h1>
-        <p style={{ fontSize: "13px", color: C.sub, margin: 0 }}>
+        <p style={{ fontSize: "14px", color: C.sub, margin: 0 }}>
           {statutAbonnement?.statut === "suspendu"
             ? "L'accès à ce groupe a été suspendu par le Super Admin de la plateforme."
             : `L'abonnement de ce groupe a expiré${statutAbonnement?.dateExpiration ? ` le ${new Date(statutAbonnement.dateExpiration).toLocaleDateString("fr-FR")}` : ""}.`}
@@ -2486,15 +2490,15 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         ]}
         active={view} onSelect={setView}
       />
-      <div className="app-main" style={{ flex: 1, padding: "32px 40px", minWidth: 0 }}>
+      <div className="app-main" style={{ flex: 1, minWidth: 0 }}>
         {view === "tontine" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+            <div className="adm-entete">
               <div>
-                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>
+                <h1 className="adm-titre">
                   {tontineActive ? tontineActive.nom : "Aucune tontine active"}
                 </h1>
-                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
+                <p className="adm-sous-titre">
                   {chargementTontine
                     ? "Chargement..."
                     : tontineActive
@@ -2564,13 +2568,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               </div>
             </div>
             {rappelMessage && (
-              <div style={{ marginTop: "10px", fontSize: "12px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
+              <div style={{ marginTop: "10px", fontSize: "13px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
                 {rappelMessage}
               </div>
             )}
 
             {erreurTontine && (
-              <div style={{ marginTop: "16px", fontSize: "12.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>
+              <div style={{ marginTop: "16px", fontSize: "13.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>
                 {erreurTontine}
               </div>
             )}
@@ -2586,14 +2590,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       t.mode === "Enchères" && !t.beneficiaireId ? (
                         <button
                           onClick={() => { setEnchereTour(t); setEnchereBeneficiaire(""); setEnchereMontant(""); setEnchereErreur(""); setShowEnchere(true); }}
-                          style={{ background: C.vifViolet, color: "#FFFFFF", border: "none", borderRadius: "7px", padding: "6px 12px", fontSize: "11.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}
+                          style={{ background: C.vifViolet, color: "#FFFFFF", border: "none", borderRadius: "7px", padding: "6px 12px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}
                         >
                           <Gavel size={13} /> Enregistrer l'enchère
                         </button>
                       ) : (
                         <button
                           onClick={() => setShowPayout(t)}
-                          style={{ background: "#2E7D46", color: "#FAF6ED", border: "none", borderRadius: "7px", padding: "6px 12px", fontSize: "11.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}
+                          className="adm-btn-ligne adm-btn-ligne-plein"
                         >
                           <Banknote size={13} /> Bénéficiaire
                         </button>
@@ -2602,23 +2606,23 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   ])} />
 
                 {tourEnCours && tourEnCours.mode === "Enchères" && (
-                  <div style={{ marginTop: "18px", background: "#EBE6F5", border: `1px solid ${C.purple}44`, borderRadius: "12px", padding: "14px 18px", fontSize: "12.5px", color: C.purple, display: "flex", gap: "8px", alignItems: "center" }}>
+                  <div style={{ marginTop: "18px", background: "#EBE6F5", border: `1px solid ${C.purple}44`, borderRadius: "12px", padding: "14px 18px", fontSize: "13.5px", color: C.purple, display: "flex", gap: "8px", alignItems: "center" }}>
                     <Gavel size={16} /> Commission d'enchères de ce tour : <b>{fmtFCFA(tourEnCours.commissionEncheres || 0)}</b> — redistribuée aux membres à la clôture.
                   </div>
                 )}
 
                 {tourEnCours && membres.filter((m) => m.statut === "actif" && !cotisationsTourEnCours.includes(m.id)).length > 0 && (
                   <div style={{ marginTop: "22px" }}>
-                    <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px" }}>Cotisations non encore reçues — Tour {tourEnCours.numero}</h2>
+                    <h2 className="adm-h2">Cotisations non encore reçues — Tour {tourEnCours.numero}</h2>
                     {membres.filter((m) => m.statut === "actif" && !cotisationsTourEnCours.includes(m.id)).map((m, i) => (
                       <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "10px", padding: "12px 16px", marginBottom: "8px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                           <Clock size={16} color={C.warn} />
-                          <div style={{ fontWeight: 600, fontSize: "13px" }}>{m.nom}</div>
+                          <div style={{ fontWeight: 600, fontSize: "14px" }}>{m.nom}</div>
                         </div>
                         <button
                           onClick={() => setShowAmende({ membre: m.nom, membreId: m.id, tour: tourEnCours.numero, tourId: tourEnCours.id })}
-                          style={{ background: C.warn, color: "#FFF6EE", border: "none", borderRadius: "7px", padding: "7px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                          className="adm-btn-ligne adm-btn-ligne-danger-plein"
                         >
                           Appliquer une amende
                         </button>
@@ -2633,10 +2637,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
         {view === "banque" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+            <div className="adm-entete">
               <div>
-                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Banques du groupe</h1>
-                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>Banque scolaire, banque annuelle, et épargnes personnalisées.</p>
+                <h1 className="adm-titre">Banques du groupe</h1>
+                <p className="adm-sous-titre">Banque scolaire, banque annuelle, et épargnes personnalisées.</p>
               </div>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <button style={btnSecondary} onClick={() => { setCotisationEpargneId(""); setCotisationDate(""); setCotisationMontants({}); setCotisationBanqueErreur(""); setShowCotisationBanque(true); }}><Plus size={15} /> Enregistrer une cotisation</button>
@@ -2655,7 +2659,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   style={{
                     padding: "8px 14px", borderRadius: "8px", border: `1px solid ${bankTab === t.key ? C.accent2 : C.border}`,
                     background: bankTab === t.key ? C.ok : "transparent", color: bankTab === t.key ? C.accent2 : C.sub,
-                    fontSize: "12.5px", fontWeight: 600, cursor: "pointer",
+                    fontSize: "13.5px", fontWeight: 600, cursor: "pointer",
                   }}
                 >
                   {t.label}
@@ -2692,7 +2696,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                               setClotureChargement(false);
                             }
                           }}
-                          style={{ width: "100%", marginTop: "6px", background: "transparent", color: C.vifRose, border: `1px solid ${C.vifRose}66`, borderRadius: "8px", padding: "7px", fontSize: "11.5px", fontWeight: 600, cursor: "pointer" }}
+                          style={{ width: "100%", marginTop: "6px", background: "transparent", color: C.vifRose, border: `1px solid ${C.vifRose}66`, borderRadius: "8px", padding: "7px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
                         >
                           Clôturer le cycle
                         </button>
@@ -2705,7 +2709,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   <button style={btnSecondary} onClick={() => { setCreditEpargneId(""); setCreditMembreId(""); setCreditMontant(""); setCreditFraisDossier(""); setCreditCommission(""); setCreditPenalite(""); setCreditDebut(""); setCreditFin(""); setCreditDepasseCaution(false); setCreditAvalisteId(""); setCreditError(""); setCreditSuccess(false); setShowCreditForm(true); }}><Plus size={14} /> Mettre en place un crédit</button>
                 </div>
                 <Table cols={["Membre", "Montant", "Avaliste", "Statut", "Échéance"]} widths="1.4fr 1fr 1.2fr 1fr 1fr"
-                  rows={prets.map((p) => [p.membre, p.montant, p.avaliste, <Badge bg={p.statut === "remboursé" ? C.ok : "#FBF1DC"} fg={p.statut === "remboursé" ? C.accent2 : C.accent}>{p.statut}</Badge>, p.echeance])} />
+                  rows={prets.map((p) => [p.membre, p.montant, p.avaliste, <Badge bg={p.statut === "remboursé" ? C.ok : "#FBF1DC"} fg={p.statut === "remboursé" ? C.accent2 : C.vifOr}>{p.statut}</Badge>, p.echeance])} />
               </>
             )}
 
@@ -2713,15 +2717,15 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               <div style={{ marginTop: "18px" }}>
                 <Table cols={["Date", "Membre", "Épargne", "Type", "Montant", "Solde après"]} widths="1fr 1.3fr 1.4fr 1fr 1.1fr 1.2fr"
                   rows={historiqueBanque.map((h) => [
-                    <span style={{ color: C.sub, fontSize: 12 }}>{h.date}</span>,
+                    <span style={{ color: C.sub, fontSize: 13 }}>{h.date}</span>,
                     h.membre,
-                    <span style={{ color: C.sub, fontSize: 12 }}>{h.epargne}</span>,
+                    <span style={{ color: C.sub, fontSize: 13 }}>{h.epargne}</span>,
                     <Badge bg={h.type === "Versement" ? C.ok : C.warnBg} fg={h.type === "Versement" ? C.accent2 : C.warn}>{h.type}</Badge>,
                     <span style={{ fontWeight: 700, color: h.type === "Versement" ? C.accent2 : C.warn }}>{h.montant}</span>,
-                    <span style={{ color: C.sub, fontSize: 12 }}>{h.solde}</span>,
+                    <span style={{ color: C.sub, fontSize: 13 }}>{h.solde}</span>,
                   ])}
                 />
-                <div style={{ fontSize: "11px", color: C.sub, marginTop: "10px" }}>
+                <div className="adm-aide adm-aide-espace">
                   Chaque cotisation apparaît comme un <b>versement</b>, chaque prêt octroyé comme un <b>retrait</b> — ce sont les deux seuls types de mouvement de la banque.
                 </div>
               </div>
@@ -2731,10 +2735,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
         {view === "fonds" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+            <div className="adm-entete">
               <div>
-                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Fonds</h1>
-                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
+                <h1 className="adm-titre">Fonds</h1>
+                <p className="adm-sous-titre">
                   Fonds de garantie, fonds de solidarité, ou toute autre rubrique — chaque membre cotise progressivement vers un objectif commun.
                 </p>
               </div>
@@ -2762,13 +2766,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
 
             {typesFonds.length === 0 ? (
-              <div style={{ marginTop: "22px", fontSize: "13px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
+              <div style={{ marginTop: "22px", fontSize: "14px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
                 Aucun type de fonds créé pour l'instant — clique "Types de fonds" pour en ajouter un (ex. Fonds de garantie).
               </div>
             ) : (
               typesFonds.map((t) => (
                 <div key={t.id} style={{ marginTop: "26px" }}>
-                  <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px" }}>{t.nom} <span style={{ color: C.sub, fontWeight: 400, fontSize: "12px" }}>— objectif {fmtFCFA(t.cible)}</span></h2>
+                  <h2 className="adm-h2">{t.nom} <span style={{ color: C.sub, fontWeight: 400, fontSize: "13px" }}>— objectif {fmtFCFA(t.cible)}</span></h2>
                   <Table cols={["Membre", "Progression", "Statut"]} widths="1.5fr 1.6fr 1.1fr"
                     rows={membres.map((m) => {
                       const f = (fondsParMembre[m.id] || []).find((x) => x.typeFondsId === t.id) || { cible: 0, solde: 0 };
@@ -2776,17 +2780,17 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       return [
                         m.nom,
                         <div>
-                          <div style={{ fontSize: "11.5px", fontWeight: 600 }}>{fmtFCFA(f.solde)} / {fmtFCFA(f.cible)}</div>
+                          <div style={{ fontSize: "12.5px", fontWeight: 600 }}>{fmtFCFA(f.solde)} / {fmtFCFA(f.cible)}</div>
                           {f.cible > 0 && (
-                            <div style={{ width: "100%", height: "5px", background: "#EEE", borderRadius: "3px", marginTop: "4px", overflow: "hidden" }}>
-                              <div style={{ width: `${Math.min(100, (f.solde / f.cible) * 100)}%`, height: "100%", background: atteint ? C.accent2 : C.warn }} />
+                            <div style={{ width: "100%", height: "5px", background: "#E3DED0", borderRadius: "3px", marginTop: "4px", overflow: "hidden" }}>
+                              <div style={{ width: `${Math.min(100, (f.solde / f.cible) * 100)}%`, height: "100%", background: atteint ? C.accent2 : C.accent }} />
                             </div>
                           )}
                         </div>,
                         f.cible > 0 ? (
-                          <Badge bg={atteint ? C.ok : C.warnBg} fg={atteint ? C.accent2 : C.warn}>{atteint ? "objectif atteint" : "en cours"}</Badge>
+                          <Badge bg={atteint ? C.ok : "#FBF1DC"} fg={atteint ? C.accent2 : C.vifOr}>{atteint ? "objectif atteint" : "en cours"}</Badge>
                         ) : (
-                          <span style={{ color: C.sub, fontSize: 11.5 }}>pas d'objectif</span>
+                          <span style={{ color: C.sub, fontSize: 12.5 }}>pas d'objectif</span>
                         ),
                       ];
                     })}
@@ -2799,10 +2803,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
         {view === "seances" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+            <div className="adm-entete">
               <div>
-                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Séances</h1>
-                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
+                <h1 className="adm-titre">Séances</h1>
+                <p className="adm-sous-titre">
                   Réunions générales de l'association — présence, amendes internes, procès-verbal.
                 </p>
               </div>
@@ -2827,7 +2831,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
 
             {seancesList.length === 0 ? (
-              <div style={{ marginTop: "22px", fontSize: "13px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
+              <div style={{ marginTop: "22px", fontSize: "14px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
                 Aucune séance créée pour l'instant.
               </div>
             ) : (
@@ -2837,7 +2841,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   rows={seancesList.map((s) => [
                     s.date,
                     s.lieu || "—",
-                    <span style={{ color: C.sub, fontSize: 12 }}>{s.ordreDuJour || "—"}</span>,
+                    <span style={{ color: C.sub, fontSize: 13 }}>{s.ordreDuJour || "—"}</span>,
                     <Badge bg={s.statut === "terminée" ? C.ok : C.warnBg} fg={s.statut === "terminée" ? C.accent2 : C.warn}>{s.statut}</Badge>,
                     <button
                       onClick={async () => {
@@ -2851,7 +2855,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                           console.error("Erreur de chargement du détail de la séance", e);
                         }
                       }}
-                      style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}66`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                      className="adm-btn-ligne"
                     >
                       Gestion de séance
                     </button>,
@@ -2878,10 +2882,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
         {view === "depenses" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+            <div className="adm-entete">
               <div>
-                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Dépenses</h1>
-                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
+                <h1 className="adm-titre">Dépenses</h1>
+                <p className="adm-sous-titre">
                   Rafraîchissement de séance — collecte, facture, reliquat conservé dans la caisse.
                 </p>
               </div>
@@ -2907,7 +2911,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
 
             {rafraichissementsList.length === 0 ? (
-              <div style={{ fontSize: "13px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
+              <div style={{ fontSize: "14px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
                 Aucun rafraîchissement enregistré pour l'instant.
               </div>
             ) : (
@@ -2945,7 +2949,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
 
             {depensesList.length === 0 ? (
-              <div style={{ marginTop: "14px", fontSize: "13px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
+              <div style={{ marginTop: "14px", fontSize: "14px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
                 Aucune dépense enregistrée pour l'instant.
               </div>
             ) : (
@@ -2954,7 +2958,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   rows={depensesList.map((d) => [
                     d.date,
                     d.typeNom,
-                    <span style={{ color: C.sub, fontSize: 12 }}>{d.motif || "—"}</span>,
+                    <span style={{ color: C.sub, fontSize: 13 }}>{d.motif || "—"}</span>,
                     libelleSourceDepense(d.sourceType),
                     <b style={{ color: C.warn }}>− {fmtFCFA(d.montant)}</b>,
                   ])}
@@ -2966,8 +2970,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
         {view === "sms" && (
           <>
-            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>SMS</h1>
-            <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>
+            <h1 className="adm-titre">SMS</h1>
+            <p style={{ fontSize: "14px", color: C.sub, margin: "6px 0 22px" }}>
               Crédits SMS, caisse collectée, et abonnement mensuel optionnel des membres.
             </p>
 
@@ -2978,7 +2982,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
 
             {smsSolde <= 0 && (
-              <div style={{ fontSize: "12.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "10px", padding: "12px 14px", marginBottom: "18px" }}>
+              <div style={{ fontSize: "13.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "10px", padding: "12px 14px", marginBottom: "18px" }}>
                 Le solde de crédits SMS de ton groupe est épuisé — les prochains SMS pourraient ne pas partir. Contacte le Super Admin de la plateforme pour en acheter, ou effectue les prélèvements d'abonnement du mois.
               </div>
             )}
@@ -3009,10 +3013,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
         {view === "depots" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+            <div className="adm-entete">
               <div>
-                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Dépôt et retrait externe</h1>
-                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
+                <h1 className="adm-titre">Dépôt et retrait externe</h1>
+                <p className="adm-sous-titre">
                   Versement des fonds du groupe dans une banque externe, après chaque séance, par un signataire du compte.
                 </p>
               </div>
@@ -3040,7 +3044,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
 
             {comptesBancaires.length === 0 ? (
-              <div style={{ marginTop: "22px", fontSize: "12.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px" }}>
+              <div style={{ marginTop: "22px", fontSize: "13.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px" }}>
                 Aucun compte bancaire enregistré pour ce groupe. Clique "Créer un compte" pour ajouter ton premier compte (courant ou épargne).
               </div>
             ) : (
@@ -3053,11 +3057,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       style={{
                         padding: "8px 14px", borderRadius: "8px", border: `1px solid ${compteActifId === c.id ? C.vifBleu : C.border}`,
                         background: compteActifId === c.id ? `${C.vifBleu}14` : "transparent", color: compteActifId === c.id ? C.vifBleu : C.sub,
-                        fontSize: "12.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
+                        fontSize: "13.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
                       }}
                     >
                       {c.type === "Épargne" ? <PiggyBank size={13} /> : <Building2 size={13} />} {c.nom}
-                      <span style={{ fontSize: "10px", opacity: 0.7 }}>({c.type})</span>
+                      <span style={{ fontSize: "12px", opacity: 0.7 }}>({c.type})</span>
                     </button>
                   ))}
                 </div>
@@ -3075,38 +3079,38 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
             <div style={{ display: "flex", alignItems: "flex-end", gap: "10px", marginTop: "22px", background: C.panel, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "14px 16px" }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: "11px", color: C.sub, marginBottom: "5px", display: "block" }}>Du</label>
+                <label style={{ fontSize: "12px", color: C.sub, marginBottom: "5px", display: "block" }}>Du</label>
                 <input
                   value={filtreDateDebut}
                   onChange={(e) => setFiltreDateDebut(e.target.value)}
                   placeholder="jj/mm/aaaa"
-                  style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none" }}
                 />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: "11px", color: C.sub, marginBottom: "5px", display: "block" }}>Au</label>
+                <label style={{ fontSize: "12px", color: C.sub, marginBottom: "5px", display: "block" }}>Au</label>
                 <input
                   value={filtreDateFin}
                   onChange={(e) => setFiltreDateFin(e.target.value)}
                   placeholder="jj/mm/aaaa"
-                  style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none" }}
                 />
               </div>
               <button
-                style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "9px 16px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
+                style={{ background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "9px 16px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
               >
                 <Search size={14} /> Rechercher
               </button>
               {(filtreDateDebut || filtreDateFin) && (
                 <button
                   onClick={() => { setFiltreDateDebut(""); setFiltreDateFin(""); }}
-                  style={{ background: "transparent", color: C.sub, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "9px 12px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+                  style={{ background: "transparent", color: C.sub, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "9px 12px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer" }}
                 >
                   Réinitialiser
                 </button>
               )}
             </div>
-            <div style={{ fontSize: "11px", color: C.sub, marginTop: "6px" }}>
+            <div className="adm-aide">
               Laissez "Au" vide pour rechercher une date précise, ou renseignez les deux champs pour une période.
             </div>
 
@@ -3121,12 +3125,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 };
                 const style = typeStyle[d.type] || typeStyle["Dépôt"];
                 return [
-                  <span style={{ color: C.sub, fontSize: 12 }}>{d.date}</span>,
+                  <span style={{ color: C.sub, fontSize: 13 }}>{d.date}</span>,
                   <Badge bg={style.bg} fg={style.fg}>{d.type}</Badge>,
                   <b>{d.montant}</b>,
                   d.signataire,
-                  <span style={{ color: C.sub, fontSize: 12 }}>{d.type === "Frais" ? d.categorie : d.motif}</span>,
-                  <b style={{ fontSize: 12.5 }}>{d.solde}</b>,
+                  <span style={{ color: C.sub, fontSize: 13 }}>{d.type === "Frais" ? d.categorie : d.motif}</span>,
+                  <b style={{ fontSize: 13.5 }}>{d.solde}</b>,
                   d.statut === "reçu joint" ? (
                     d.recuUrl ? (
                       <a href={d.recuUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
@@ -3160,7 +3164,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       <button
                         disabled={joindreRecuEnCours === d.id}
                         onClick={() => inputsFichierRecu.current[d.id]?.click()}
-                        style={{ background: C.warnBg, color: C.warn, border: `1px solid ${C.warn}44`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: joindreRecuEnCours === d.id ? "default" : "pointer" }}
+                        style={{ background: C.warnBg, color: C.warn, border: `1px solid ${C.warn}44`, borderRadius: "7px", padding: "5px 10px", fontSize: "12px", fontWeight: 600, cursor: joindreRecuEnCours === d.id ? "default" : "pointer" }}
                       >
                         {joindreRecuEnCours === d.id ? "Envoi..." : "Joindre le reçu"}
                       </button>
@@ -3168,7 +3172,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   ),
                 ];
               })} />
-            <div style={{ fontSize: "11px", color: C.sub, marginTop: "10px" }}>
+            <div className="adm-aide adm-aide-espace">
               Le mouvement peut être enregistré tout de suite, et le reçu joint plus tard au retour de la banque — sans jamais modifier les autres données déjà enregistrées.
             </div>
           </>
@@ -3176,10 +3180,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
         {view === "assurance" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+            <div className="adm-entete">
               <div>
-                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Assurance mutuelle</h1>
-                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>Solde minimum requis : {fmtFCFA(soldeMinimum)} par membre · délai de reconstitution : {delaiJoursAssurance} jours.</p>
+                <h1 className="adm-titre">Assurance mutuelle</h1>
+                <p className="adm-sous-titre">Solde minimum requis : {fmtFCFA(soldeMinimum)} par membre · délai de reconstitution : {delaiJoursAssurance} jours.</p>
               </div>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <button
@@ -3207,7 +3211,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   style={{
                     padding: "8px 14px", borderRadius: "8px", border: `1px solid ${assuranceTab === t.key ? C.vifRose : C.border}`,
                     background: assuranceTab === t.key ? `${C.vifRose}14` : "transparent", color: assuranceTab === t.key ? C.vifRose : C.sub,
-                    fontSize: "12.5px", fontWeight: 600, cursor: "pointer",
+                    fontSize: "13.5px", fontWeight: 600, cursor: "pointer",
                   }}
                 >
                   {t.label}
@@ -3224,7 +3228,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     return [
                       m.nom,
                       fmtFCFA(info.solde),
-                      <div style={{ width: "100%", height: "5px", background: "#EEE", borderRadius: "3px", overflow: "hidden" }}>
+                      <div style={{ width: "100%", height: "5px", background: "#E3DED0", borderRadius: "3px", overflow: "hidden" }}>
                         <div style={{ width: `${Math.min(100, soldeMinimum > 0 ? (info.solde / soldeMinimum) * 100 : 100)}%`, height: "100%", background: aJour ? C.accent2 : C.warn }} />
                       </div>,
                       aJour
@@ -3242,15 +3246,15 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               <>
                 <Table cols={["Date", "Membre", "Type", "Montant", "Solde après"]} widths="1fr 1.4fr 1fr 1.1fr 1.2fr"
                   rows={historiqueAssurance.map((h) => [
-                    <span style={{ color: C.sub, fontSize: 12 }}>{h.date}</span>,
+                    <span style={{ color: C.sub, fontSize: 13 }}>{h.date}</span>,
                     h.membre,
-                    <Badge bg={h.type === "Cotisation" ? C.ok : "#FBE8E8"} fg={h.type === "Cotisation" ? C.accent2 : C.warn}>{h.type}</Badge>,
+                    <Badge bg={h.type === "Cotisation" ? C.ok : C.warnBg} fg={h.type === "Cotisation" ? C.accent2 : C.warn}>{h.type}</Badge>,
                     <span style={{ fontWeight: 700, color: h.type === "Cotisation" ? C.accent2 : C.warn }}>{h.type === "Cotisation" ? "+" : "-"}{fmtFCFA(h.montant)}</span>,
-                    <span style={{ color: C.sub, fontSize: 12 }}>{fmtFCFA(h.solde)}</span>,
+                    <span style={{ color: C.sub, fontSize: 13 }}>{fmtFCFA(h.solde)}</span>,
                   ])}
                 />
                 {historiqueAssurance.length === 0 && (
-                  <div style={{ fontSize: "12.5px", color: C.sub, marginTop: "12px" }}>Aucun mouvement enregistré pour l'instant.</div>
+                  <div style={{ fontSize: "13.5px", color: C.sub, marginTop: "12px" }}>Aucun mouvement enregistré pour l'instant.</div>
                 )}
               </>
             )}
@@ -3259,8 +3263,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
         {view === "bilan" && (
           <>
-            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Bilan général</h1>
-            <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>
+            <h1 className="adm-titre">Bilan général</h1>
+            <p style={{ fontSize: "14px", color: C.sub, margin: "6px 0 22px" }}>
               À présenter à l'assemblée générale. Calculé en direct à partir des données enregistrées dans l'application.
             </p>
             <div style={{ display: "flex", gap: "14px", marginBottom: "22px", flexWrap: "wrap" }}>
@@ -3276,66 +3280,66 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               <StatCard label="Membres" value={`${membres.filter((m) => m.statut === "actif").length} actif(s)`} icon={<Users size={16} />} />
             </div>
 
-            <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px" }}>Répartition par module</h2>
+            <h2 className="adm-h2">Répartition par module</h2>
             <Table cols={["Module", "Solde actuel", "Détail"]} widths="1.4fr 1.2fr 2fr"
               rows={[
                 ...epargnes.map((ep) => [
                   ep.nom, fmtFCFA(ep.solde),
-                  <span style={{ color: C.sub, fontSize: 12 }}>Clôture {ep.cloture} · taux {ep.tauxInteret}</span>,
+                  <span style={{ color: C.sub, fontSize: 13 }}>Clôture {ep.cloture} · taux {ep.tauxInteret}</span>,
                 ]),
                 ...comptesBancaires.map((c) => [
                   c.nom, fmtFCFA(c.solde),
-                  <span style={{ color: C.sub, fontSize: 12 }}>{c.type} · {c.banque || "—"}</span>,
+                  <span style={{ color: C.sub, fontSize: 13 }}>{c.type} · {c.banque || "—"}</span>,
                 ]),
                 [
                   "Tontine",
                   `${tours.filter((t) => t.statut === "clôturé").length} tour(s) clôturé(s)`,
-                  <span style={{ color: C.sub, fontSize: 12 }}>{tours.length} tour(s) au total, {tours.filter((t) => t.statut === "en cours").length} en cours</span>,
+                  <span style={{ color: C.sub, fontSize: 13 }}>{tours.length} tour(s) au total, {tours.filter((t) => t.statut === "en cours").length} en cours</span>,
                 ],
                 ...(totalRedistributions > 0 ? [[
                   "Commissions redistribuées",
                   fmtFCFA(totalRedistributions),
-                  <span style={{ color: C.sub, fontSize: 12 }}>Commissions d'enchères déjà reversées aux membres</span>,
+                  <span style={{ color: C.sub, fontSize: 13 }}>Commissions d'enchères déjà reversées aux membres</span>,
                 ]] : []),
                 [
                   "Assurance",
                   fmtFCFA(Object.values(assuranceSoldes).reduce((s, a) => s + (a.solde || 0), 0)),
-                  <span style={{ color: C.sub, fontSize: 12 }}>{evenements.length} événement(s) déclaré(s) cette année</span>,
+                  <span style={{ color: C.sub, fontSize: 13 }}>{evenements.length} événement(s) déclaré(s) cette année</span>,
                 ],
                 ...typesFonds.map((t) => [
                   t.nom,
                   fmtFCFA(Object.values(fondsParMembre).flat().filter((f) => f.typeFondsId === t.id).reduce((s, f) => s + (f.solde || 0), 0)),
-                  <span style={{ color: C.sub, fontSize: 12 }}>Objectif {fmtFCFA(t.cible)} par membre</span>,
+                  <span style={{ color: C.sub, fontSize: 13 }}>Objectif {fmtFCFA(t.cible)} par membre</span>,
                 ]),
                 [
                   "Prêts en cours",
                   `${prets.filter((p) => p.statut === "en cours").length} prêt(s)`,
-                  <span style={{ color: C.sub, fontSize: 12 }}>{prets.filter((p) => p.statut === "remboursé").length} remboursé(s)</span>,
+                  <span style={{ color: C.sub, fontSize: 13 }}>{prets.filter((p) => p.statut === "remboursé").length} remboursé(s)</span>,
                 ],
                 [
                   "Membres",
                   `${membres.filter((m) => m.statut === "actif").length} actif(s)`,
-                  <span style={{ color: C.sub, fontSize: 12 }}>{membres.filter((m) => m.statut === "en attente").length} en attente de validation</span>,
+                  <span style={{ color: C.sub, fontSize: 13 }}>{membres.filter((m) => m.statut === "en attente").length} en attente de validation</span>,
                 ],
                 [
                   "Caisse des amendes",
                   fmtFCFA(soldeCaisseAmendes),
-                  <span style={{ color: C.sub, fontSize: 12 }}>Amendes de séance payées (espèces ou déduit banque)</span>,
+                  <span style={{ color: C.sub, fontSize: 13 }}>Amendes de séance payées (espèces ou déduit banque)</span>,
                 ],
                 [
                   "Caisse reliquat boisson",
                   fmtFCFA(soldeCaisseRafraichissement),
-                  <span style={{ color: soldeCaisseRafraichissement < 0 ? C.warn : C.sub, fontSize: 12 }}>{soldeCaisseRafraichissement < 0 ? "En débit — à rééquilibrer" : `${rafraichissementsList.length} rafraîchissement(s) enregistré(s)`}</span>,
+                  <span style={{ color: soldeCaisseRafraichissement < 0 ? C.warn : C.sub, fontSize: 13 }}>{soldeCaisseRafraichissement < 0 ? "En débit — à rééquilibrer" : `${rafraichissementsList.length} rafraîchissement(s) enregistré(s)`}</span>,
                 ],
                 [
                   "Séances",
                   `${seancesList.filter((s) => s.statut === "terminée").length} terminée(s)`,
-                  <span style={{ color: C.sub, fontSize: 12 }}>{seancesList.length} séance(s) au total</span>,
+                  <span style={{ color: C.sub, fontSize: 13 }}>{seancesList.length} séance(s) au total</span>,
                 ],
                 [
                   "Dépenses",
                   fmtFCFA(depensesList.reduce((s, d) => s + Number(d.montant), 0)),
-                  <span style={{ color: C.sub, fontSize: 12 }}>{depensesList.length} dépense(s) enregistrée(s)</span>,
+                  <span style={{ color: C.sub, fontSize: 13 }}>{depensesList.length} dépense(s) enregistrée(s)</span>,
                 ],
               ]}
             />
@@ -3371,14 +3375,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
         {view === "membres" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+            <div className="adm-entete">
               <div>
-                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Membres</h1>
-                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
+                <h1 className="adm-titre">Membres</h1>
+                <p className="adm-sous-titre">
                   Invitation soumise à validation du Président. {loadingData ? "Chargement..." : `${membres.length} membre(s) enregistré(s).`}
                 </p>
                 {membresErreurChargement && (
-                  <p style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px", marginTop: "8px" }}>
+                  <p style={{ fontSize: "13px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px", marginTop: "8px" }}>
                     {membresErreurChargement}
                   </p>
                 )}
@@ -3400,28 +3404,28 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               </div>
             </div>
             <div style={{ marginTop: "22px" }} />
-            <Table cols={["Nom", "Identifiant", "Rôle", "Statut", "Fonds de garantie", ""]} widths="1.1fr 1fr 0.8fr 0.8fr 1.3fr 1.7fr"
+            <Table cols={["Nom", "Identifiant", "Rôle", "Statut", "Fonds de garantie", ""]} widths="1.2fr 1fr 0.8fr 0.8fr 1fr 3fr"
               rows={membres.map((m, i) => {
                 const fg = fondsGarantieDe(m.id);
                 return [
                 m.nom,
-                <span style={{ color: C.sub, fontSize: 12 }}>{m.identifiant || "—"}</span>,
+                <span style={{ color: C.sub, fontSize: 13 }}>{m.identifiant || "—"}</span>,
                 m.role,
                 <Badge bg={m.statut === "actif" ? C.ok : C.warnBg} fg={m.statut === "actif" ? C.accent2 : C.warn}>{m.statut}</Badge>,
                 <div>
-                  <div style={{ fontSize: "11.5px", fontWeight: 600, color: fg && fg.solde >= fg.cible && fg.cible > 0 ? C.accent2 : C.ink }}>
+                  <div style={{ fontSize: "12.5px", fontWeight: 600, color: fg && fg.solde >= fg.cible && fg.cible > 0 ? C.accent2 : C.ink }}>
                     {fmtFCFA(fg?.solde || 0)} / {fmtFCFA(fg?.cible || 0)}
                   </div>
                   {fg && fg.cible > 0 && (
-                    <div style={{ width: "100%", height: "5px", background: "#EEE", borderRadius: "3px", marginTop: "4px", overflow: "hidden" }}>
-                      <div style={{ width: `${Math.min(100, (fg.solde / fg.cible) * 100)}%`, height: "100%", background: fg.solde >= fg.cible ? C.accent2 : C.warn }} />
+                    <div style={{ width: "100%", height: "5px", background: "#E3DED0", borderRadius: "3px", marginTop: "4px", overflow: "hidden" }}>
+                      <div style={{ width: `${Math.min(100, (fg.solde / fg.cible) * 100)}%`, height: "100%", background: fg.solde >= fg.cible ? C.accent2 : C.accent }} />
                     </div>
                   )}
                 </div>,
                 <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                   <button
                     onClick={() => { setShowGererFondsMembre(m); }}
-                    style={{ background: "transparent", color: C.vifOr, border: `1px solid ${C.vifOr}66`, borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                    className="adm-btn-ligne"
                   >
                     Gérer les fonds
                   </button>
@@ -3436,7 +3440,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                           console.error("Erreur de validation du membre", e);
                         }
                       }}
-                      style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                      className="adm-btn-ligne adm-btn-ligne-plein"
                     >
                       Valider
                     </button>
@@ -3452,12 +3456,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                           console.error("Erreur de changement de statut du membre", e);
                         }
                       }}
-                      style={{
-                        background: m.statut === "actif" ? "transparent" : C.accent2,
-                        color: m.statut === "actif" ? C.warn : "#FAF6ED",
-                        border: m.statut === "actif" ? `1px solid ${C.warn}66` : "none",
-                        borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer",
-                      }}
+                      className={`adm-btn-ligne ${m.statut === "actif" ? "adm-btn-ligne-danger" : "adm-btn-ligne-plein"}`}
                     >
                       {m.statut === "actif" ? "Rendre inactif" : "Réactiver"}
                     </button>
@@ -3476,7 +3475,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         setChargementHistoriqueMembre(false);
                       }
                     }}
-                    style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}55`, borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                    className="adm-btn-ligne"
                   >
                     Historique
                   </button>
@@ -3497,20 +3496,20 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         console.error("Erreur de chargement des documents", e);
                       }
                     }}
-                    style={{ background: "transparent", color: C.accent2, border: `1px solid ${C.border}`, borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                    className="adm-btn-ligne"
                   >
                     Modifier
                   </button>
                   <button
                     onClick={() => { setShowDeleteMembre(m); setDeleteErreur(""); }}
-                    style={{ background: "transparent", color: C.warn, border: `1px solid ${C.warn}55`, borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                    className="adm-btn-ligne adm-btn-ligne-danger"
                   >
                     Supprimer
                   </button>
                 </div>,
               ];
               })} />
-            <div style={{ fontSize: "11px", color: C.sub, marginTop: "10px" }}>
+            <div className="adm-aide adm-aide-espace">
               Les membres invités sont sauvegardés automatiquement. "Compte non activé" signifie que le membre n'a pas encore créé son mot de passe de connexion.
             </div>
           </>
@@ -3520,45 +3519,45 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showCotisationTontine && (
         <Modal onClose={() => setShowCotisationTontine(false)} title="Enregistrer une cotisation — Tontine">
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Date de la séance</label>
+            <label className="adm-label">Date de la séance</label>
             <input
               value={cotisationTontineDate}
               onChange={(e) => setCotisationTontineDate(e.target.value)}
               placeholder="jj/mm/aaaa"
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             />
-            <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>
+            <div className="adm-aide">
               Une seule date pour toute la séance — elle s'applique à chaque montant saisi ci-dessous.
             </div>
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Montant par membre</label>
+            <label className="adm-label">Montant par membre</label>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {membres.map((m) => (
                 <div key={m.nom} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div style={{ flex: 1, fontSize: "13px", fontWeight: 600 }}>{m.nom}</div>
+                  <div style={{ flex: 1, fontSize: "14px", fontWeight: 600 }}>{m.nom}</div>
                   <input
                     value={cotisationTontineMontants[m.nom] || ""}
                     onChange={(e) => setMontantTontineMembre(m.nom, e.target.value)}
                     placeholder="0 FCFA"
-                    style={{ width: "130px", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none", textAlign: "right" }}
+                    className="adm-input adm-input-compact adm-input-montant"
                   />
                 </div>
               ))}
             </div>
           </div>
 
-          <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Laissez vide un membre qui n'a pas cotisé — il apparaîtra automatiquement dans les cotisations en attente.
           </div>
           {cotisationTontineError && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {cotisationTontineError}
             </div>
           )}
           <button
-            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn-valider"
             onClick={async () => {
               if (!cotisationTontineDate.trim()) { setCotisationTontineError("La date de séance est obligatoire."); return; }
               if (!tourEnCours) { setCotisationTontineError("Aucun tour en cours."); return; }
@@ -3598,7 +3597,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showConfigAssurance && (
         <Modal onClose={() => setShowConfigAssurance(false)} title="Configurer l'assurance" icon={<HeartHandshake />} accentColor={C.vifRose}>
-          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Chaque groupe fixe son propre montant minimum, son propre délai de reconstitution, et le montant standard prélevé par membre à chaque événement.
           </div>
           <FormField label="Solde minimum requis par membre (FCFA)" placeholder="Ex. 80 000" value={configSoldeMinimum} onChange={(e) => setConfigSoldeMinimum(e.target.value)} />
@@ -3606,18 +3605,18 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <FormField label="Montant standard prélevé par membre (FCFA)" placeholder="Ex. 10 000" value={configMontantPrelevement} onChange={(e) => setConfigMontantPrelevement(e.target.value)} />
 
           {configAssuranceErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {configAssuranceErreur}
             </div>
           )}
           {configAssuranceSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               <CheckCircle2 size={14} /> Configuration enregistrée.
             </div>
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}
+            style={{ marginTop: "6px", background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}
             onClick={async () => {
               const soldeNum = parseInt(configSoldeMinimum.replace(/[^\d]/g, ""), 10);
               const delaiNum = parseInt(configDelaiJours.replace(/[^\d]/g, ""), 10);
@@ -3648,18 +3647,18 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showDeclarerEvenement && (
         <Modal onClose={() => setShowDeclarerEvenement(false)} title="Déclarer un événement">
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Type d'événement</label>
+            <label className="adm-label">Type d'événement</label>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               <select
                 value={typeEvenementId}
                 onChange={(e) => setTypeEvenementId(e.target.value)}
-                style={{ flex: 1, boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+                className="adm-input adm-flex"
               >
                 {eventTypes.map((t) => <option key={t.id} value={t.id}>{t.nom}</option>)}
               </select>
               <button
                 onClick={() => setShowNewType(!showNewType)}
-                style={{ background: C.ok, color: C.accent2, border: `1px solid ${C.accent2}33`, borderRadius: "9px", padding: "0 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                className="adm-btn-mini adm-btn-mini-doux"
               >
                 <Plus size={14} />
               </button>
@@ -3670,24 +3669,24 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   value={newTypeName}
                   onChange={(e) => setNewTypeName(e.target.value)}
                   placeholder="Ex. Naissance, Maladie..."
-                  style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
+                  className="adm-input adm-input-compact adm-flex"
                 />
-                <button onClick={addEventType} style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "0 12px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}>
+                <button onClick={addEventType} className="adm-btn-mini">
                   Ajouter
                 </button>
               </div>
             )}
-            <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>
+            <div className="adm-aide">
               L'admin peut ajouter de nouveaux types d'événements propres au groupe.
             </div>
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Membre bénéficiaire</label>
+            <label className="adm-label">Membre bénéficiaire</label>
             <select
               value={evenementBeneficiaire}
               onChange={(e) => setEvenementBeneficiaire(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Sélectionner un membre</option>
               {membres.filter((m) => m.statut === "actif").map((m) => {
@@ -3700,7 +3699,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 );
               })}
             </select>
-            <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>
+            <div className="adm-aide">
               Seuls les membres à jour de leur assurance peuvent bénéficier de l'aide.
             </div>
           </div>
@@ -3715,44 +3714,44 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               <FormField label="Frais de déclaration" placeholder="Ex. 2 000 FCFA" />
             </div>
           </div>
-          <div style={{ fontSize: "11px", color: C.sub, marginTop: "-6px" }}>
+          <div className="adm-aide adm-aide-colle">
             Le membre doit déclarer l'événement à l'avance (ex. une semaine avant) ; l'aide est décaissée une semaine avant la date de l'événement.
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Membres délégués (représentation à l'événement)</label>
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", marginBottom: "8px", cursor: "pointer" }}>
+            <label className="adm-label">Membres délégués (représentation à l'événement)</label>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px", marginBottom: "8px", cursor: "pointer" }}>
               <input type="checkbox" checked={touteReunion} onChange={(e) => setTouteReunion(e.target.checked)} />
               Toute la réunion se déplace
             </label>
             {!touteReunion && (
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {membres.filter((m) => m.statut === "actif").map((m) => (
-                  <label key={m.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", cursor: "pointer" }}>
+                  <label key={m.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px", cursor: "pointer" }}>
                     <input type="checkbox" checked={delegues.includes(m.id)} onChange={() => toggleDelegue(m.id)} />
                     {m.nom}
                   </label>
                 ))}
               </div>
             )}
-            <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>
+            <div className="adm-aide">
               Choisissez 2 personnes, plus, ou toute la réunion selon le cas.
             </div>
           </div>
 
           <FormField label="Montant brut de l'aide" placeholder="Ex. 50 000 FCFA" value={evenementMontant} onChange={(e) => setEvenementMontant(e.target.value)} />
-          <div style={{ fontSize: "11px", color: C.sub, marginTop: "-6px" }}>
+          <div className="adm-aide adm-aide-colle">
             Montant standard configuré pour ce groupe : <b>{fmtFCFA(montantPrelevementDefaut)}</b> par membre — soit {fmtFCFA(montantPrelevementDefaut * membres.filter((m) => m.statut === "actif").length)} au total pour {membres.filter((m) => m.statut === "actif").length} membre(s) actif(s).{" "}
             <button
               onClick={() => setEvenementMontant(String(montantPrelevementDefaut * membres.filter((m) => m.statut === "actif").length))}
-              style={{ background: "none", border: "none", color: C.vifRose, fontWeight: 700, cursor: "pointer", padding: 0, fontSize: "11px" }}
+              style={{ background: "none", border: "none", color: C.vifRose, fontWeight: 700, cursor: "pointer", padding: 0, fontSize: "12px" }}
             >
               Utiliser ce montant
             </button>
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Déductions (transport, achats, etc.)</label>
+            <label className="adm-label">Déductions (transport, achats, etc.)</label>
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               {deductions.map((d, i) => (
                 <div key={i} style={{ display: "flex", gap: "6px", alignItems: "center" }}>
@@ -3760,13 +3759,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     value={d.label}
                     onChange={(e) => updateDeduction(i, "label", e.target.value)}
                     placeholder="Ex. Achat de couronne"
-                    style={{ flex: 1.4, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
+                    style={{ flex: 1.4, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none" }}
                   />
                   <input
                     value={d.montant}
                     onChange={(e) => updateDeduction(i, "montant", e.target.value)}
                     placeholder="Montant"
-                    style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none", textAlign: "right" }}
+                    style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none", textAlign: "right" }}
                   />
                   <X size={14} color={C.sub} style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => removeDeduction(i)} />
                 </div>
@@ -3774,37 +3773,37 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
             <button
               onClick={addDeduction}
-              style={{ marginTop: "8px", background: "transparent", border: `1px dashed ${C.border}`, borderRadius: "8px", padding: "7px 10px", fontSize: "11.5px", fontWeight: 600, color: C.sub, cursor: "pointer", width: "100%" }}
+              style={{ marginTop: "8px", background: "transparent", border: `1px dashed ${C.border}`, borderRadius: "8px", padding: "7px 10px", fontSize: "12.5px", fontWeight: 600, color: C.sub, cursor: "pointer", width: "100%" }}
             >
               + Ajouter une déduction
             </button>
-            <div style={{ fontSize: "11px", color: C.sub, marginTop: "6px" }}>
+            <div className="adm-aide">
               Ces frais sont déduits selon le règlement propre au groupe (transport des délégués, achats, etc.), avant versement du reste au bénéficiaire.
             </div>
           </div>
 
           <FormField label="Date de l'événement" placeholder="jj/mm/aaaa" />
 
-          <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Le montant brut sera prélevé au prorata sur le solde d'assurance de <b>tous les membres</b>, et non depuis une caisse déjà constituée.
           </div>
-          <div style={{ fontSize: "11px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
             Chaque membre débité aura un délai de reconstitution (défini par le groupe) pour ramener son solde au minimum requis.
           </div>
 
           {evenementError && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {evenementError}
             </div>
           )}
           {evenementSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               <CheckCircle2 size={14} /> Événement déclaré — les soldes d'assurance de tous les membres ont été mis à jour.
             </div>
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn-valider"
             onClick={async () => {
               const montantBrut = parseInt(evenementMontant.replace(/[^\d]/g, ""), 10);
               if (!evenementBeneficiaire) { setEvenementError("Sélectionnez un membre bénéficiaire à jour."); setEvenementSuccess(false); return; }
@@ -3877,42 +3876,42 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showCotisationAssurance && (
         <Modal onClose={() => setShowCotisationAssurance(false)} title="Enregistrer une cotisation — Assurance">
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Date de la séance</label>
+            <label className="adm-label">Date de la séance</label>
             <input
               value={cotisationAssuranceDate}
               onChange={(e) => setCotisationAssuranceDate(e.target.value)}
               placeholder="jj/mm/aaaa"
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             />
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Montant versé par membre</label>
+            <label className="adm-label">Montant versé par membre</label>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {membres.map((m) => (
                 <div key={m.nom} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div style={{ flex: 1, fontSize: "13px", fontWeight: 600 }}>{m.nom}</div>
+                  <div style={{ flex: 1, fontSize: "14px", fontWeight: 600 }}>{m.nom}</div>
                   <input
                     value={cotisationAssuranceMontants[m.nom] || ""}
                     onChange={(e) => setMontantAssuranceMembre(m.nom, e.target.value)}
                     placeholder="0 FCFA"
-                    style={{ width: "130px", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none", textAlign: "right" }}
+                    className="adm-input adm-input-compact adm-input-montant"
                   />
                 </div>
               ))}
             </div>
           </div>
 
-          <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Ces montants viennent reconstituer le solde d'assurance de chaque membre vers le minimum requis.
           </div>
           {cotisationAssuranceErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {cotisationAssuranceErreur}
             </div>
           )}
           <button
-            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn-valider"
             onClick={async () => {
               try {
                 const cotisations = membres
@@ -3950,26 +3949,26 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showCloture && (
         <Modal onClose={() => setShowCloture(null)} title={`Clôturer — ${showCloture.nom}`} icon={<PiggyBank />} accentColor={C.vifRose}>
           {clotureChargement ? (
-            <div style={{ fontSize: "13px", color: C.sub, textAlign: "center", padding: "20px 0" }}>Calcul en cours...</div>
+            <div className="adm-vide">Calcul en cours...</div>
           ) : !clotureApercu ? (
-            <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>{clotureErreur || "Erreur de chargement."}</div>
+            <div className="adm-msg adm-msg-erreur" role="alert">{clotureErreur || "Erreur de chargement."}</div>
           ) : clotureEtape === 1 ? (
             <>
-              <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+              <div className="adm-msg adm-msg-info">
                 Taux annuel : <b>{clotureApercu.taux}%</b> — intérêt calculé au prorata du montant et de la durée de chaque dépôt.
               </div>
 
               {clotureApercu.membres.length === 0 ? (
-                <div style={{ fontSize: "12.5px", color: C.sub, textAlign: "center", padding: "10px 0" }}>Aucune cotisation enregistrée sur cette épargne.</div>
+                <div className="adm-vide">Aucune cotisation enregistrée sur cette épargne.</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   {clotureApercu.membres.map((m) => (
-                    <div key={m.membreId} style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px", fontSize: "12px" }}>
+                    <div key={m.membreId} style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px", fontSize: "13px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
                         <b>{m.nom}</b>
                         <b style={{ color: C.accent2 }}>{fmtFCFA(m.total)}</b>
                       </div>
-                      <div style={{ color: C.sub, fontSize: "11px" }}>Capital {fmtFCFA(m.capital)} + intérêt {fmtFCFA(m.interet)}</div>
+                      <div style={{ color: C.sub, fontSize: "12px" }}>Capital {fmtFCFA(m.capital)} + intérêt {fmtFCFA(m.interet)}</div>
                     </div>
                   ))}
                 </div>
@@ -3977,7 +3976,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
               <button
                 disabled={clotureApercu.membres.length === 0}
-                style={{ marginTop: "6px", background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: clotureApercu.membres.length === 0 ? "default" : "pointer", opacity: clotureApercu.membres.length === 0 ? 0.6 : 1 }}
+                style={{ marginTop: "6px", background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: clotureApercu.membres.length === 0 ? "default" : "pointer", opacity: clotureApercu.membres.length === 0 ? 0.6 : 1 }}
                 onClick={() => setClotureEtape(2)}
               >
                 Continuer
@@ -3985,13 +3984,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </>
           ) : (
             <>
-              <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+              <div className="adm-msg adm-msg-info">
                 Pour chaque membre, choisis s'il récupère son montant (sort de la caisse) ou le reconduit (reversé dans une nouvelle épargne).
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {clotureApercu.membres.map((m) => (
-                  <div key={m.membreId} style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "6px" }}>
+                  <div key={m.membreId} className="adm-encart">
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px" }}>
                       <b>{m.nom}</b>
                       <b style={{ color: C.accent2 }}>{fmtFCFA(m.total)}</b>
                     </div>
@@ -4000,7 +3999,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         <div
                           key={opt}
                           onClick={() => setClotureDecisions({ ...clotureDecisions, [m.membreId]: opt })}
-                          style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "7px", border: `1px solid ${clotureDecisions[m.membreId] === opt ? C.vifRose : C.border}`, background: clotureDecisions[m.membreId] === opt ? `${C.vifRose}14` : "#FFFFFF", fontSize: "11px", fontWeight: 600, color: clotureDecisions[m.membreId] === opt ? C.vifRose : C.sub, cursor: "pointer" }}
+                          style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "7px", border: `1px solid ${clotureDecisions[m.membreId] === opt ? C.vifRose : C.border}`, background: clotureDecisions[m.membreId] === opt ? `${C.vifRose}14` : "#FFFFFF", fontSize: "12px", fontWeight: 600, color: clotureDecisions[m.membreId] === opt ? C.vifRose : C.sub, cursor: "pointer" }}
                         >
                           {opt === "recuperer" ? "Récupérer" : "Reconduire"}
                         </div>
@@ -4015,18 +4014,18 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               )}
 
               {clotureErreur && (
-                <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                <div className="adm-msg adm-msg-erreur" role="alert">
                   {clotureErreur}
                 </div>
               )}
 
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                <button onClick={() => setClotureEtape(1)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, color: C.sub, cursor: "pointer" }}>
+                <button onClick={() => setClotureEtape(1)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, color: C.sub, cursor: "pointer" }}>
                   Retour
                 </button>
                 <button
                   disabled={clotureEnCours}
-                  style={{ flex: 2, background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: clotureEnCours ? "default" : "pointer" }}
+                  style={{ flex: 2, background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: clotureEnCours ? "default" : "pointer" }}
                   onClick={async () => {
                     setClotureEnCours(true);
                     setClotureErreur("");
@@ -4064,13 +4063,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showCreateEpargne && (
         <Modal onClose={() => setShowCreateEpargne(false)} title="Créer une épargne">
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Type</label>
+            <label className="adm-label">Type</label>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {["Banque scolaire", "Banque annuelle", "Personnalisée"].map((m) => (
                 <div
                   key={m}
                   onClick={() => setEpargneType(m)}
-                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${epargneType === m ? C.accent2 : C.border}`, background: epargneType === m ? C.ok : "#FBFAF6", fontSize: "11px", fontWeight: 600, color: epargneType === m ? C.accent2 : C.sub, cursor: "pointer" }}
+                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${epargneType === m ? C.accent2 : C.border}`, background: epargneType === m ? C.ok : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: epargneType === m ? C.accent2 : C.sub, cursor: "pointer" }}
                 >
                   {m}
                 </div>
@@ -4083,18 +4082,18 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <FormField label="Date de clôture du cycle" placeholder="jj/mm/aaaa" value={epargneCloture} onChange={(e) => setEpargneCloture(e.target.value)} />
 
           {epargneError && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {epargneError}
             </div>
           )}
           {epargneSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               <CheckCircle2 size={14} /> Épargne créée — elle apparaît maintenant dans la vue d'ensemble de la Banque.
             </div>
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn-valider"
             onClick={async () => {
               if (!epargneNom.trim()) { setEpargneError("Le nom de l'épargne est obligatoire."); setEpargneSuccess(false); return; }
               if (epargnes.some((ep) => ep.nom.toLowerCase() === epargneNom.trim().toLowerCase())) {
@@ -4133,11 +4132,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showCotisationBanque && (
         <Modal onClose={() => setShowCotisationBanque(false)} title="Enregistrer une cotisation">
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Épargne concernée</label>
+            <label className="adm-label">Épargne concernée</label>
             <select
               value={cotisationEpargneId}
               onChange={(e) => setCotisationEpargneId(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Sélectionner une épargne</option>
               {epargnes.map((ep) => (
@@ -4147,45 +4146,45 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Date du dépôt (séance)</label>
+            <label className="adm-label">Date du dépôt (séance)</label>
             <input
               value={cotisationDate}
               onChange={(e) => setCotisationDate(e.target.value)}
               placeholder="jj/mm/aaaa"
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             />
-            <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>
+            <div className="adm-aide">
               Une seule date pour toute la séance — elle s'applique à chaque montant saisi ci-dessous.
             </div>
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Montant par membre</label>
+            <label className="adm-label">Montant par membre</label>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {membres.map((m) => (
                 <div key={m.nom} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div style={{ flex: 1, fontSize: "13px", fontWeight: 600 }}>{m.nom}</div>
+                  <div style={{ flex: 1, fontSize: "14px", fontWeight: 600 }}>{m.nom}</div>
                   <input
                     value={cotisationMontants[m.nom] || ""}
                     onChange={(e) => setMontantMembre(m.nom, e.target.value)}
                     placeholder="0 FCFA"
-                    style={{ width: "130px", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none", textAlign: "right" }}
+                    className="adm-input adm-input-compact adm-input-montant"
                   />
                 </div>
               ))}
             </div>
           </div>
 
-          <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             La date du dépôt sert au calcul des intérêts au prorata à la clôture du cycle. Laissez vide un membre qui n'a pas cotisé.
           </div>
           {cotisationBanqueErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {cotisationBanqueErreur}
             </div>
           )}
           <button
-            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn-valider"
             onClick={async () => {
               if (!cotisationEpargneId) { setCotisationBanqueErreur("Sélectionne une épargne."); return; }
               if (!cotisationDate.trim()) { setCotisationBanqueErreur("La date du dépôt est obligatoire."); return; }
@@ -4227,22 +4226,22 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showCreditForm && (
         <Modal onClose={() => setShowCreditForm(false)} title="Mettre en place un crédit">
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Épargne concernée</label>
+            <label className="adm-label">Épargne concernée</label>
             <select
               value={creditEpargneId}
               onChange={(e) => setCreditEpargneId(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Sélectionner une épargne</option>
               {epargnes.map((ep) => <option key={ep.id} value={ep.id}>{ep.nom} ({fmtFCFA(ep.solde)} disponible)</option>)}
             </select>
           </div>
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Membre emprunteur</label>
+            <label className="adm-label">Membre emprunteur</label>
             <select
               value={creditMembreId}
               onChange={(e) => setCreditMembreId(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Sélectionner un membre</option>
               {membres.filter((m) => m.statut === "actif").map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
@@ -4263,53 +4262,53 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <FormField label="Pénalité en cas de non-remboursement" placeholder="Ex. 3 % du solde dû par mois de retard" value={creditPenalite} onChange={(e) => setCreditPenalite(e.target.value)} />
 
-          <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Le taux ou montant de pénalité est fixé par l'admin du groupe et s'applique automatiquement dès l'échéance dépassée.
           </div>
 
-          <div style={{ fontSize: "11.5px", color: C.sub, background: "#EBE6F5", border: `1px solid ${C.purple}44`, borderRadius: "8px", padding: "9px 11px" }}>
+          <div style={{ fontSize: "12.5px", color: C.sub, background: "#EBE6F5", border: `1px solid ${C.purple}44`, borderRadius: "8px", padding: "9px 11px" }}>
             <b style={{ color: C.purple }}>Renouvellement</b> — ce membre a droit à un renouvellement unique de ce crédit, sous réserve du paiement des frais de mise en place à chaque renouvellement.
           </div>
 
-          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "9px 11px" }}>
+          <div className="adm-msg adm-msg-info">
             Fonds de garantie du membre : <b>{fmtFCFA(fondsGarantieDe(creditMembreId)?.solde || 0)}</b>
           </div>
 
-          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: C.sub, cursor: "pointer" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: C.sub, cursor: "pointer" }}>
             <input type="checkbox" checked={creditDepasseCaution} onChange={(e) => setCreditDepasseCaution(e.target.checked)} />
             Le montant demandé dépasse le fonds de garantie du membre
           </label>
 
           {creditDepasseCaution && (
             <div>
-              <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Avaliste (garant)</label>
+              <label className="adm-label">Avaliste (garant)</label>
               <select
                 value={creditAvalisteId}
                 onChange={(e) => setCreditAvalisteId(e.target.value)}
-                style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+                className="adm-input"
               >
                 <option value="">Sélectionner un avaliste</option>
                 {membres.filter((m) => m.statut === "actif" && m.id !== creditMembreId).map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
               </select>
-              <div style={{ fontSize: "11px", color: C.sub, marginTop: "6px" }}>
+              <div className="adm-aide">
                 Un avaliste peut garantir plusieurs membres tant que la somme des montants garantis ne dépasse pas ses avoirs.
               </div>
             </div>
           )}
 
           {creditError && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {creditError}
             </div>
           )}
           {creditSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               <CheckCircle2 size={14} /> Crédit mis en place — il apparaît maintenant dans la liste des prêts en cours.
             </div>
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn-valider"
             onClick={async () => {
               const montantNum = parseInt(creditMontant.replace(/[^\d]/g, ""), 10);
               if (!creditEpargneId) { setCreditError("Sélectionnez l'épargne concernée."); setCreditSuccess(false); return; }
@@ -4384,17 +4383,17 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           {!rapportJour ? (
             <>
               <FormField label="Date de la séance" placeholder="jj/mm/aaaa" value={rapportJourDate} onChange={(e) => setRapportJourDate(e.target.value)} />
-              <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "9px 11px" }}>
+              <div className="adm-msg adm-msg-info">
                 Le rapport reprend toutes les cotisations, versements, amendes, mouvements bancaires et événements d'assurance enregistrés à cette date, tous modules confondus.
               </div>
               {rapportJourErreur && (
-                <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                <div className="adm-msg adm-msg-erreur" role="alert">
                   {rapportJourErreur}
                 </div>
               )}
               <button
                 disabled={rapportJourChargement}
-                style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: rapportJourChargement ? "default" : "pointer" }}
+                style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: rapportJourChargement ? "default" : "pointer" }}
                 onClick={async () => {
                   const iso = versDateISO(rapportJourDate);
                   if (!iso) { setRapportJourErreur("Saisis une date valide (jj/mm/aaaa)."); return; }
@@ -4416,15 +4415,15 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </>
           ) : (
             <>
-              <div style={{ fontSize: "13px", fontWeight: 700 }}>{rapportJourDate}</div>
+              <div style={{ fontSize: "14px", fontWeight: 700 }}>{rapportJourDate}</div>
 
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <div style={{ flex: 1, background: C.ok, borderRadius: "10px", padding: "10px 12px" }}>
-                  <div style={{ fontSize: "10.5px", color: C.accent2 }}>Total encaissé</div>
+                  <div style={{ fontSize: "12px", color: C.accent2 }}>Total encaissé</div>
                   <div style={{ fontSize: "15px", fontWeight: 700, color: C.accent2 }}>{fmtFCFA(rapportJour.totalEncaisse)}</div>
                 </div>
                 <div style={{ flex: 1, background: C.warnBg, borderRadius: "10px", padding: "10px 12px" }}>
-                  <div style={{ fontSize: "10.5px", color: C.warn }}>Total décaissé</div>
+                  <div style={{ fontSize: "12px", color: C.warn }}>Total décaissé</div>
                   <div style={{ fontSize: "15px", fontWeight: 700, color: C.warn }}>{fmtFCFA(rapportJour.totalDecaisse)}</div>
                 </div>
               </div>
@@ -4434,7 +4433,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                (!rapportJour.mouvementsFonds || rapportJour.mouvementsFonds.length === 0) &&
                (!rapportJour.amendesSeanceDeclarees || rapportJour.amendesSeanceDeclarees.length === 0) &&
                (!rapportJour.paiementsAmendesJour || rapportJour.paiementsAmendesJour.length === 0) && (
-                <div style={{ fontSize: "12.5px", color: C.sub, textAlign: "center", padding: "10px 0" }}>Aucune activité enregistrée à cette date.</div>
+                <div className="adm-vide">Aucune activité enregistrée à cette date.</div>
               )}
 
               {rapportJour.tontineCotisations.length > 0 && (
@@ -4503,7 +4502,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
               <button
                 onClick={() => { setRapportJour(null); setRapportJourDate(""); }}
-                style={{ marginTop: "6px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+                style={{ marginTop: "6px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
               >
                 Choisir une autre date
               </button>
@@ -4518,29 +4517,29 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             <>
               <div style={{ display: "flex", gap: "8px" }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Mois</label>
-                  <select value={rapportMoisSelection} onChange={(e) => setRapportMoisSelection(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}>
+                  <label className="adm-label">Mois</label>
+                  <select value={rapportMoisSelection} onChange={(e) => setRapportMoisSelection(e.target.value)} className="adm-input">
                     {["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map((m, i) => (
                       <option key={m} value={m}>{["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"][i]}</option>
                     ))}
                   </select>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Année</label>
-                  <input value={rapportAnneeSelection} onChange={(e) => setRapportAnneeSelection(e.target.value.replace(/[^\d]/g, ""))} maxLength={4} style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }} />
+                  <label className="adm-label">Année</label>
+                  <input value={rapportAnneeSelection} onChange={(e) => setRapportAnneeSelection(e.target.value.replace(/[^\d]/g, ""))} maxLength={4} className="adm-input" />
                 </div>
               </div>
-              <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "9px 11px" }}>
+              <div className="adm-msg adm-msg-info">
                 Synthèse de toutes les activités du mois sélectionné, tous modules confondus.
               </div>
               {rapportMoisErreur && (
-                <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                <div className="adm-msg adm-msg-erreur" role="alert">
                   {rapportMoisErreur}
                 </div>
               )}
               <button
                 disabled={rapportMoisChargement}
-                style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: rapportMoisChargement ? "default" : "pointer" }}
+                style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: rapportMoisChargement ? "default" : "pointer" }}
                 onClick={async () => {
                   setRapportMoisChargement(true);
                   setRapportMoisErreur("");
@@ -4560,26 +4559,26 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </>
           ) : (
             <>
-              <div style={{ fontSize: "13px", fontWeight: 700 }}>
+              <div style={{ fontSize: "14px", fontWeight: 700 }}>
                 {["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"][parseInt(rapportMois.periode.slice(5, 7), 10) - 1]} {rapportMois.periode.slice(0, 4)}
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
                 <div style={{ flex: 1, background: C.ok, borderRadius: "10px", padding: "10px 12px" }}>
-                  <div style={{ fontSize: "10.5px", color: C.accent2 }}>Total encaissé</div>
+                  <div style={{ fontSize: "12px", color: C.accent2 }}>Total encaissé</div>
                   <div style={{ fontSize: "15px", fontWeight: 700, color: C.accent2 }}>{fmtFCFA(rapportMois.totalEncaisse)}</div>
                 </div>
                 <div style={{ flex: 1, background: C.warnBg, borderRadius: "10px", padding: "10px 12px" }}>
-                  <div style={{ fontSize: "10.5px", color: C.warn }}>Total décaissé</div>
+                  <div style={{ fontSize: "12px", color: C.warn }}>Total décaissé</div>
                   <div style={{ fontSize: "15px", fontWeight: 700, color: C.warn }}>{fmtFCFA(rapportMois.totalDecaisse)}</div>
                 </div>
               </div>
 
               {Object.keys(rapportMois.parModule).length === 0 ? (
-                <div style={{ fontSize: "12.5px", color: C.sub, textAlign: "center", padding: "10px 0" }}>Aucune activité enregistrée ce mois-ci.</div>
+                <div className="adm-vide">Aucune activité enregistrée ce mois-ci.</div>
               ) : (
                 <RapportSection titre="Par module">
                   {Object.entries(rapportMois.parModule).map(([module, t]) => (
-                    <div key={module} style={{ background: "#FBFAF6", borderRadius: "7px", padding: "8px 10px", fontSize: "12px" }}>
+                    <div key={module} style={{ background: "#FBFAF6", borderRadius: "7px", padding: "8px 10px", fontSize: "13px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
                         <b>{module}</b>
                         <span style={{ color: C.sub }}>{t.nb} mouvement(s)</span>
@@ -4602,7 +4601,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
               <button
                 onClick={() => setRapportMois(null)}
-                style={{ marginTop: "6px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+                style={{ marginTop: "6px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
               >
                 Choisir un autre mois
               </button>
@@ -4613,28 +4612,28 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showExportBilan && (
         <Modal onClose={() => setShowExportBilan(false)} title="Exporter le bilan annuel" icon={<FileBarChart />} accentColor={C.vifBleu}>
-          <div style={{ fontSize: "12.5px", color: C.sub }}>
+          <div style={{ fontSize: "13.5px", color: C.sub }}>
             Génère un fichier <b>.csv</b> (s'ouvre directement dans Excel) avec tous les mouvements de l'année, tous modules confondus, prêt pour l'assemblée générale.
           </div>
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Année</label>
-            <input value={exportAnnee} onChange={(e) => setExportAnnee(e.target.value.replace(/[^\d]/g, ""))} maxLength={4} style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }} />
+            <label className="adm-label">Année</label>
+            <input value={exportAnnee} onChange={(e) => setExportAnnee(e.target.value.replace(/[^\d]/g, ""))} maxLength={4} className="adm-input" />
           </div>
 
           {exportErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {exportErreur}
             </div>
           )}
           {exportSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               <CheckCircle2 size={14} /> Fichier téléchargé.
             </div>
           )}
 
           <button
             disabled={exportEnCours}
-            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: exportEnCours ? "default" : "pointer" }}
+            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: exportEnCours ? "default" : "pointer" }}
             onClick={async () => {
               setExportEnCours(true);
               setExportErreur("");
@@ -4697,7 +4696,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               }}
             >
               <Users size={20} color={C.sub} />
-              <span style={{ fontSize: "9.5px", color: C.sub, textAlign: "center" }}>Photo 4×4</span>
+              <span style={{ fontSize: "12px", color: C.sub, textAlign: "center" }}>Photo 4×4</span>
             </div>
           </div>
 
@@ -4708,13 +4707,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <FormField label="Quartier / Milieu d'habitation" placeholder="Ex. Nkolbisson, Yaoundé" />
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Statut de logement</label>
+            <label className="adm-label">Statut de logement</label>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {["Locataire", "Propriétaire"].map((t) => (
                 <div
                   key={t}
                   onClick={() => setLogementType(t)}
-                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${logementType === t ? C.accent2 : C.border}`, background: logementType === t ? C.ok : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: logementType === t ? C.accent2 : C.sub, cursor: "pointer" }}
+                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${logementType === t ? C.accent2 : C.border}`, background: logementType === t ? C.ok : "#FBFAF6", fontSize: "13px", fontWeight: 600, color: logementType === t ? C.accent2 : C.sub, cursor: "pointer" }}
                 >
                   {t}
                 </div>
@@ -4723,44 +4722,44 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Carte Nationale d'Identité (CNI)</label>
+            <label className="adm-label">Carte Nationale d'Identité (CNI)</label>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <input placeholder="Numéro CNI" style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }} />
+              <input placeholder="Numéro CNI" className="adm-input" />
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                <input placeholder="Date de délivrance" style={{ flex: 1, boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }} />
-                <input placeholder="Lieu de délivrance" style={{ flex: 1, boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }} />
+                <input placeholder="Date de délivrance" className="adm-input adm-flex" />
+                <input placeholder="Lieu de délivrance" className="adm-input adm-flex" />
               </div>
             </div>
-            <div style={{ fontSize: "11px", color: C.sub, marginTop: "6px" }}>
+            <div className="adm-aide">
               Ces informations aident le groupe à garantir la fiabilité des fonds confiés au membre.
             </div>
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Parrain (membre déjà dans le groupe)</label>
+            <label className="adm-label">Parrain (membre déjà dans le groupe)</label>
             <select
               value={parrain}
               onChange={(e) => setParrain(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Sélectionner un parrain</option>
               {membres.map((m) => <option key={m.nom} value={m.nom}>{m.nom}</option>)}
             </select>
-            <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>
+            <div className="adm-aide">
               Le parrain doit obligatoirement être un membre déjà présent dans la tontine.
             </div>
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Pièces jointes</label>
+            <label className="adm-label">Pièces jointes</label>
             <div
               style={{
                 border: `1.5px dashed ${C.border}`, borderRadius: "10px", padding: "16px",
                 textAlign: "center", background: "#FBFAF6", cursor: "pointer",
               }}
             >
-              <div style={{ fontSize: "12px", fontWeight: 600, color: C.accent2 }}>+ Joindre des fichiers</div>
-              <div style={{ fontSize: "10.5px", color: C.sub, marginTop: "4px" }}>
+              <div style={{ fontSize: "13px", fontWeight: 600, color: C.accent2 }}>+ Joindre des fichiers</div>
+              <div style={{ fontSize: "12px", color: C.sub, marginTop: "4px" }}>
                 CNI, plan de localisation, et autres justificatifs
               </div>
             </div>
@@ -4769,7 +4768,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 { nom: "CNI_recto_verso.pdf" },
                 { nom: "Plan_localisation.jpg" },
               ].map((f, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "12px" }}>
+                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "13px" }}>
                   <span>{f.nom}</span>
                   <X size={13} color={C.sub} style={{ cursor: "pointer" }} />
                 </div>
@@ -4778,13 +4777,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Type de membre</label>
+            <label className="adm-label">Type de membre</label>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {["Membre simple", "Membre du bureau"].map((t) => (
                 <div
                   key={t}
                   onClick={() => setRoleType(t)}
-                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${roleType === t ? C.accent2 : C.border}`, background: roleType === t ? C.ok : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: roleType === t ? C.accent2 : C.sub, cursor: "pointer" }}
+                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${roleType === t ? C.accent2 : C.border}`, background: roleType === t ? C.ok : "#FBFAF6", fontSize: "13px", fontWeight: 600, color: roleType === t ? C.accent2 : C.sub, cursor: "pointer" }}
                 >
                   {t}
                 </div>
@@ -4794,18 +4793,18 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           {roleType === "Membre du bureau" && (
             <div>
-              <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Poste</label>
+              <label className="adm-label">Poste</label>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 <select
                   value={posteChoisi}
                   onChange={(e) => setPosteChoisi(e.target.value)}
-                  style={{ flex: 1, boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+                  className="adm-input adm-flex"
                 >
                   {postes.map((p) => <option key={p}>{p}</option>)}
                 </select>
                 <button
                   onClick={() => setShowNewPoste(!showNewPoste)}
-                  style={{ background: C.ok, color: C.accent2, border: `1px solid ${C.accent2}33`, borderRadius: "9px", padding: "0 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                  className="adm-btn-mini adm-btn-mini-doux"
                 >
                   <Plus size={14} />
                 </button>
@@ -4816,48 +4815,48 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     value={newPosteName}
                     onChange={(e) => setNewPosteName(e.target.value)}
                     placeholder="Ex. Chargé des sanctions"
-                    style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
+                    className="adm-input adm-input-compact adm-flex"
                   />
-                  <button onClick={addPoste} style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "0 12px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}>
+                  <button onClick={addPoste} className="adm-btn-mini">
                     Ajouter
                   </button>
                 </div>
               )}
-              <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>
+              <div className="adm-aide">
                 Les membres du bureau ont des accès plus avancés que les membres simples.
               </div>
             </div>
           )}
 
           <FormField label="Versement immédiat au fonds de garantie (optionnel)" placeholder="Ex. 20 000 FCFA — si prêt à verser tout de suite" value={inviteVersementInitial} onChange={(e) => setInviteVersementInitial(e.target.value)} />
-          <div style={{ fontSize: "11px", color: C.sub, marginTop: "-6px" }}>
+          <div className="adm-aide adm-aide-colle">
             L'objectif du fonds est commun à tout le groupe (voir l'écran "Fonds"). Si le membre n'est pas prêt à verser maintenant, laisse ce champ vide — il cotisera plus tard.
           </div>
 
-          <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             L'invitation est envoyée au membre, puis soumise à la <b>validation du Président</b> avant qu'il ne rejoigne officiellement le groupe.
           </div>
 
           {inviteError && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {inviteError}
             </div>
           )}
           {inviteSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
                 <CheckCircle2 size={14} /> Membre créé — {inviteNom} apparaît maintenant "en attente".
               </div>
               <div>Identifiant : <b>{inviteIdentifiant}</b></div>
               <div>Mot de passe temporaire : <b>{inviteMotDePasseTemp}</b></div>
-              <div style={{ color: C.sub, fontSize: "10.5px", marginTop: "4px" }}>
+              <div style={{ color: C.sub, fontSize: "12px", marginTop: "4px" }}>
                 Il pourra changer ce mot de passe une fois connecté à son compte.
               </div>
             </div>
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn-valider"
             onClick={async () => {
               if (!inviteNom.trim() || !inviteEmail.trim()) {
                 setInviteError("Le nom complet et l'email sont obligatoires.");
@@ -4915,14 +4914,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showGererTypesFonds && (
         <Modal onClose={() => setShowGererTypesFonds(false)} title="Types de fonds" icon={<PiggyBank />} accentColor={C.vifOr}>
-          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Crée les rubriques de fonds propres à ton groupe (Fonds de garantie, Fonds de solidarité, etc.). L'objectif fixé s'applique à tous les membres.
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {typesFonds.map((t) => (
               <div key={t.id} style={{ padding: "10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-                  <span style={{ fontSize: "13px", fontWeight: 600 }}>{t.nom}</span>
+                  <span style={{ fontSize: "14px", fontWeight: 600 }}>{t.nom}</span>
                   <X
                     size={14}
                     color={C.sub}
@@ -4942,7 +4941,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     value={cibleTypeInputs[t.id] ?? String(t.cible || "")}
                     onChange={(e) => setCibleTypeInputs({ ...cibleTypeInputs, [t.id]: e.target.value })}
                     placeholder="Objectif commun (FCFA)"
-                    style={{ flex: 1, boxSizing: "border-box", padding: "8px 9px", borderRadius: "7px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "12px", outline: "none" }}
+                    style={{ flex: 1, boxSizing: "border-box", padding: "8px 9px", borderRadius: "7px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13px", outline: "none" }}
                   />
                   <button
                     disabled={cibleTypeEnCours === t.id}
@@ -4958,7 +4957,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         setCibleTypeEnCours("");
                       }
                     }}
-                    style={{ background: "transparent", border: `1px solid ${C.vifOr}66`, borderRadius: "7px", padding: "0 12px", fontSize: "11.5px", fontWeight: 600, color: C.vifOr, cursor: "pointer" }}
+                    className="adm-btn-ligne"
                   >
                     {cibleTypeEnCours === t.id ? "..." : "Fixer"}
                   </button>
@@ -4966,7 +4965,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               </div>
             ))}
           </div>
-          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em" }}>Nouveau type de fonds</div>
+          <div className="adm-surtitre">Nouveau type de fonds</div>
           <FormField label="Nom" placeholder="Ex. Fonds de solidarité" value={newTypeFondsNom} onChange={(e) => setNewTypeFondsNom(e.target.value)} />
           <FormField label="Objectif commun (FCFA)" placeholder="Ex. 50 000 FCFA" value={newTypeFondsCible} onChange={(e) => setNewTypeFondsCible(e.target.value)} />
           <button
@@ -4981,7 +4980,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 console.error("Erreur de création du type de fonds", e);
               }
             }}
-            style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "10px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+            style={{ background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "10px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer" }}
           >
             Ajouter ce type de fonds
           </button>
@@ -4991,11 +4990,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showCotisationFonds && (
         <Modal onClose={() => setShowCotisationFonds(false)} title="Enregistrer fonds" icon={<Wallet />} accentColor={C.vifOr}>
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Type de fonds concerné</label>
+            <label className="adm-label">Type de fonds concerné</label>
             <select
               value={cotisationFondsTypeId}
               onChange={(e) => setCotisationFondsTypeId(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Sélectionner un type de fonds</option>
               {typesFonds.map((t) => (
@@ -5005,45 +5004,45 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Date du versement</label>
+            <label className="adm-label">Date du versement</label>
             <input
               value={cotisationFondsDate}
               onChange={(e) => setCotisationFondsDate(e.target.value)}
               placeholder="jj/mm/aaaa"
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             />
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Montant par membre</label>
+            <label className="adm-label">Montant par membre</label>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {membres.map((m) => (
                 <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div style={{ flex: 1, fontSize: "13px", fontWeight: 600 }}>{m.nom}</div>
+                  <div style={{ flex: 1, fontSize: "14px", fontWeight: 600 }}>{m.nom}</div>
                   <input
                     value={cotisationFondsMontants[m.id] || ""}
                     onChange={(e) => setCotisationFondsMontants({ ...cotisationFondsMontants, [m.id]: e.target.value })}
                     placeholder="0 FCFA"
-                    style={{ width: "130px", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none", textAlign: "right" }}
+                    className="adm-input adm-input-compact adm-input-montant"
                   />
                 </div>
               ))}
             </div>
           </div>
 
-          <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Laisse vide un membre qui n'a pas versé ce jour-là.
           </div>
 
           {cotisationFondsErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {cotisationFondsErreur}
             </div>
           )}
 
           <button
             disabled={cotisationFondsEnCours}
-            style={{ marginTop: "6px", background: C.vifOr, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: cotisationFondsEnCours ? "default" : "pointer" }}
+            style={{ marginTop: "6px", background: C.vifOr, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: cotisationFondsEnCours ? "default" : "pointer" }}
             onClick={async () => {
               if (!cotisationFondsTypeId) { setCotisationFondsErreur("Sélectionne un type de fonds."); return; }
               if (!cotisationFondsDate.trim()) { setCotisationFondsErreur("La date du versement est obligatoire."); return; }
@@ -5086,23 +5085,23 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showHistoriqueMembre && (
         <Modal onClose={() => { setShowHistoriqueMembre(null); setHistoriqueMembreData(null); }} title={`Historique — ${showHistoriqueMembre.nom}`} icon={<FileBarChart />} accentColor={C.vifBleu}>
           {chargementHistoriqueMembre ? (
-            <div style={{ fontSize: "13px", color: C.sub, textAlign: "center", padding: "20px 0" }}>Chargement...</div>
+            <div className="adm-vide">Chargement...</div>
           ) : !historiqueMembreData ? (
-            <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>Impossible de charger l'historique.</div>
+            <div className="adm-msg adm-msg-erreur" role="alert">Impossible de charger l'historique.</div>
           ) : (
             <>
               {historiqueMembreData.tontine && (
-                <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", fontSize: "12px" }}>
+                <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", fontSize: "13px" }}>
                   <b>{historiqueMembreData.tontine.nom}</b> — {fmtFCFA(historiqueMembreData.tontine.montantParTour)}/tour
                   {historiqueMembreData.tontine.tourEnCoursNumero && (
-                    <div style={{ color: C.sub, fontSize: "11px", marginTop: "3px" }}>
+                    <div style={{ color: C.sub, fontSize: "12px", marginTop: "3px" }}>
                       Tour {historiqueMembreData.tontine.tourEnCoursNumero} en cours — {historiqueMembreData.tontine.aCotiseCeTour ? "cotisation à jour" : "cotisation non reçue"}
                     </div>
                   )}
                 </div>
               )}
               {historiqueMembreData.assurance && (
-                <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", fontSize: "12px" }}>
+                <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", fontSize: "13px" }}>
                   Solde assurance : <b>{fmtFCFA(historiqueMembreData.assurance.solde)}</b>
                   {historiqueMembreData.assurance.delaiExpireLe && (
                     <span style={{ color: C.warn }}> — à reconstituer avant le {historiqueMembreData.assurance.delaiExpireLe}</span>
@@ -5110,18 +5109,18 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 </div>
               )}
 
-              <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", margin: "4px 0 2px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", margin: "4px 0 2px" }}>
                 Mouvements ({historiqueMembreData.historique.length})
               </div>
               {historiqueMembreData.historique.length === 0 ? (
-                <div style={{ fontSize: "12px", color: C.sub, textAlign: "center", padding: "10px 0" }}>Aucun mouvement enregistré.</div>
+                <div style={{ fontSize: "13px", color: C.sub, textAlign: "center", padding: "10px 0" }}>Aucun mouvement enregistré.</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "280px", overflowY: "auto" }}>
                   {historiqueMembreData.historique.map((h, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: "8px", padding: "8px 10px", background: "#FBFAF6", borderRadius: "8px", fontSize: "12px" }}>
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: "8px", padding: "8px 10px", background: "#FBFAF6", borderRadius: "8px", fontSize: "13px" }}>
                       <div>
                         <div style={{ fontWeight: 600 }}>{h.label}</div>
-                        <div style={{ color: C.sub, fontSize: "10.5px" }}>{h.date}</div>
+                        <div style={{ color: C.sub, fontSize: "12px" }}>{h.date}</div>
                       </div>
                       <div style={{ fontWeight: 700, color: h.montant < 0 ? C.warn : C.accent2, whiteSpace: "nowrap" }}>
                         {h.montant < 0 ? "-" : "+"}{fmtFCFA(Math.abs(h.montant))}
@@ -5142,7 +5141,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <FormField label="Téléphone" placeholder="Ex. 6XX XXX XXX" value={editTelephone} onChange={(e) => setEditTelephone(e.target.value)} />
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "8px", display: "block" }}>Documents</label>
+            <label style={{ fontSize: "13px", color: C.sub, marginBottom: "8px", display: "block" }}>Documents</label>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {[
                 { type: "photo", label: "Photo 4×4", accept: "image/*" },
@@ -5150,10 +5149,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 { type: "plan_localisation", label: "Plan de localisation", accept: "image/*,.pdf" },
               ].map((doc) => (
                 <div key={doc.type} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
-                  <span style={{ fontSize: "12px" }}>{doc.label}</span>
+                  <span style={{ fontSize: "13px" }}>{doc.label}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     {editDocuments[doc.type] && (
-                      <a href={editDocuments[doc.type]} target="_blank" rel="noopener noreferrer" style={{ fontSize: "11px", color: C.accent2, fontWeight: 600 }}>
+                      <a href={editDocuments[doc.type]} target="_blank" rel="noopener noreferrer" style={{ fontSize: "12px", color: C.accent2, fontWeight: 600 }}>
                         Voir
                       </a>
                     )}
@@ -5180,7 +5179,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     <button
                       disabled={documentEnCours === doc.type}
                       onClick={() => inputsDocumentsRef.current[doc.type]?.click()}
-                      style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}55`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                      className="adm-btn-ligne"
                     >
                       {documentEnCours === doc.type ? "Envoi..." : editDocuments[doc.type] ? "Remplacer" : "Ajouter"}
                     </button>
@@ -5190,23 +5189,23 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
           </div>
 
-          <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Le mot de passe de connexion n'est jamais modifiable ici — seul le membre lui-même peut le changer, une fois son compte activé.
           </div>
 
           {editError && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {editError}
             </div>
           )}
           {editSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               <CheckCircle2 size={14} /> Informations mises à jour.
             </div>
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn-valider"
             onClick={async () => {
               if (!editNom.trim()) {
                 setEditError("Le nom complet est obligatoire.");
@@ -5240,37 +5239,37 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showResetMembre && (
         <Modal onClose={() => setShowResetMembre(false)} title="Accès d'urgence — réinitialiser un mot de passe" icon={<KeyRound />} accentColor={C.vifViolet}>
-          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Réservé aux cas d'urgence (membre bloqué, mot de passe oublié sans accès email). Un nouveau mot de passe temporaire est généré immédiatement, et la personne devra en choisir un nouveau à sa prochaine connexion.
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Membre à réinitialiser</label>
+            <label className="adm-label">Membre à réinitialiser</label>
             <select
               value={resetMembreId}
               onChange={(e) => setResetMembreId(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Sélectionner un membre</option>
               {membres.filter((m) => m.compteActive).map((m) => <option key={m.id} value={m.id}>{m.nom} — {m.role}</option>)}
             </select>
             {membres.filter((m) => m.compteActive).length === 0 && (
-              <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>Aucun membre avec un compte activé pour l'instant.</div>
+              <div className="adm-aide">Aucun membre avec un compte activé pour l'instant.</div>
             )}
           </div>
 
           {resetMembreErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {resetMembreErreur}
             </div>
           )}
           {resetMembreMotDePasse && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
                 <CheckCircle2 size={14} /> Mot de passe réinitialisé.
               </div>
               <div>Nouveau mot de passe temporaire : <b>{resetMembreMotDePasse}</b></div>
-              <div style={{ color: C.sub, fontSize: "10.5px", marginTop: "4px" }}>
+              <div style={{ color: C.sub, fontSize: "12px", marginTop: "4px" }}>
                 À communiquer au membre — il devra le changer dès sa prochaine connexion.
               </div>
             </div>
@@ -5279,7 +5278,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           {!resetMembreMotDePasse && (
             <button
               disabled={resetMembreEnCours}
-              style={{ marginTop: "6px", background: C.vifViolet, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: resetMembreEnCours ? "default" : "pointer" }}
+              style={{ marginTop: "6px", background: C.vifViolet, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: resetMembreEnCours ? "default" : "pointer" }}
               onClick={async () => {
                 if (!resetMembreId) { setResetMembreErreur("Sélectionne un membre."); return; }
                 setResetMembreEnCours(true);
@@ -5304,12 +5303,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showDeleteMembre && (
         <Modal onClose={() => setShowDeleteMembre(null)} title="Supprimer ce membre">
-          <div style={{ fontSize: "12.5px", color: C.sub }}>
+          <div style={{ fontSize: "13.5px", color: C.sub }}>
             Es-tu sûr de vouloir supprimer <b>{showDeleteMembre.nom}</b> du groupe ? Cette action est impossible s'il a déjà effectué une cotisation (tontine ou banque), pour préserver l'historique financier.
           </div>
 
           {deleteErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {deleteErreur}
             </div>
           )}
@@ -5317,7 +5316,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
             <button
               onClick={() => setShowDeleteMembre(null)}
-              style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+              style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
             >
               Annuler
             </button>
@@ -5337,7 +5336,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   setDeleteEnCours(false);
                 }
               }}
-              style={{ flex: 1, background: C.warn, color: "#FFF6EE", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: deleteEnCours ? "default" : "pointer", opacity: deleteEnCours ? 0.7 : 1 }}
+              style={{ flex: 1, background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, cursor: deleteEnCours ? "default" : "pointer", opacity: deleteEnCours ? 0.7 : 1 }}
             >
               {deleteEnCours ? "Suppression..." : "Supprimer définitivement"}
             </button>
@@ -5347,15 +5346,15 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showAjouterSignataire && (
         <Modal onClose={() => setShowAjouterSignataire(false)} title="Ajouter un signataire" icon={<UserCog />} accentColor={C.vifBleu}>
-          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Les signataires sont les personnes habilitées à valider un retrait (2 à 3 requis par opération).
           </div>
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Membre</label>
+            <label className="adm-label">Membre</label>
             <select
               value={sigMembreId}
               onChange={(e) => setSigMembreId(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Sélectionner un membre</option>
               {membres.filter((m) => m.statut === "actif" && !signataires.some((s) => s.membreId === m.id)).map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
@@ -5364,18 +5363,18 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <FormField label="Fonction (optionnel)" placeholder="Ex. Président, Trésorière..." value={sigFonction} onChange={(e) => setSigFonction(e.target.value)} />
 
           {sigError && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {sigError}
             </div>
           )}
           {sigSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               <CheckCircle2 size={14} /> Signataire ajouté.
             </div>
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}
+            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}
             onClick={async () => {
               if (!sigMembreId) { setSigError("Sélectionnez un membre."); return; }
               try {
@@ -5405,13 +5404,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <FormField label="Numéro de compte (optionnel)" placeholder="Ex. 0123456789" value={compteNumero} onChange={(e) => setCompteNumero(e.target.value)} />
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Type de compte</label>
+            <label className="adm-label">Type de compte</label>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {["Courant", "Épargne"].map((t) => (
                 <div
                   key={t}
                   onClick={() => setCompteType(t)}
-                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${compteType === t ? C.vifBleu : C.border}`, background: compteType === t ? `${C.vifBleu}14` : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: compteType === t ? C.vifBleu : C.sub, cursor: "pointer" }}
+                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${compteType === t ? C.vifBleu : C.border}`, background: compteType === t ? `${C.vifBleu}14` : "#FBFAF6", fontSize: "13px", fontWeight: 600, color: compteType === t ? C.vifBleu : C.sub, cursor: "pointer" }}
                 >
                   {t}
                 </div>
@@ -5424,18 +5423,18 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           )}
 
           {compteError && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {compteError}
             </div>
           )}
           {compteSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               <CheckCircle2 size={14} /> Compte créé.
             </div>
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}
+            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}
             onClick={async () => {
               if (!compteNom.trim()) { setCompteError("Le nom du compte est obligatoire."); return; }
               try {
@@ -5466,25 +5465,25 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showNouveauDepot && (
         <Modal onClose={() => setShowNouveauDepot(false)} title="Enregistrer un mouvement bancaire" icon={<Building2 />} accentColor={C.vifBleu}>
-          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Compte concerné : <b>{compteActif?.nom || "—"}</b>
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Type de mouvement</label>
+            <label className="adm-label">Type de mouvement</label>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
               {["Dépôt", "Retrait", "Frais", ...(compteActif?.type === "Épargne" ? ["Intérêt"] : [])].map((t) => (
                 <div
                   key={t}
                   onClick={() => setTypeMouvementBanque(t)}
-                  style={{ flex: "1 1 auto", textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${typeMouvementBanque === t ? C.accent2 : C.border}`, background: typeMouvementBanque === t ? C.ok : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: typeMouvementBanque === t ? C.accent2 : C.sub, cursor: "pointer" }}
+                  style={{ flex: "1 1 auto", textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${typeMouvementBanque === t ? C.accent2 : C.border}`, background: typeMouvementBanque === t ? C.ok : "#FBFAF6", fontSize: "13px", fontWeight: 600, color: typeMouvementBanque === t ? C.accent2 : C.sub, cursor: "pointer" }}
                 >
                   {t}
                 </div>
               ))}
             </div>
             {compteActif?.type !== "Épargne" && (
-              <div style={{ fontSize: "10.5px", color: C.sub, marginTop: "5px" }}>
+              <div style={{ fontSize: "12px", color: C.sub, marginTop: "5px" }}>
                 "Intérêt" n'est disponible que pour un compte de type Épargne.
               </div>
             )}
@@ -5499,19 +5498,19 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           {typeMouvementBanque === "Frais" && (
             <div>
-              <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Catégorie de frais</label>
+              <label className="adm-label">Catégorie de frais</label>
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                 <select
                   value={depotCategorie}
                   onChange={(e) => setDepotCategorie(e.target.value)}
-                  style={{ flex: 1, boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+                  className="adm-input adm-flex"
                 >
                   <option value="">Sélectionner une catégorie</option>
                   {categoriesFrais.map((c) => <option key={c.id} value={c.nom}>{c.nom}</option>)}
                 </select>
                 <button
                   onClick={() => setShowNewCategorieFrais(!showNewCategorieFrais)}
-                  style={{ background: C.ok, color: C.accent2, border: `1px solid ${C.accent2}33`, borderRadius: "9px", padding: "0 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                  className="adm-btn-mini adm-btn-mini-doux"
                 >
                   <Plus size={14} />
                 </button>
@@ -5522,7 +5521,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     value={newCategorieFraisNom}
                     onChange={(e) => setNewCategorieFraisNom(e.target.value)}
                     placeholder="Ex. Frais de dossier"
-                    style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
+                    className="adm-input adm-input-compact adm-flex"
                   />
                   <button
                     onClick={async () => {
@@ -5537,7 +5536,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         console.error("Erreur de création de la catégorie", e);
                       }
                     }}
-                    style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "0 12px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+                    className="adm-btn-mini"
                   >
                     Ajouter
                   </button>
@@ -5546,7 +5545,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               {categoriesFrais.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
                   {categoriesFrais.map((c) => (
-                    <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "999px", padding: "3px 8px 3px 10px", fontSize: "11px", color: C.sub }}>
+                    <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "999px", padding: "3px 8px 3px 10px", fontSize: "12px", color: C.sub }}>
                       {c.nom}
                       <X
                         size={11}
@@ -5570,10 +5569,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           {typeMouvementBanque === "Frais" && (
             <div>
-              <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Responsable(s) — 1 à 2 personnes</label>
+              <label className="adm-label">Responsable(s) — 1 à 2 personnes</label>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {membres.filter((m) => m.statut === "actif").map((m) => (
-                  <label key={m.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", cursor: "pointer" }}>
+                  <label key={m.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px", cursor: "pointer" }}>
                     <input
                       type="checkbox"
                       checked={responsablesFrais.includes(m.id)}
@@ -5589,7 +5588,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   </label>
                 ))}
               </div>
-              <div style={{ fontSize: "11px", color: C.sub, marginTop: "6px" }}>
+              <div className="adm-aide">
                 Pas besoin de plusieurs signataires officiels pour un frais — une ou deux personnes suffisent.
               </div>
             </div>
@@ -5597,55 +5596,55 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           {(typeMouvementBanque === "Dépôt" || typeMouvementBanque === "Intérêt") ? (
             <div>
-              <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>
+              <label className="adm-label">
                 {typeMouvementBanque === "Intérêt" ? "Enregistré par" : "Membre effectuant le versement"}
               </label>
               <select
                 value={depotMembreSimple}
                 onChange={(e) => setDepotMembreSimple(e.target.value)}
-                style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+                className="adm-input"
               >
                 <option value="">Sélectionner un membre</option>
                 {membres.filter((m) => m.statut === "actif").map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
               </select>
               {typeMouvementBanque === "Dépôt" && (
-                <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>
+                <div className="adm-aide">
                   Pour un versement, n'importe quel membre du groupe peut être désigné.
                 </div>
               )}
             </div>
           ) : typeMouvementBanque === "Retrait" ? (
             <div>
-              <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Signataires (2 à 3 requis)</label>
+              <label className="adm-label">Signataires (2 à 3 requis)</label>
               {signataires.length === 0 ? (
-                <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                <div className="adm-msg adm-msg-erreur" role="alert">
                   Aucun signataire enregistré pour ce groupe — ajoutes-en depuis les paramètres avant de faire un retrait.
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   {signataires.map((s) => (
-                    <label key={s.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", cursor: "pointer" }}>
+                    <label key={s.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px", cursor: "pointer" }}>
                       <input type="checkbox" checked={signatairesChoisis.includes(s.id)} onChange={() => toggleSignataire(s.id)} />
                       {s.nom}{s.fonction ? ` — ${s.fonction}` : ""}
                     </label>
                   ))}
                 </div>
               )}
-              <div style={{ fontSize: "11px", color: signatairesChoisis.length >= 2 && signatairesChoisis.length <= 3 ? C.sub : C.warn, marginTop: "6px" }}>
+              <div style={{ fontSize: "12px", color: signatairesChoisis.length >= 2 && signatairesChoisis.length <= 3 ? C.sub : C.warn, marginTop: "6px" }}>
                 {signatairesChoisis.length < 2
                   ? "Sélectionnez au moins 2 signataires officiels du compte."
                   : signatairesChoisis.length > 3
                   ? "Maximum 3 signataires pour cette opération."
                   : `${signatairesChoisis.length} signataire(s) sélectionné(s).`}
               </div>
-              <div style={{ fontSize: "11px", color: C.sub, marginTop: "4px" }}>
+              <div style={{ fontSize: "12px", color: C.sub, marginTop: "4px" }}>
                 Un retrait exige la validation de 2 à 3 signataires officiels.
               </div>
             </div>
           ) : null}
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>
+            <label className="adm-label">
               {typeMouvementBanque === "Retrait" ? "Reçu retrait" : "Reçu / justificatif"}
             </label>
             {!recuJoint ? (
@@ -5653,35 +5652,35 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 onClick={() => setRecuJoint(true)}
                 style={{ border: `1.5px dashed ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center", background: "#FBFAF6", cursor: "pointer" }}
               >
-                <div style={{ fontSize: "12px", fontWeight: 600, color: C.accent2 }}>
+                <div style={{ fontSize: "13px", fontWeight: 600, color: C.accent2 }}>
                   + Joindre le justificatif
                 </div>
-                <div style={{ fontSize: "10.5px", color: C.sub, marginTop: "4px" }}>Photo ou scan remis au retour de la séance</div>
+                <div style={{ fontSize: "12px", color: C.sub, marginTop: "4px" }}>Photo ou scan remis au retour de la séance</div>
               </div>
             ) : (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: "8px", border: `1px solid ${C.accent2}44`, background: C.ok, fontSize: "12.5px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: "8px", border: `1px solid ${C.accent2}44`, background: C.ok, fontSize: "13.5px" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: "6px", color: C.accent2, fontWeight: 600 }}><CheckCircle2 size={14} /> Reçu joint</span>
                 <X size={13} color={C.sub} style={{ cursor: "pointer" }} onClick={() => setRecuJoint(false)} />
               </div>
             )}
-            <div style={{ fontSize: "11px", color: C.sub, marginTop: "6px" }}>
+            <div className="adm-aide">
               Le mouvement reste "en attente du reçu" tant qu'aucun justificatif n'est joint à la ligne.
             </div>
           </div>
 
           {depotError && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {depotError}
             </div>
           )}
           {depotSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               <CheckCircle2 size={14} /> Mouvement enregistré — le solde du compte a été mis à jour.
             </div>
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn-valider"
             onClick={async () => {
               if (!compteActifId) { setDepotError("Sélectionnez d'abord un compte."); setDepotSuccess(false); return; }
               const montantNum = parseInt(depotMontant.replace(/[^\d]/g, ""), 10);
@@ -5738,14 +5737,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showAmende && (
         <Modal onClose={() => setShowAmende(null)} title="Appliquer une amende de retard">
-          <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px", fontSize: "12.5px" }}>
+          <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px", fontSize: "13.5px" }}>
             <b>{showAmende.membre}</b> — Tour {showAmende.tour}<br />
             <span style={{ color: C.warn }}>Cotisation pas encore reçue</span>
           </div>
           <FormField label="Montant de l'amende" placeholder="Ex. 5 000 FCFA" value={amendeMontant} onChange={(e) => setAmendeMontant(e.target.value)} />
           <FormField label="Motif (optionnel)" placeholder="Ex. Cotisation non versée à la séance" value={amendeMotif} onChange={(e) => setAmendeMotif(e.target.value)} />
           {amendeError && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {amendeError}
             </div>
           )}
@@ -5772,7 +5771,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 setAmendeError(e.message || "Erreur lors de l'application de l'amende.");
               }
             }}
-            style={{ marginTop: "6px", background: C.warn, color: "#FFF6EE", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            style={{ marginTop: "6px", background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}
           >
             Appliquer l'amende
           </button>
@@ -5781,16 +5780,16 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showEnchere && enchereTour && tontineActive && (
         <Modal onClose={() => setShowEnchere(false)} title="Enregistrer l'enchère" icon={<Gavel />} accentColor={C.vifViolet}>
-          <div style={{ fontSize: "12px", color: C.sub }}>
+          <div style={{ fontSize: "13px", color: C.sub }}>
             Tour {enchereTour.tour} — mode Enchères. Indique qui a remporté l'enchère et pour quel montant.
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Gagnant de l'enchère</label>
+            <label className="adm-label">Gagnant de l'enchère</label>
             <select
               value={enchereBeneficiaire}
               onChange={(e) => setEnchereBeneficiaire(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Sélectionner un membre</option>
               {membres.filter((m) => m.statut === "actif").map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
@@ -5803,25 +5802,25 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             const cagnotte = tontineActive.montantParTour * membres.filter((m) => m.statut === "actif").length;
             const montantNum = parseInt(enchereMontant.replace(/[^\d]/g, ""), 10) || 0;
             return (
-              <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "9px 11px" }}>
+              <div className="adm-msg adm-msg-info">
                 Cagnotte totale estimée : <b>{fmtFCFA(cagnotte)}</b> ({fmtFCFA(tontineActive.montantParTour)} × {membres.filter((m) => m.statut === "actif").length} membres)<br />
                 Montant net versé au bénéficiaire : <b style={{ color: C.vifVert }}>{fmtFCFA(Math.max(0, cagnotte - montantNum))}</b>
               </div>
             );
           })()}
 
-          <div style={{ fontSize: "11px", color: C.vifViolet, background: `${C.vifViolet}0D`, border: `1px solid ${C.vifViolet}33`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div style={{ fontSize: "12px", color: C.vifViolet, background: `${C.vifViolet}0D`, border: `1px solid ${C.vifViolet}33`, borderRadius: "8px", padding: "8px 10px" }}>
             Ce montant d'enchère est mis de côté comme commission, redistribuée à tous les membres à la clôture du cycle.
           </div>
 
           {enchereErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {enchereErreur}
             </div>
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.vifViolet, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}
+            style={{ marginTop: "6px", background: C.vifViolet, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}
             onClick={async () => {
               const montantNum = parseInt(enchereMontant.replace(/[^\d]/g, ""), 10);
               if (!enchereBeneficiaire) { setEnchereErreur("Sélectionne le gagnant de l'enchère."); return; }
@@ -5849,11 +5848,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             <div style={{ width: "48px", height: "48px", margin: "0 auto 12px", borderRadius: "12px", background: C.ok, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Banknote size={22} color={C.accent2} />
             </div>
-            <div style={{ fontSize: "13px", color: C.sub }}>Tour {showPayout.tour} — Bénéficiaire</div>
+            <div style={{ fontSize: "14px", color: C.sub }}>Tour {showPayout.tour} — Bénéficiaire</div>
             <div style={{ fontSize: "17px", fontWeight: 700, margin: "2px 0 6px" }}>{showPayout.beneficiaire}</div>
-            <div style={{ fontSize: "22px", fontWeight: 700, color: C.accent2 }}>{showPayout.montant}</div>
+            <div style={{ fontSize: "24px", fontWeight: 700, color: C.accent2 }}>{showPayout.montant}</div>
           </div>
-          <div style={{ fontSize: "12px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px" }}>
+          <div style={{ fontSize: "13px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px" }}>
             Mode de ce tour : <b>{showPayout.mode}</b>. Confirmez que la cagnotte a bien été remise au bénéficiaire (espèces ou Mobile Money) pour clôturer ce tour.
           </div>
           <button
@@ -5876,7 +5875,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 console.error("Erreur lors du versement", e);
               }
             }}
-            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn-valider"
           >
             Confirmer le versement
           </button>
@@ -5885,16 +5884,16 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showAjouterMembreCycle && tontineActive && (
         <Modal onClose={() => setShowAjouterMembreCycle(false)} title="Ajouter un membre au cycle">
-          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Le mode de distribution des tours déjà planifiés ne change pas. Si des tours sont déjà clôturés, le nouveau membre rattrape les cotisations passées avec un montant de rappel.
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Membre à ajouter</label>
+            <label className="adm-label">Membre à ajouter</label>
             <select
               value={ajoutMembreId}
               onChange={(e) => setAjoutMembreId(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Sélectionner un membre</option>
               {membres.filter((m) => m.statut === "actif").map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
@@ -5904,29 +5903,29 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           {tours.filter((t) => t.statut === "clôturé").length > 0 ? (
             <>
               <FormField label={`Montant de rappel (${tours.filter((t) => t.statut === "clôturé").length} tour(s) déjà clôturé(s))`} placeholder="Ex. 150 000 FCFA" value={ajoutMontantRappel} onChange={(e) => setAjoutMontantRappel(e.target.value)} />
-              <div style={{ fontSize: "11px", color: C.sub, marginTop: "-6px" }}>
+              <div className="adm-aide adm-aide-colle">
                 Ce montant sera réparti automatiquement sur les {tours.filter((t) => t.statut === "clôturé").length} tour(s) déjà clôturé(s).
               </div>
             </>
           ) : (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               Aucun tour clôturé pour l'instant — le membre rejoint directement, sans rappel à verser.
             </div>
           )}
 
           {ajoutErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {ajoutErreur}
             </div>
           )}
           {ajoutSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               <CheckCircle2 size={14} /> Membre ajouté au cycle.
             </div>
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn-valider"
             onClick={async () => {
               if (!ajoutMembreId) { setAjoutErreur("Sélectionne un membre."); setAjoutSuccess(false); return; }
               const toursClotures = tours.filter((t) => t.statut === "clôturé");
@@ -5960,23 +5959,23 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showRedistribution && (
         <Modal onClose={() => setShowRedistribution(false)} title="Redistribuer la commission d'enchères" icon={<Gavel />} accentColor={C.vifRose}>
           {redistributionChargement ? (
-            <div style={{ fontSize: "13px", color: C.sub, textAlign: "center", padding: "20px 0" }}>Calcul en cours...</div>
+            <div className="adm-vide">Calcul en cours...</div>
           ) : !redistributionApercu ? (
-            <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>{redistributionErreur || "Erreur de chargement."}</div>
+            <div className="adm-msg adm-msg-erreur" role="alert">{redistributionErreur || "Erreur de chargement."}</div>
           ) : redistributionApercu.commissionTotale === 0 ? (
-            <div style={{ fontSize: "12.5px", color: C.sub, textAlign: "center", padding: "10px 0" }}>Aucune commission d'enchères à redistribuer sur ce cycle.</div>
+            <div className="adm-vide">Aucune commission d'enchères à redistribuer sur ce cycle.</div>
           ) : (
             <>
-              <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+              <div className="adm-msg adm-msg-info">
                 Commission totale : <b>{fmtFCFA(redistributionApercu.commissionTotale)}</b> — répartie proportionnellement au nombre de tours où chaque membre a cotisé ({redistributionApercu.totalCotisations} cotisation(s) au total sur ce cycle).
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {redistributionApercu.membres.map((m) => (
-                  <div key={m.membreId} style={{ display: "flex", justifyContent: "space-between", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px", fontSize: "12px" }}>
+                  <div key={m.membreId} style={{ display: "flex", justifyContent: "space-between", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px", fontSize: "13px" }}>
                     <div>
                       <b>{m.nom}</b>
-                      <div style={{ color: C.sub, fontSize: "11px" }}>{m.nbCotisations} cotisation(s) sur ce cycle</div>
+                      <div style={{ color: C.sub, fontSize: "12px" }}>{m.nbCotisations} cotisation(s) sur ce cycle</div>
                     </div>
                     <b style={{ color: C.accent2 }}>{fmtFCFA(m.part)}</b>
                   </div>
@@ -5984,12 +5983,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               </div>
 
               {redistributionErreur && (
-                <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                <div className="adm-msg adm-msg-erreur" role="alert">
                   {redistributionErreur}
                 </div>
               )}
               {redistributionSuccess && (
-                <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <div className="adm-msg adm-msg-succes" role="status">
                   <CheckCircle2 size={14} /> Commission redistribuée avec succès.
                 </div>
               )}
@@ -5997,7 +5996,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               {!redistributionSuccess && (
                 <button
                   disabled={redistributionEnCours}
-                  style={{ marginTop: "6px", background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: redistributionEnCours ? "default" : "pointer" }}
+                  style={{ marginTop: "6px", background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: redistributionEnCours ? "default" : "pointer" }}
                   onClick={async () => {
                     setRedistributionEnCours(true);
                     setRedistributionErreur("");
@@ -6031,14 +6030,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showTypesAmendesSeance && (
         <Modal onClose={() => setShowTypesAmendesSeance(false)} title="Types d'amendes de séance" icon={<AlertTriangle />} accentColor={C.warn}>
-          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Chaque groupe fixe ses propres amendes selon son règlement intérieur (ex. Absence non excusée, Retard).
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {typesAmendesSeance.map((t) => (
               <div key={t.id} style={{ padding: "10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "13px", fontWeight: 600 }}>{t.nom}</span>
+                  <span style={{ fontSize: "14px", fontWeight: 600 }}>{t.nom}</span>
                   <X
                     size={14}
                     color={C.sub}
@@ -6058,7 +6057,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     value={montantAmendeInputs[t.id] ?? String(t.montant || "")}
                     onChange={(e) => setMontantAmendeInputs({ ...montantAmendeInputs, [t.id]: e.target.value })}
                     placeholder="Montant (FCFA)"
-                    style={{ flex: 1, boxSizing: "border-box", padding: "8px 9px", borderRadius: "7px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "12px", outline: "none" }}
+                    style={{ flex: 1, boxSizing: "border-box", padding: "8px 9px", borderRadius: "7px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13px", outline: "none" }}
                   />
                   <button
                     onClick={async () => {
@@ -6070,7 +6069,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         console.error("Erreur de mise à jour du montant", e);
                       }
                     }}
-                    style={{ background: "transparent", border: `1px solid ${C.warn}66`, borderRadius: "7px", padding: "0 12px", fontSize: "11.5px", fontWeight: 600, color: C.warn, cursor: "pointer" }}
+                    className="adm-btn-ligne adm-btn-ligne-danger"
                   >
                     Fixer
                   </button>
@@ -6078,7 +6077,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               </div>
             ))}
           </div>
-          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em" }}>Nouveau type d'amende</div>
+          <div className="adm-surtitre">Nouveau type d'amende</div>
           <FormField label="Nom" placeholder="Ex. Absence non excusée" value={newTypeAmendeNom} onChange={(e) => setNewTypeAmendeNom(e.target.value)} />
           <FormField label="Montant par défaut (FCFA)" placeholder="Ex. 1 000 FCFA" value={newTypeAmendeMontant} onChange={(e) => setNewTypeAmendeMontant(e.target.value)} />
           <button
@@ -6093,7 +6092,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 console.error("Erreur de création du type d'amende", e);
               }
             }}
-            style={{ background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "10px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+            style={{ background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "10px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer" }}
           >
             Ajouter ce type d'amende
           </button>
@@ -6105,22 +6104,22 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <FormField label="Date de la séance" placeholder="jj/mm/aaaa" value={seanceDate} onChange={(e) => setSeanceDate(e.target.value)} />
           <FormField label="Lieu" placeholder="Ex. Domicile du président" value={seanceLieu} onChange={(e) => setSeanceLieu(e.target.value)} />
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Ordre du jour</label>
+            <label className="adm-label">Ordre du jour</label>
             <textarea
               value={seanceOrdreDuJour}
               onChange={(e) => setSeanceOrdreDuJour(e.target.value)}
               placeholder="Ex. Cotisations du mois, point sur les prêts en cours, questions diverses..."
               rows={3}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none", resize: "vertical", fontFamily: "inherit" }}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "14px", outline: "none", resize: "vertical", fontFamily: "inherit" }}
             />
           </div>
           {seanceCreationErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {seanceCreationErreur}
             </div>
           )}
           <button
-            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}
+            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}
             onClick={async () => {
               const dateISO = versDateISO(seanceDate);
               if (!dateISO) { setSeanceCreationErreur("Date invalide (jj/mm/aaaa)."); return; }
@@ -6142,25 +6141,25 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showDetailSeance && (
         <Modal onClose={() => { setShowDetailSeance(null); setPresencesSeance({}); setAmendesSeanceList([]); }} title={`Séance du ${showDetailSeance.date}`} icon={<Calendar />} accentColor={C.vifBleu}>
           {showDetailSeance.lieu && (
-            <div style={{ fontSize: "12px", color: C.sub }}>Lieu : {showDetailSeance.lieu}</div>
+            <div style={{ fontSize: "13px", color: C.sub }}>Lieu : {showDetailSeance.lieu}</div>
           )}
           {showDetailSeance.ordreDuJour && (
-            <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-info">
               <b>Ordre du jour :</b> {showDetailSeance.ordreDuJour}
             </div>
           )}
 
-          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em" }}>Présence</div>
+          <div className="adm-surtitre">Présence</div>
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             {membres.map((m) => (
               <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                <span style={{ flex: 1, fontSize: "12.5px", fontWeight: 600 }}>{m.nom}</span>
+                <span style={{ flex: 1, fontSize: "13.5px", fontWeight: 600 }}>{m.nom}</span>
                 <div style={{ display: "flex", gap: "4px" }}>
                   {["présent", "absent", "excusé"].map((opt) => (
                     <div
                       key={opt}
                       onClick={() => setPresencesSeance({ ...presencesSeance, [m.id]: opt })}
-                      style={{ padding: "5px 9px", borderRadius: "6px", border: `1px solid ${presencesSeance[m.id] === opt ? C.vifBleu : C.border}`, background: presencesSeance[m.id] === opt ? `${C.vifBleu}14` : "#FBFAF6", fontSize: "10.5px", fontWeight: 600, color: presencesSeance[m.id] === opt ? C.vifBleu : C.sub, cursor: "pointer" }}
+                      style={{ padding: "5px 9px", borderRadius: "6px", border: `1px solid ${presencesSeance[m.id] === opt ? C.vifBleu : C.border}`, background: presencesSeance[m.id] === opt ? `${C.vifBleu}14` : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: presencesSeance[m.id] === opt ? C.vifBleu : C.sub, cursor: "pointer" }}
                     >
                       {opt}
                     </div>
@@ -6178,20 +6177,20 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 console.error("Erreur d'enregistrement des présences", e);
               }
             }}
-            style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "9px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+            style={{ background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "9px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer" }}
           >
             Enregistrer la présence
           </button>
 
-          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: "6px" }}>Amendes</div>
+          <div className="adm-surtitre adm-surtitre-espace">Amendes</div>
           {amendesSeanceList.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               {amendesSeanceList.map((a) => {
                 const membre = membres.find((m) => m.id === a.membreId);
                 const enPaiement = paiementAmendeId === a.id;
                 return (
-                  <div key={a.id} style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
+                  <div key={a.id} className="adm-encart">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
                       <span>{membre?.nom || "—"} — {a.typeNom}</span>
                       <b>{fmtFCFA(a.montant)}</b>
                     </div>
@@ -6204,7 +6203,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                           {!enPaiement && (
                             <button
                               onClick={() => { setPaiementAmendeId(a.id); setPaiementMode("espèces"); setPaiementEpargneId(""); }}
-                              style={{ background: "transparent", color: C.accent2, border: `1px solid ${C.accent2}66`, borderRadius: "6px", padding: "4px 8px", fontSize: "10.5px", fontWeight: 600, cursor: "pointer" }}
+                              className="adm-btn-ligne"
                             >
                               Marquer payée
                             </button>
@@ -6219,7 +6218,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                             <div
                               key={mode}
                               onClick={() => setPaiementMode(mode)}
-                              style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "6px", border: `1px solid ${paiementMode === mode ? C.accent2 : C.border}`, background: paiementMode === mode ? C.ok : "#FFFFFF", fontSize: "10.5px", fontWeight: 600, color: paiementMode === mode ? C.accent2 : C.sub, cursor: "pointer" }}
+                              style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "6px", border: `1px solid ${paiementMode === mode ? C.accent2 : C.border}`, background: paiementMode === mode ? C.ok : "#FFFFFF", fontSize: "12px", fontWeight: 600, color: paiementMode === mode ? C.accent2 : C.sub, cursor: "pointer" }}
                             >
                               {mode === "espèces" ? "Espèces" : "Déduit banque"}
                             </div>
@@ -6229,7 +6228,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                           <select
                             value={paiementEpargneId}
                             onChange={(e) => setPaiementEpargneId(e.target.value)}
-                            style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "11px", outline: "none" }}
+                            style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "12px", outline: "none" }}
                           >
                             <option value="">Sélectionner l'épargne à débiter</option>
                             {epargnes.map((ep) => <option key={ep.id} value={ep.id}>{ep.nom} ({fmtFCFA(ep.solde)})</option>)}
@@ -6238,7 +6237,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         <div style={{ display: "flex", gap: "6px" }}>
                           <button
                             onClick={() => setPaiementAmendeId(null)}
-                            style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "7px", fontSize: "11px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+                            style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "7px", fontSize: "12px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
                           >
                             Annuler
                           </button>
@@ -6267,7 +6266,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                                 setPaiementEnCours(false);
                               }
                             }}
-                            style={{ flex: 1, background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "6px", padding: "7px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                            style={{ flex: 1, background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "6px", padding: "7px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
                           >
                             {paiementEnCours ? "..." : "Confirmer"}
                           </button>
@@ -6283,7 +6282,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             <select
               value={amendeSeanceMembreId}
               onChange={(e) => setAmendeSeanceMembreId(e.target.value)}
-              style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12px", outline: "none" }}
+              className="adm-input adm-input-compact adm-flex"
             >
               <option value="">Membre</option>
               {membres.map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
@@ -6295,7 +6294,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 const type = typesAmendesSeance.find((t) => t.id === e.target.value);
                 if (type) setAmendeSeanceMontant(String(type.montant));
               }}
-              style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12px", outline: "none" }}
+              className="adm-input adm-input-compact adm-flex"
             >
               <option value="">Type d'amende</option>
               {typesAmendesSeance.map((t) => <option key={t.id} value={t.id}>{t.nom} ({fmtFCFA(t.montant)})</option>)}
@@ -6306,7 +6305,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               value={amendeSeanceMontant}
               onChange={(e) => setAmendeSeanceMontant(e.target.value)}
               placeholder="Montant"
-              style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12px", outline: "none" }}
+              className="adm-input adm-input-compact adm-flex"
             />
             <button
               onClick={async () => {
@@ -6329,19 +6328,19 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   console.error("Erreur d'application de l'amende", e);
                 }
               }}
-              style={{ background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+              style={{ background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
             >
               Appliquer
             </button>
           </div>
 
-          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: "6px" }}>Procès-verbal / compte-rendu</div>
+          <div className="adm-surtitre adm-surtitre-espace">Procès-verbal / compte-rendu</div>
           <textarea
             value={seanceCompteRendu}
             onChange={(e) => setSeanceCompteRendu(e.target.value)}
             placeholder="Résumé des décisions prises, points discutés..."
             rows={4}
-            style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none", resize: "vertical", fontFamily: "inherit" }}
+            style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "14px", outline: "none", resize: "vertical", fontFamily: "inherit" }}
           />
           <button
             onClick={async () => {
@@ -6353,7 +6352,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 console.error("Erreur d'enregistrement du compte-rendu", e);
               }
             }}
-            style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "10px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+            style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "10px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer" }}
           >
             Enregistrer et clôturer la séance
           </button>
@@ -6365,11 +6364,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <FormField label="Date" placeholder="jj/mm/aaaa" value={rafraDate} onChange={(e) => setRafraDate(e.target.value)} />
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Séance liée (optionnel)</label>
+            <label className="adm-label">Séance liée (optionnel)</label>
             <select
               value={rafraSeanceId}
               onChange={(e) => setRafraSeanceId(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Aucune</option>
               {seancesList.map((s) => <option key={s.id} value={s.id}>{s.date}{s.lieu ? ` — ${s.lieu}` : ""}</option>)}
@@ -6377,11 +6376,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Responsable de l'achat</label>
+            <label className="adm-label">Responsable de l'achat</label>
             <select
               value={rafraResponsableId}
               onChange={(e) => setRafraResponsableId(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Sélectionner un membre</option>
               {membres.map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
@@ -6391,10 +6390,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <FormField label="Montant par membre participant (FCFA)" placeholder="Ex. 1 000" value={rafraMontantParMembre} onChange={(e) => setRafraMontantParMembre(e.target.value)} />
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Membres participants</label>
+            <label className="adm-label">Membres participants</label>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "180px", overflowY: "auto" }}>
               {membres.filter((m) => m.statut === "actif").map((m) => (
-                <label key={m.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", cursor: "pointer" }}>
+                <label key={m.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px", cursor: "pointer" }}>
                   <input
                     type="checkbox"
                     checked={!!rafraParticipants[m.id]}
@@ -6421,7 +6420,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             const facture = parseInt(rafraFacture.replace(/[^\d]/g, ""), 10) || 0;
             const reliquat = collecte - facture;
             return (
-              <div style={{ fontSize: "12px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px" }}>
+              <div style={{ fontSize: "13px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}><span>Collecté</span><b>{fmtFCFA(collecte)}</b></div>
                 <div style={{ display: "flex", justifyContent: "space-between" }}><span>Facture</span><b>{fmtFCFA(facture)}</b></div>
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", paddingTop: "4px", borderTop: `1px solid ${C.border}` }}>
@@ -6433,14 +6432,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           })()}
 
           {rafraErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {rafraErreur}
             </div>
           )}
 
           <button
             disabled={rafraEnCours}
-            style={{ marginTop: "6px", background: C.vifOr, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: rafraEnCours ? "default" : "pointer" }}
+            style={{ marginTop: "6px", background: C.vifOr, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: rafraEnCours ? "default" : "pointer" }}
             onClick={async () => {
               const dateISO = versDateISO(rafraDate);
               if (!dateISO) { setRafraErreur("Date invalide (jj/mm/aaaa)."); return; }
@@ -6477,13 +6476,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showTypesDepenses && (
         <Modal onClose={() => setShowTypesDepenses(false)} title="Types de dépenses" icon={<ShoppingCart />} accentColor={C.vifBleu}>
-          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Crée les catégories de dépenses propres à ton groupe (ex. Fournitures, Transport, Communication).
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             {typesDepenses.map((t) => (
               <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
-                <span style={{ fontSize: "13px", fontWeight: 600 }}>{t.nom}</span>
+                <span style={{ fontSize: "14px", fontWeight: 600 }}>{t.nom}</span>
                 <X
                   size={14}
                   color={C.sub}
@@ -6505,7 +6504,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               value={newTypeDepenseNom}
               onChange={(e) => setNewTypeDepenseNom(e.target.value)}
               placeholder="Ex. Fournitures de bureau"
-              style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
+              className="adm-input adm-input-compact adm-flex"
             />
             <button
               onClick={async () => {
@@ -6518,7 +6517,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   console.error("Erreur de création du type de dépense", e);
                 }
               }}
-              style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+              style={{ background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer" }}
             >
               Ajouter
             </button>
@@ -6529,11 +6528,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showCreerDepense && (
         <Modal onClose={() => setShowCreerDepense(false)} title="Enregistrer une dépense" icon={<ShoppingCart />} accentColor={C.warn}>
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Catégorie</label>
+            <label className="adm-label">Catégorie</label>
             <select
               value={depenseTypeId}
               onChange={(e) => setDepenseTypeId(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Sélectionner une catégorie</option>
               {typesDepenses.map((t) => <option key={t.id} value={t.id}>{t.nom}</option>)}
@@ -6545,11 +6544,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <FormField label="Motif" placeholder="Ex. Achat de cahiers de compte" value={depenseMotif} onChange={(e) => setDepenseMotif(e.target.value)} />
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Source à débiter</label>
+            <label className="adm-label">Source à débiter</label>
             <select
               value={depenseSourceType}
               onChange={(e) => { setDepenseSourceType(e.target.value); setDepenseSourceId(""); }}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Sélectionner une source</option>
               <option value="epargne">Épargne (banque)</option>
@@ -6563,7 +6562,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             <select
               value={depenseSourceId}
               onChange={(e) => setDepenseSourceId(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Sélectionner l'épargne</option>
               {epargnes.map((ep) => <option key={ep.id} value={ep.id}>{ep.nom} ({fmtFCFA(ep.solde)})</option>)}
@@ -6573,7 +6572,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             <select
               value={depenseSourceId}
               onChange={(e) => setDepenseSourceId(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">Sélectionner le compte</option>
               {comptesBancaires.map((c) => <option key={c.id} value={c.id}>{c.nom} ({fmtFCFA(c.solde)})</option>)}
@@ -6581,14 +6580,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           )}
 
           {depenseErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {depenseErreur}
             </div>
           )}
 
           <button
             disabled={depenseEnCours}
-            style={{ marginTop: "6px", background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: depenseEnCours ? "default" : "pointer" }}
+            style={{ marginTop: "6px", background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: depenseEnCours ? "default" : "pointer" }}
             onClick={async () => {
               const montant = parseInt(depenseMontant.replace(/[^\d]/g, ""), 10);
               const dateISO = versDateISO(depenseDate);
@@ -6629,23 +6628,23 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showAbonnementSms && (
         <Modal onClose={() => setShowAbonnementSms(false)} title="Abonnement SMS mensuel" icon={<Repeat />} accentColor={C.vifBleu}>
-          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             C'est toi (l'admin) qui coches les membres ayant accepté par contrat manuel. Le paiement alimente le pool de crédits SMS du groupe.
           </div>
 
-          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em" }}>Tarif</div>
+          <div className="adm-surtitre">Tarif</div>
           <div style={{ display: "flex", gap: "6px" }}>
             <input
               value={abonnementSmsPrixInput}
               onChange={(e) => setAbonnementSmsPrixInput(e.target.value)}
               placeholder="Prix mensuel (FCFA)"
-              style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12px", outline: "none" }}
+              className="adm-input adm-input-compact adm-flex"
             />
             <input
               value={abonnementSmsCreditsInput}
               onChange={(e) => setAbonnementSmsCreditsInput(e.target.value)}
               placeholder="Crédits SMS offerts"
-              style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12px", outline: "none" }}
+              className="adm-input adm-input-compact adm-flex"
             />
             <button
               disabled={abonnementSmsTarifEnCours}
@@ -6664,22 +6663,22 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   setAbonnementSmsTarifEnCours(false);
                 }
               }}
-              style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "12px", fontWeight: 600, cursor: abonnementSmsTarifEnCours ? "default" : "pointer" }}
+              style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "13px", fontWeight: 600, cursor: abonnementSmsTarifEnCours ? "default" : "pointer" }}
             >
               {abonnementSmsTarifEnCours ? "..." : "Fixer"}
             </button>
           </div>
-          <div style={{ fontSize: "11px", color: C.sub }}>
+          <div style={{ fontSize: "12px", color: C.sub }}>
             Tarif actuel : <b>{fmtFCFA(abonnementSmsConfig.prixMensuel)}</b> pour <b>{abonnementSmsConfig.credits} SMS</b>.
           </div>
 
           {abonnementSmsErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {abonnementSmsErreur}
             </div>
           )}
 
-          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: "6px" }}>
+          <div className="adm-surtitre adm-surtitre-espace">
             Membres — coche ceux ayant un contrat signé
           </div>
 
@@ -6690,9 +6689,9 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               const enCours = prelevementSmsMembreId === m.id;
               const toggleEnCours = abonnementToggleMembreId === m.id;
               return (
-                <div key={m.id} style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+                <div key={m.id} className="adm-encart">
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
-                    <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", fontWeight: 600, cursor: toggleEnCours ? "default" : "pointer", flex: 1 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px", fontWeight: 600, cursor: toggleEnCours ? "default" : "pointer", flex: 1 }}>
                       <input
                         type="checkbox"
                         checked={estAbonne}
@@ -6722,7 +6721,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       ) : !enCours ? (
                         <button
                           onClick={() => { setPrelevementSmsMembreId(m.id); setPrelevementSmsMode("espèces"); setPrelevementSmsEpargneId(""); }}
-                          style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}66`, borderRadius: "6px", padding: "4px 8px", fontSize: "10.5px", fontWeight: 600, cursor: "pointer" }}
+                          className="adm-btn-ligne"
                         >
                           Prélever
                         </button>
@@ -6736,7 +6735,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                           <div
                             key={mode}
                             onClick={() => setPrelevementSmsMode(mode)}
-                            style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "6px", border: `1px solid ${prelevementSmsMode === mode ? C.vifBleu : C.border}`, background: prelevementSmsMode === mode ? `${C.vifBleu}14` : "#FFFFFF", fontSize: "10.5px", fontWeight: 600, color: prelevementSmsMode === mode ? C.vifBleu : C.sub, cursor: "pointer" }}
+                            style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "6px", border: `1px solid ${prelevementSmsMode === mode ? C.vifBleu : C.border}`, background: prelevementSmsMode === mode ? `${C.vifBleu}14` : "#FFFFFF", fontSize: "12px", fontWeight: 600, color: prelevementSmsMode === mode ? C.vifBleu : C.sub, cursor: "pointer" }}
                           >
                             {mode === "espèces" ? "Espèces" : "Déduit banque"}
                           </div>
@@ -6746,7 +6745,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         <select
                           value={prelevementSmsEpargneId}
                           onChange={(e) => setPrelevementSmsEpargneId(e.target.value)}
-                          style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "11px", outline: "none" }}
+                          style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "12px", outline: "none" }}
                         >
                           <option value="">Sélectionner l'épargne</option>
                           {epargnes.map((ep) => <option key={ep.id} value={ep.id}>{ep.nom} ({fmtFCFA(ep.solde)})</option>)}
@@ -6755,7 +6754,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       <div style={{ display: "flex", gap: "6px" }}>
                         <button
                           onClick={() => setPrelevementSmsMembreId(null)}
-                          style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "7px", fontSize: "11px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+                          style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "7px", fontSize: "12px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
                         >
                           Annuler
                         </button>
@@ -6787,7 +6786,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                               setPrelevementSmsEnCours(false);
                             }
                           }}
-                          style={{ flex: 1, background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "6px", padding: "7px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                          style={{ flex: 1, background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "6px", padding: "7px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
                         >
                           {prelevementSmsEnCours ? "..." : "Confirmer"}
                         </button>
@@ -6805,33 +6804,33 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         <Modal onClose={() => setShowCreateTontine(false)} title="Créer une tontine" icon={<Banknote />} accentColor={C.vifOr}>
           <FormField label="Nom de la tontine" placeholder="Ex. Tontine des Bâtisseurs — Cycle 2" value={tontineNom} onChange={(e) => setTontineNom(e.target.value)} />
           <FormField label="Montant cotisé par tour" placeholder="Ex. 75 000 FCFA" value={tontineMontant} onChange={(e) => setTontineMontant(e.target.value)} />
-          <div style={{ fontSize: "11px", color: C.vifVert, marginTop: "-4px", display: "flex", alignItems: "center", gap: "5px", fontWeight: 600 }}>
+          <div style={{ fontSize: "12px", color: C.vifVert, marginTop: "-4px", display: "flex", alignItems: "center", gap: "5px", fontWeight: 600 }}>
             <Users size={13} /> {membres.filter((m) => m.statut === "actif").length} membre(s) actif(s) participent automatiquement, désignés par rotation.
           </div>
 
           <div>
             <button
               onClick={() => setShowPartsDetail(!showPartsDetail)}
-              style={{ background: "transparent", border: "none", padding: 0, fontSize: "11.5px", color: C.vifBleu, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}
+              style={{ background: "transparent", border: "none", padding: 0, fontSize: "12.5px", color: C.vifBleu, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}
             >
               <Repeat size={12} /> {showPartsDetail ? "Masquer" : "Un membre prend plusieurs parts ?"}
             </button>
             {showPartsDetail && (
               <div style={{ marginTop: "8px", background: `${C.vifBleu}0D`, border: `1px solid ${C.vifBleu}33`, borderRadius: "10px", padding: "10px" }}>
-                <div style={{ fontSize: "10.5px", color: C.sub, marginBottom: "8px" }}>
+                <div style={{ fontSize: "12px", color: C.sub, marginBottom: "8px" }}>
                   Un membre avec plusieurs parts cotise et reçoit plusieurs fois dans ce même cycle.
                 </div>
                 {membres.filter((m) => m.statut === "actif").map((m) => (
                   <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0" }}>
-                    <span style={{ fontSize: "12.5px", fontWeight: 600 }}>{m.nom}</span>
+                    <span style={{ fontSize: "13.5px", fontWeight: 600 }}>{m.nom}</span>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <button onClick={() => ajusterParts(m.id, -1)} style={{ width: "22px", height: "22px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "#FFFFFF", cursor: "pointer", fontSize: "13px", lineHeight: 1 }}>−</button>
-                      <span style={{ fontSize: "12.5px", fontWeight: 700, color: C.vifBleu, minWidth: "14px", textAlign: "center" }}>{partsParMembre[m.id] || 1}</span>
-                      <button onClick={() => ajusterParts(m.id, 1)} style={{ width: "22px", height: "22px", borderRadius: "6px", border: `1px solid ${C.border}`, background: "#FFFFFF", cursor: "pointer", fontSize: "13px", lineHeight: 1 }}>+</button>
+                      <button onClick={() => ajusterParts(m.id, -1)} style={{ width: "36px", height: "36px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", cursor: "pointer", fontSize: "14px", lineHeight: 1 }}>−</button>
+                      <span style={{ fontSize: "13.5px", fontWeight: 700, color: C.vifBleu, minWidth: "14px", textAlign: "center" }}>{partsParMembre[m.id] || 1}</span>
+                      <button onClick={() => ajusterParts(m.id, 1)} style={{ width: "36px", height: "36px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", cursor: "pointer", fontSize: "14px", lineHeight: 1 }}>+</button>
                     </div>
                   </div>
                 ))}
-                <div style={{ fontSize: "10.5px", color: C.sub, marginTop: "6px" }}>
+                <div style={{ fontSize: "12px", color: C.sub, marginTop: "6px" }}>
                   Total des parts : <b>{membres.filter((m) => m.statut === "actif").reduce((s, m) => s + (partsParMembre[m.id] || 1), 0)}</b> — idéalement égal au nombre de séances ci-dessous, pour que chaque part reçoive un tour.
                 </div>
               </div>
@@ -6839,25 +6838,25 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "flex", alignItems: "center", gap: "5px" }}>
+            <label style={{ fontSize: "13px", color: C.sub, marginBottom: "6px", display: "flex", alignItems: "center", gap: "5px" }}>
               <Repeat size={13} color={C.vifViolet} /> Mode de distribution actuel
             </label>
             <select
               value={newMode}
               onChange={(e) => setNewMode(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: "8px", border: `1.5px solid ${C.vifViolet}`, background: `${C.vifViolet}14`, fontSize: "13px", outline: "none", color: C.vifViolet, fontWeight: 700 }}
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: "8px", border: `1.5px solid ${C.vifViolet}`, background: `${C.vifViolet}14`, fontSize: "14px", outline: "none", color: C.vifViolet, fontWeight: 700 }}
             >
               <option>Ordre fixe</option>
               <option>Désignation</option>
               <option>Enchères</option>
             </select>
-            <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>
+            <div className="adm-aide">
               S'applique automatiquement à chaque date ajoutée ci-dessous, jusqu'à ce que tu le changes.
             </div>
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "flex", alignItems: "center", gap: "5px" }}>
+            <label style={{ fontSize: "13px", color: C.sub, marginBottom: "6px", display: "flex", alignItems: "center", gap: "5px" }}>
               <Calendar size={13} color={C.vifOr} /> Dates de séance
             </label>
 
@@ -6866,7 +6865,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 <div
                   key={o.key}
                   onClick={() => setModeSaisie(o.key)}
-                  style={{ flex: 1, textAlign: "center", padding: "8px 4px", borderRadius: "8px", border: `1px solid ${modeSaisie === o.key ? C.accent2 : C.border}`, background: modeSaisie === o.key ? C.ok : "#FBFAF6", fontSize: "11.5px", fontWeight: 600, color: modeSaisie === o.key ? C.accent2 : C.sub, cursor: "pointer" }}
+                  style={{ flex: 1, textAlign: "center", padding: "8px 4px", borderRadius: "8px", border: `1px solid ${modeSaisie === o.key ? C.accent2 : C.border}`, background: modeSaisie === o.key ? C.ok : "#FBFAF6", fontSize: "12.5px", fontWeight: 600, color: modeSaisie === o.key ? C.accent2 : C.sub, cursor: "pointer" }}
                 >
                   {o.label}
                 </div>
@@ -6876,15 +6875,15 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             {modeSaisie === "auto" && (
               <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", marginBottom: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                  <input value={autoDateDebut} onChange={(e) => setAutoDateDebut(e.target.value)} placeholder="Début jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "12.5px", outline: "none" }} />
-                  <input value={autoDateFin} onChange={(e) => setAutoDateFin(e.target.value)} placeholder="Fin jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "12.5px", outline: "none" }} />
+                  <input value={autoDateDebut} onChange={(e) => setAutoDateDebut(e.target.value)} placeholder="Début jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none" }} />
+                  <input value={autoDateFin} onChange={(e) => setAutoDateFin(e.target.value)} placeholder="Fin jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none" }} />
                 </div>
 
-                <select value={autoJourSemaine} onChange={(e) => setAutoJourSemaine(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "12.5px", outline: "none" }}>
+                <select value={autoJourSemaine} onChange={(e) => setAutoJourSemaine(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none" }}>
                   {JOURS_SEMAINE.map((j, idx) => <option key={idx} value={idx}>{j}</option>)}
                 </select>
 
-                <select value={autoFrequence} onChange={(e) => setAutoFrequence(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "12.5px", outline: "none" }}>
+                <select value={autoFrequence} onChange={(e) => setAutoFrequence(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none" }}>
                   <option value="chaque_semaine">Chaque semaine</option>
                   <option value="toutes_2_semaines">Toutes les 2 semaines</option>
                   <option value="mensuel_occurrences">Occurrences précises du mois</option>
@@ -6896,7 +6895,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       <div
                         key={o.v}
                         onClick={() => toggleOccurrence(o.v)}
-                        style={{ padding: "6px 10px", borderRadius: "7px", border: `1px solid ${autoOccurrences.includes(o.v) ? C.accent2 : C.border}`, background: autoOccurrences.includes(o.v) ? C.ok : "#FFFFFF", fontSize: "11.5px", fontWeight: 600, color: autoOccurrences.includes(o.v) ? C.accent2 : C.sub, cursor: "pointer" }}
+                        style={{ padding: "6px 10px", borderRadius: "7px", border: `1px solid ${autoOccurrences.includes(o.v) ? C.accent2 : C.border}`, background: autoOccurrences.includes(o.v) ? C.ok : "#FFFFFF", fontSize: "12.5px", fontWeight: 600, color: autoOccurrences.includes(o.v) ? C.accent2 : C.sub, cursor: "pointer" }}
                       >
                         {o.l}
                       </div>
@@ -6905,14 +6904,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 )}
 
                 {autoErreur && (
-                  <div style={{ fontSize: "11px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "7px 9px" }}>
+                  <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "7px 9px" }}>
                     {autoErreur}
                   </div>
                 )}
 
                 <button
                   onClick={genererDatesAuto}
-                  style={{ background: C.vifOr, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "9px", fontSize: "12.5px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                  style={{ background: C.vifOr, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "9px", fontSize: "13.5px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                 >
                   <Calendar size={14} /> Générer les dates avec le mode "{newMode}"
                 </button>
@@ -6921,7 +6920,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
             {seances.map((s, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", marginBottom: "6px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px" }}>
                   <span style={{ fontWeight: 600 }}>{s.date}</span>
                   <Badge bg={`${C.vifViolet}1A`} fg={C.vifViolet}>{s.mode}</Badge>
                 </div>
@@ -6935,11 +6934,11 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 value={newDate}
                 onChange={(e) => setNewDate(e.target.value)}
                 placeholder="jj/mm/aaaa"
-                style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
+                className="adm-input adm-input-compact adm-flex"
               />
               <button
                 onClick={addSeance}
-                style={{ background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "8px", padding: "0 12px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+                className="adm-btn-mini"
               >
                 <Plus size={14} />
               </button>
@@ -6947,24 +6946,24 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             )}
           </div>
           {seances.length > 0 && (
-            <div style={{ fontSize: "11px", color: C.sub, marginTop: "-4px" }}>
+            <div style={{ fontSize: "12px", color: C.sub, marginTop: "-4px" }}>
               La tontine débutera le <b>{seances.slice().sort((a, b) => versDateISO(a.date).localeCompare(versDateISO(b.date)))[0].date}</b> (date de la première séance).
             </div>
           )}
 
           {tontineError && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {tontineError}
             </div>
           )}
           {tontineSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               <CheckCircle2 size={14} /> Tontine créée — {seances.length} tour(s) généré(s) dans le tableau.
             </div>
           )}
 
           <button
-            style={{ marginTop: "6px", background: `linear-gradient(135deg, ${C.vifOr}, ${C.accent2})`, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "13px", fontSize: "13.5px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}
+            style={{ marginTop: "6px", background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "13px", fontSize: "14.5px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}
             onClick={async () => {
               if (!tontineNom.trim()) { setTontineError("Le nom de la tontine est obligatoire."); setTontineSuccess(false); return; }
               if (!tontineMontant.trim()) { setTontineError("Le montant cotisé par tour est obligatoire."); setTontineSuccess(false); return; }
@@ -7382,40 +7381,50 @@ function LigneInfo({ icon, label, value, note }) {
 // ============================================================
 function Sidebar({ role, sub, items, active, onSelect, logoUrl }) {
   return (
-    <div className="app-sidebar" style={{ width: "210px", background: C.accent2, padding: "26px 16px", display: "flex", flexDirection: "column", gap: "6px" }}>
-      <div className="sidebar-header" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "30px", paddingLeft: "6px" }}>
+    <nav className="app-sidebar" aria-label="Navigation de l'espace">
+      <div className="sidebar-header">
         {logoUrl ? (
-          <img src={logoUrl} alt="Logo" style={{ width: "32px", height: "32px", borderRadius: "9px", objectFit: "cover", flexShrink: 0 }} />
+          <img src={logoUrl} alt="" className="sidebar-logo" />
         ) : (
-          <div style={{ width: "32px", height: "32px", borderRadius: "9px", background: C.accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <LayoutDashboard size={16} color={C.accent2} />
+          <div className="sidebar-logo sidebar-logo-defaut" aria-hidden="true">
+            <LayoutDashboard size={18} />
           </div>
         )}
-        <div>
-          <div style={{ color: "#FAF6ED", fontWeight: 700, fontSize: "13px", lineHeight: 1.1 }}>{role}</div>
-          <div style={{ color: "#9DB3A6", fontSize: "10.5px" }}>{sub}</div>
+        <div className="sidebar-titres">
+          <div className="sidebar-role">{role}</div>
+          <div className="sidebar-sub">{sub}</div>
         </div>
       </div>
-      {items.map((item) => (
-        <div key={item.key} className="sidebar-item" onClick={() => onSelect(item.key)} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "8px", color: active === item.key ? C.accent2 : "#D7E3DA", background: active === item.key ? C.accent : "transparent", fontSize: "13px", fontWeight: active === item.key ? 600 : 500, cursor: "pointer" }}>
-          {item.icon} {item.label}
-        </div>
-      ))}
-      <div className="sidebar-footer" style={{ marginTop: "auto", fontSize: "10.5px", color: "#7F9788", paddingLeft: "6px" }}>Three T Solutions — 2026</div>
-    </div>
+      <ul className="sidebar-liste">
+        {items.map((item) => (
+          <li key={item.key}>
+            <button
+              type="button"
+              className={`sidebar-item${active === item.key ? " est-actif" : ""}`}
+              aria-current={active === item.key ? "page" : undefined}
+              onClick={() => onSelect(item.key)}
+            >
+              <span className="sidebar-icone" aria-hidden="true">{item.icon}</span>
+              <span>{item.label}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="sidebar-footer">Three T Solutions — 2026</div>
+    </nav>
   );
 }
 
 function Table({ cols, widths, rows }) {
   return (
     <div className="table-scroll">
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: widths, padding: "12px 20px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: C.sub, borderBottom: `1px solid ${C.border}` }}>
-          {cols.map((c) => <div key={c}>{c}</div>)}
+      <div className="tableau" role="table">
+        <div className="tableau-entete" role="row" style={{ gridTemplateColumns: widths }}>
+          {cols.map((c, j) => <div key={`${c}-${j}`} role="columnheader">{c}</div>)}
         </div>
         {rows.map((row, i) => (
-          <div key={i} style={{ display: "grid", gridTemplateColumns: widths, padding: "14px 20px", fontSize: "13px", alignItems: "center", borderBottom: i < rows.length - 1 ? `1px solid ${C.border}` : "none" }}>
-            {row.map((cell, j) => <div key={j}>{cell}</div>)}
+          <div key={i} className="tableau-ligne" role="row" style={{ gridTemplateColumns: widths }}>
+            {row.map((cell, j) => <div key={j} role="cell">{cell}</div>)}
           </div>
         ))}
       </div>
@@ -7424,39 +7433,45 @@ function Table({ cols, widths, rows }) {
 }
 
 function Badge({ bg, fg, children }) {
-  return <span style={{ background: bg, color: fg, fontSize: "11px", fontWeight: 600, padding: "4px 10px", borderRadius: "999px", textTransform: "capitalize" }}>{children}</span>;
+  return <span className="badge" style={{ background: bg, color: fg }}>{children}</span>;
 }
 
 function Modal({ children, onClose, title, icon, accentColor }) {
+  const titreId = React.useId();
+  const couleur = accentColor || C.accent2;
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(20,24,20,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, padding: "16px" }}>
-      <div className="responsive-modal" style={{ background: "#FFFFFF", borderRadius: "16px", padding: "26px", width: "360px", maxWidth: "100%", maxHeight: "85vh", overflowY: "auto", border: `1px solid ${C.border}` }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+    <div className="modal-fond">
+      <div className="responsive-modal modal" role="dialog" aria-modal="true" aria-labelledby={titreId}>
+        <div className="modal-entete">
+          <div className="modal-titre-groupe">
             {icon && (
-              <div style={{ width: "34px", height: "34px", borderRadius: "10px", background: `${accentColor || C.accent2}1A`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                {React.cloneElement(icon, { size: 17, color: accentColor || C.accent2 })}
+              <div className="modal-icone" style={{ background: `${couleur}1A`, color: couleur }} aria-hidden="true">
+                {React.cloneElement(icon, { size: 18, color: couleur })}
               </div>
             )}
-            <h2 style={{ fontSize: "16px", fontWeight: 700, margin: 0, color: C.ink }}>{title}</h2>
+            <h2 id={titreId} className="modal-titre">{title}</h2>
           </div>
-          <X size={18} color={C.sub} style={{ cursor: "pointer" }} onClick={onClose} />
+          <button type="button" className="modal-fermer" onClick={onClose} aria-label="Fermer">
+            <X size={18} aria-hidden="true" />
+          </button>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>{children}</div>
+        <div className="modal-corps">{children}</div>
       </div>
     </div>
   );
 }
 
 function FormField({ label, placeholder, value, onChange }) {
+  const champId = React.useId();
   return (
     <div>
-      <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>{label}</label>
+      <label htmlFor={champId} className="adm-label">{label}</label>
       <input
+        id={champId}
+        className="adm-input"
         placeholder={placeholder}
         value={value !== undefined ? value : undefined}
         onChange={onChange}
-        style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
       />
     </div>
   );
@@ -7465,30 +7480,36 @@ function FormField({ label, placeholder, value, onChange }) {
 function RapportSection({ titre, children }) {
   return (
     <div>
-      <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", margin: "4px 0 6px" }}>{titre}</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>{children}</div>
+      <div className="adm-surtitre rapport-titre">{titre}</div>
+      <div className="rapport-lignes">{children}</div>
     </div>
   );
 }
 
 function RapportLigne({ gauche, droite, positif }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: "8px", padding: "6px 8px", background: "#FBFAF6", borderRadius: "7px", fontSize: "12px" }}>
+    <div className="rapport-ligne">
       <span>{gauche}</span>
-      <span style={{ fontWeight: 700, color: positif ? C.accent2 : C.ink, whiteSpace: "nowrap" }}>{droite}</span>
+      <span className={`num rapport-montant${positif ? " rapport-positif" : ""}`}>{droite}</span>
     </div>
   );
 }
 
 function StatCard({ label, value, sub, icon }) {
   return (
-    <div style={{ flex: "1 1 160px", minWidth: "160px", background: C.panel, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "16px 18px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", color: C.sub, fontSize: "12px", marginBottom: "8px" }}>{icon} {label}</div>
-      <div style={{ fontSize: "18px", fontWeight: 700 }}>{value}</div>
-      {sub && <div style={{ fontSize: "11px", color: C.sub, marginTop: "3px" }}>{sub}</div>}
+    <div className="stat-carte">
+      <div className="stat-label">
+        {icon && <span className="stat-icone" aria-hidden="true">{icon}</span>}
+        {label}
+      </div>
+      <div className="stat-valeur num">{value}</div>
+      {sub && <div className="stat-sub">{sub}</div>}
     </div>
   );
 }
 
-const btnPrimary = { background: `linear-gradient(135deg, ${C.accent2}, ${C.accent})`, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "11px 18px", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", whiteSpace: "nowrap", boxShadow: `0 4px 12px ${C.accent2}40`, transition: "transform 0.12s ease, box-shadow 0.12s ease" };
-const btnSecondary = { background: "#FFFFFF", color: C.accent2, border: `1.5px solid ${C.accent2}55`, borderRadius: "10px", padding: "11px 18px", fontSize: "13px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap", boxShadow: "0 2px 6px rgba(27,67,50,0.08)", transition: "transform 0.12s ease" };
+// Boutons des écrans d'administration. Objets de style (et non classes)
+// car les écrans les étendent en ligne : { ...btnPrimary, marginTop: "18px" }.
+// Les couleurs passent par les tokens CSS, donc suivent le thème choisi.
+const btnPrimary = { background: "var(--primary)", color: "var(--on-primary)", border: "1px solid transparent", borderRadius: "var(--radius-control)", minHeight: "44px", padding: "0 18px", fontSize: "14px", fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", boxShadow: "0 1px 2px rgba(20,32,26,0.12)", fontFamily: "inherit" };
+const btnSecondary = { background: "var(--surface)", color: "var(--primary)", border: "1px solid var(--border-strong)", borderRadius: "var(--radius-control)", minHeight: "44px", padding: "0 16px", fontSize: "14px", fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" };
