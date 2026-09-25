@@ -44,6 +44,7 @@ import {
   CreditCard, ScrollText, LayoutDashboard, Wallet, Shield, FileBarChart,
   Gavel, Bell, LogOut, Moon, Sun, Lock, ChevronLeft, CheckCircle2, Clock,
   Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat, Eye, EyeOff, AlertTriangle, ShoppingCart, Palette,
+  ShieldCheck, MessageSquareText, ListChecks, UserRound, Mail, ArrowDownLeft, ArrowUpRight,
 } from "lucide-react";
 
 // ---------- Palette partagée ----------
@@ -78,6 +79,17 @@ const THEMES = {
   violet: { nom: "Violet moderne", accent: "#D97706", accent2: "#5B21B6", purple: "#9333EA" },
 };
 
+// Reporte les couleurs de marque du thème dans les tokens CSS du
+// design system (src/index.css), utilisés par les écrans qui ont
+// migré vers les classes CSS (ex. l'écran d'accueil).
+function appliquerThemeCss() {
+  const racine = document.documentElement.style;
+  racine.setProperty("--brand-panel", C.accent2);
+  racine.setProperty("--primary", C.accent2);
+  racine.setProperty("--gold", C.accent);
+  racine.setProperty("--ring", C.accent);
+}
+
 export default function AppPrototype() {
   const [chargementSession, setChargementSession] = useState(true);
   const [connecte, setConnecte] = useState(false);
@@ -96,6 +108,7 @@ export default function AppPrototype() {
       try {
         const theme = await fetchThemeActuel();
         Object.assign(C, THEMES[theme] || THEMES.vert);
+        appliquerThemeCss();
       } catch (eTheme) {
         console.error("Erreur de chargement du thème", eTheme);
       }
@@ -151,7 +164,7 @@ export default function AppPrototype() {
 
   if (chargementSession) {
     return (
-      <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", color: C.sub, fontFamily: "'Sora','Segoe UI',sans-serif" }}>
+      <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", color: C.sub, fontFamily: "var(--font-sans)" }}>
         Chargement...
       </div>
     );
@@ -159,7 +172,7 @@ export default function AppPrototype() {
 
   if (modeRecuperation) {
     return (
-      <div style={{ fontFamily: "'Sora','Segoe UI',sans-serif" }}>
+      <div style={{ fontFamily: "var(--font-sans)" }}>
         <ChangerMotDePasseScreen onDone={async () => { setModeRecuperation(false); await chargerSessionEtRole(); }} />
       </div>
     );
@@ -167,7 +180,7 @@ export default function AppPrototype() {
 
   if (!connecte) {
     return (
-      <div style={{ fontFamily: "'Sora','Segoe UI',sans-serif" }}>
+      <div style={{ fontFamily: "var(--font-sans)" }}>
         <ConnexionScreen onLoggedIn={chargerSessionEtRole} />
       </div>
     );
@@ -175,14 +188,14 @@ export default function AppPrototype() {
 
   if (monProfil?.doit_changer_mdp) {
     return (
-      <div style={{ fontFamily: "'Sora','Segoe UI',sans-serif" }}>
+      <div style={{ fontFamily: "var(--font-sans)" }}>
         <ChangerMotDePasseScreen onDone={chargerSessionEtRole} />
       </div>
     );
   }
 
   return (
-    <div style={{ fontFamily: "'Sora','Segoe UI',sans-serif", background: "#0E1210" }}>
+    <div style={{ fontFamily: "var(--font-sans)", background: "#0E1210" }}>
       {/* Barre de session — visible sur tous les écrans une fois connecté */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", background: "#0E1210" }}>
         <span style={{ fontSize: "12px", color: "#9AA69C" }}>
@@ -246,11 +259,6 @@ function ConnexionScreen({ onLoggedIn }) {
   const [oubliErreur, setOubliErreur] = useState("");
   const [oubliSuccess, setOubliSuccess] = useState(false);
   const [oubliChargement, setOubliChargement] = useState(false);
-  const bg = dark ? "#14181A" : C.bg;
-  const panelBg = dark ? "#1E2427" : C.panel;
-  const ink = dark ? "#F2EEE3" : C.ink;
-  const sub = dark ? "#9AA69C" : C.sub;
-  const border = dark ? "#2B3336" : C.border;
 
   const handleLogin = async () => {
     if (!identifiant.trim() || !password.trim()) {
@@ -288,136 +296,228 @@ function ConnexionScreen({ onLoggedIn }) {
     }
   };
 
+  const handleSubmitLogin = (e) => {
+    e.preventDefault();
+    handleLogin();
+  };
+
+  const handleSubmitOubli = (e) => {
+    e.preventDefault();
+    handleDemandeReinitialisation();
+  };
+
   return (
-    <div style={{ minHeight: "680px", background: bg, display: "flex", flexDirection: "column", position: "relative" }}>
-      <div style={{ height: "6px", background: `repeating-linear-gradient(90deg, ${C.accent} 0px, ${C.accent} 24px, ${C.accent2} 24px, ${C.accent2} 48px)` }} />
-      <button onClick={() => setDark(!dark)} style={{ position: "absolute", top: "24px", right: "24px", background: "transparent", border: `1px solid ${border}`, borderRadius: "999px", padding: "8px 14px", display: "flex", alignItems: "center", gap: "6px", color: sub, fontSize: "13px", cursor: "pointer" }}>
-        {dark ? <Sun size={14} /> : <Moon size={14} />} {dark ? "Clair" : "Sombre"}
-      </button>
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
-        <div style={{ width: "100%", maxWidth: "380px", background: panelBg, borderRadius: "18px", border: `1px solid ${border}`, padding: "40px 32px", boxShadow: dark ? "0 20px 60px rgba(0,0,0,0.4)" : "0 20px 50px rgba(27,67,50,0.08)" }}>
-          {!modeOubli ? (
-            <>
-              <div style={{ textAlign: "center", marginBottom: "28px" }}>
-                <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", borderRadius: "14px", background: `linear-gradient(135deg, ${C.accent2}, ${C.accent})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Users size={26} color="#FAF6ED" />
-                </div>
-                <div style={{ fontSize: "11px", letterSpacing: "0.12em", textTransform: "uppercase", color: C.accent, fontWeight: 600, marginBottom: "6px" }}>Connexion</div>
-                <h1 style={{ fontSize: "22px", fontWeight: 700, color: ink, margin: 0 }}>DJANGUI</h1>
-                <div style={{ fontSize: "10.5px", color: sub, marginTop: "4px", letterSpacing: "0.04em" }}>By 3TSOLUTION</div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                <div>
-                  <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>Identifiant</label>
-                  <input
-                    type="text"
-                    value={identifiant}
-                    onChange={(e) => setIdentifiant(e.target.value)}
-                    placeholder="Ex. jeanmballa42"
-                    style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>Mot de passe</label>
-                  <div style={{ position: "relative" }}>
-                    <Lock size={15} color={sub} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                      placeholder="••••••••"
-                      style={{ width: "100%", boxSizing: "border-box", padding: "12px 38px 12px 38px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
-                    />
-                    <div
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", cursor: "pointer", display: "flex" }}
-                    >
-                      {showPassword ? <EyeOff size={15} color={sub} /> : <Eye size={15} color={sub} />}
+    <div className="accueil" data-theme={dark ? "dark" : "light"}>
+      {/* Panneau de marque : mission + preuves de confiance */}
+      <section className="accueil-marque" aria-labelledby="accueil-titre">
+        <div className="accueil-logo">
+          <div className="accueil-logo-mark" aria-hidden="true">
+            <Users size={22} strokeWidth={2.2} />
+          </div>
+          <div>
+            <div className="accueil-logo-nom">DJANGUI</div>
+            <div className="accueil-logo-sub">par Three T Solutions</div>
+          </div>
+        </div>
+
+        <div>
+          <p id="accueil-titre" className="accueil-titre">
+            Votre tontine, <em>claire et sereine.</em>
+          </p>
+          <p className="accueil-intro">
+            Cotisations, tours, épargne, prêts et assurance de votre groupe réunis au même endroit, visibles par chaque membre.
+          </p>
+        </div>
+
+        <ul className="accueil-preuves">
+          <li className="accueil-preuve">
+            <div className="accueil-preuve-icone" aria-hidden="true"><ListChecks size={18} /></div>
+            <div>
+              <strong>Chaque franc est tracé</strong>
+              <span>Cotisations suivies tour par tour, soldes à jour pour tous.</span>
+            </div>
+          </li>
+          <li className="accueil-preuve">
+            <div className="accueil-preuve-icone" aria-hidden="true"><MessageSquareText size={18} /></div>
+            <div>
+              <strong>Confirmation par SMS</strong>
+              <span>Chaque opération sur votre compte vous est notifiée.</span>
+            </div>
+          </li>
+          <li className="accueil-preuve">
+            <div className="accueil-preuve-icone" aria-hidden="true"><ShieldCheck size={18} /></div>
+            <div>
+              <strong>Accès selon le rôle</strong>
+              <span>Président, trésorier ou membre : chacun voit ce qui le concerne.</span>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      {/* Colonne formulaire */}
+      <main className="accueil-form-col">
+        <div className="accueil-barre">
+          <button
+            type="button"
+            className="btn-pastille"
+            onClick={() => setDark(!dark)}
+            aria-label="Mode sombre"
+            aria-pressed={dark}
+          >
+            {dark ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
+            <span className="btn-pastille-texte">Mode sombre</span>
+          </button>
+        </div>
+
+        <div className="accueil-form-zone">
+          <div className="carte-auth">
+            {!modeOubli ? (
+              <>
+                <div className="carte-auth-surtitre">Espace membres</div>
+                <h1>Connexion</h1>
+                <p className="carte-auth-desc">Utilise l'identifiant fourni par le bureau de ton groupe.</p>
+
+                <form onSubmit={handleSubmitLogin} noValidate>
+                  <div className="champ">
+                    <label htmlFor="connexion-identifiant">Identifiant</label>
+                    <div className="champ-saisie">
+                      <UserRound size={18} aria-hidden="true" />
+                      <input
+                        id="connexion-identifiant"
+                        type="text"
+                        name="username"
+                        autoComplete="username"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        value={identifiant}
+                        onChange={(e) => setIdentifiant(e.target.value)}
+                        placeholder="Ex. jeanmballa42"
+                        aria-invalid={!!erreur}
+                        aria-describedby={erreur ? "connexion-erreur" : undefined}
+                      />
                     </div>
                   </div>
-                  <div style={{ textAlign: "right", marginTop: "6px" }}>
-                    <span
-                      onClick={() => { setModeOubli(true); setIdentifiantOubli(identifiant); setOubliErreur(""); setOubliSuccess(false); }}
-                      style={{ fontSize: "12px", color: C.accent, cursor: "pointer", fontWeight: 600 }}
-                    >
-                      Mot de passe oublié ?
-                    </span>
-                  </div>
-                </div>
 
-                {erreur && (
-                  <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
-                    {erreur}
+                  <div className="champ">
+                    <label htmlFor="connexion-mdp">Mot de passe</label>
+                    <div className="champ-saisie avec-action">
+                      <Lock size={18} aria-hidden="true" />
+                      <input
+                        id="connexion-mdp"
+                        type={showPassword ? "text" : "password"}
+                        name="password"
+                        autoComplete="current-password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Ton mot de passe"
+                        aria-invalid={!!erreur}
+                        aria-describedby={erreur ? "connexion-erreur" : undefined}
+                      />
+                      <button
+                        type="button"
+                        className="btn-icone"
+                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                        aria-pressed={showPassword}
+                      >
+                        {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                      </button>
+                    </div>
                   </div>
-                )}
 
-                <button
-                  onClick={handleLogin}
-                  disabled={chargement}
-                  style={{ marginTop: "10px", width: "100%", padding: "13px", borderRadius: "10px", border: "none", background: C.accent2, color: "#FAF6ED", fontSize: "14px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", cursor: chargement ? "default" : "pointer", opacity: chargement ? 0.7 : 1 }}
-                >
-                  {chargement ? "Connexion..." : "Se connecter"} <ChevronRight size={16} />
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div style={{ textAlign: "center", marginBottom: "24px" }}>
-                <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", borderRadius: "14px", background: `linear-gradient(135deg, ${C.accent2}, ${C.accent})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <KeyRound size={26} color="#FAF6ED" />
+                  <button
+                    type="button"
+                    className="lien-discret"
+                    onClick={() => { setModeOubli(true); setIdentifiantOubli(identifiant); setOubliErreur(""); setOubliSuccess(false); }}
+                  >
+                    Mot de passe oublié ?
+                  </button>
+
+                  {erreur && (
+                    <div id="connexion-erreur" className="message message-erreur" role="alert">
+                      <AlertTriangle size={16} aria-hidden="true" /> {erreur}
+                    </div>
+                  )}
+
+                  <button type="submit" className="btn-principal" disabled={chargement}>
+                    {chargement ? "Connexion…" : "Se connecter"}
+                    {!chargement && <ChevronRight size={18} aria-hidden="true" />}
+                  </button>
+                </form>
+
+                <div className="accueil-securite">
+                  <Lock size={14} aria-hidden="true" /> Connexion chiffrée
                 </div>
-                <h1 style={{ fontSize: "19px", fontWeight: 700, color: ink, margin: 0 }}>Mot de passe oublié</h1>
-                <p style={{ fontSize: "12.5px", color: sub, marginTop: "8px" }}>
-                  Indique ton identifiant, on t'envoie un lien par email pour choisir un nouveau mot de passe.
+              </>
+            ) : (
+              <>
+                <div className="carte-auth-surtitre">Récupération</div>
+                <h1>Mot de passe oublié</h1>
+                <p className="carte-auth-desc">
+                  Indique ton identifiant : on t'envoie par email un lien pour choisir un nouveau mot de passe.
                 </p>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                <div>
-                  <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>Identifiant</label>
-                  <input
-                    type="text"
-                    value={identifiantOubli}
-                    onChange={(e) => setIdentifiantOubli(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleDemandeReinitialisation()}
-                    placeholder="Ex. jeanmballa42"
-                    style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
-                  />
-                </div>
 
-                {oubliErreur && (
-                  <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
-                    {oubliErreur}
+                <form onSubmit={handleSubmitOubli} noValidate>
+                  <div className="champ">
+                    <label htmlFor="oubli-identifiant">Identifiant</label>
+                    <div className="champ-saisie">
+                      <UserRound size={18} aria-hidden="true" />
+                      <input
+                        id="oubli-identifiant"
+                        type="text"
+                        name="username"
+                        autoComplete="username"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        value={identifiantOubli}
+                        onChange={(e) => setIdentifiantOubli(e.target.value)}
+                        placeholder="Ex. jeanmballa42"
+                        aria-invalid={!!oubliErreur}
+                        aria-describedby={oubliErreur ? "oubli-erreur" : undefined}
+                      />
+                    </div>
                   </div>
-                )}
-                {oubliSuccess && (
-                  <div style={{ fontSize: "12px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
-                    Email envoyé ! Vérifie ta boîte mail et clique sur le lien reçu pour choisir un nouveau mot de passe.
-                  </div>
-                )}
 
-                <button
-                  onClick={handleDemandeReinitialisation}
-                  disabled={oubliChargement || oubliSuccess}
-                  style={{ marginTop: "6px", width: "100%", padding: "13px", borderRadius: "10px", border: "none", background: C.accent2, color: "#FAF6ED", fontSize: "14px", fontWeight: 600, cursor: (oubliChargement || oubliSuccess) ? "default" : "pointer", opacity: (oubliChargement || oubliSuccess) ? 0.7 : 1 }}
-                >
-                  {oubliChargement ? "Envoi..." : "Envoyer le lien de réinitialisation"}
-                </button>
+                  {oubliErreur && (
+                    <div id="oubli-erreur" className="message message-erreur" role="alert">
+                      <AlertTriangle size={16} aria-hidden="true" /> {oubliErreur}
+                    </div>
+                  )}
+                  {oubliSuccess && (
+                    <div className="message message-succes" role="status">
+                      <Mail size={16} aria-hidden="true" />
+                      Email envoyé ! Ouvre le lien reçu pour choisir un nouveau mot de passe.
+                    </div>
+                  )}
 
-                <button
-                  onClick={() => { setModeOubli(false); setOubliErreur(""); setOubliSuccess(false); }}
-                  style={{ background: "transparent", border: "none", color: sub, fontSize: "12.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "5px" }}
-                >
-                  <ChevronLeft size={14} /> Retour à la connexion
-                </button>
-              </div>
-            </>
-          )}
+                  <button type="submit" className="btn-principal" disabled={oubliChargement || oubliSuccess}>
+                    {oubliChargement ? "Envoi…" : "Envoyer le lien"}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="lien-retour"
+                    onClick={() => { setModeOubli(false); setOubliErreur(""); setOubliSuccess(false); }}
+                  >
+                    <ChevronLeft size={16} aria-hidden="true" /> Retour à la connexion
+                  </button>
+                </form>
+              </>
+            )}
+          </div>
+
+          {/* Sur mobile, les preuves de confiance passent sous le formulaire */}
+          <ul className="accueil-preuves-mobile">
+            <li><ListChecks size={18} aria-hidden="true" /> Cotisations suivies tour par tour</li>
+            <li><MessageSquareText size={18} aria-hidden="true" /> Confirmation SMS à chaque opération</li>
+            <li><ShieldCheck size={18} aria-hidden="true" /> Accès sécurisé selon ton rôle</li>
+          </ul>
         </div>
-      </div>
-      <div style={{ textAlign: "center", padding: "18px", fontSize: "12px", color: sub }}>
-        Application créée par <span style={{ color: C.accent, fontWeight: 600 }}>Three T Solutions</span> — 2026
-      </div>
+
+        <footer className="accueil-pied">
+          Application créée par <strong>Three T Solutions</strong> — 2026
+        </footer>
+      </main>
     </div>
   );
 }
@@ -6920,6 +7020,7 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
   const [configAbonnementSms, setConfigAbonnementSms] = useState({ prixMensuel: 0, credits: 0 });
   const [monAbonnementSmsActif, setMonAbonnementSmsActif] = useState(false);
   const [abonnementSmsEnCours, setAbonnementSmsEnCours] = useState(false);
+  const [soldeMinimumAssurance, setSoldeMinimumAssurance] = useState(0);
   const fmtFCFA = (n) => `${Math.round(n || 0).toLocaleString("fr-FR")} FCFA`;
 
   useEffect(() => {
@@ -6930,12 +7031,12 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
     fetchLogoGroupe(groupId)
       .then(setLogoGroupeUrl)
       .catch((e) => console.error("Erreur de chargement du logo", e));
-    fetchSoldeSms(groupId)
-      .then((s) => setSmsSolde(s.solde))
-      .catch((e) => console.error("Erreur de chargement du solde SMS", e));
     fetchConfigAbonnementSms(groupId)
       .then(setConfigAbonnementSms)
       .catch((e) => console.error("Erreur de chargement de la config abonnement SMS", e));
+    fetchConfigAssurance(groupId)
+      .then((c) => setSoldeMinimumAssurance(c.soldeMinimum || 0))
+      .catch((e) => console.error("Erreur de chargement de la config assurance", e));
   }, [groupId]);
   const licenceExpiree = statutAbonnement?.expire === true || statutAbonnement?.statut === "suspendu";
 
@@ -6991,188 +7092,287 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
     return () => { annule = true; };
   }, [groupId, profileId]);
 
-  return licenceExpiree ? (
-    <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: "30px", textAlign: "center" }}>
-      <div style={{ maxWidth: "320px" }}>
-        <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", borderRadius: "14px", background: C.warnBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <ShieldAlert size={26} color={C.warn} />
+  const tontine = tableauDeBord?.tontine;
+  const fondsVisibles = mesFonds.filter((f) => f.cible > 0 || f.solde > 0);
+  const aDesFonds = !!tableauDeBord?.assurance || fondsVisibles.length > 0;
+  const aDesPrets = tableauDeBord?.mesPrets?.length > 0;
+  const aDesEpargnes = tableauDeBord?.epargnes?.length > 0;
+  const aboSmsActif = configAbonnementSms.prixMensuel > 0 && monAbonnementSmsActif;
+  const rienAAfficher = tableauDeBord && !tontine && !aDesFonds && !aDesPrets && !aDesEpargnes && !aboSmsActif;
+  // Le contenu ne remonte sur le bandeau vert que si le premier élément
+  // affiché est une carte (squelette ou carte tontine) : un titre de
+  // section gris posé sur le vert serait illisible.
+  const chevauche = chargement || (!erreur && !erreurDetail && !!tontine && monCompte?.statut !== "en attente");
+
+  if (licenceExpiree) {
+    return (
+      <div className="tdb tdb-centre" data-theme="light">
+        <div className="tdb-carte tdb-bloque" role="alert">
+          <div className="tdb-bloque-icone" aria-hidden="true"><ShieldAlert size={26} /></div>
+          <h1>Licence expirée</h1>
+          <p>
+            {statutAbonnement?.statut === "suspendu"
+              ? "L'accès à ton groupe a été suspendu par le Super Admin de la plateforme."
+              : "L'abonnement de ton groupe a expiré."}
+            {" "}Contacte l'admin de ton groupe ou le Super Admin de la plateforme.
+          </p>
         </div>
-        <h1 style={{ fontSize: "18px", fontWeight: 700, color: C.ink, margin: "0 0 8px" }}>Licence expirée</h1>
-        <p style={{ fontSize: "13px", color: C.sub, margin: 0 }}>
-          {statutAbonnement?.statut === "suspendu"
-            ? "L'accès à ton groupe a été suspendu par le Super Admin de la plateforme."
-            : "L'abonnement de ton groupe a expiré."}
-          {" "}Contacte l'admin de ton groupe ou le Super Admin de la plateforme.
-        </p>
       </div>
-    </div>
-  ) : (
-    <div style={{ minHeight: "680px", background: C.bg, display: "flex", justifyContent: "center", padding: "30px 0" }}>
-      <div className="responsive-card" style={{ width: "360px", maxWidth: "94vw", background: C.panel, borderRadius: "26px", border: `1px solid ${C.border}`, overflow: "hidden", boxShadow: "0 20px 50px rgba(27,67,50,0.1)" }}>
-        <div style={{ background: C.accent2, padding: "22px 20px", color: "#FAF6ED", display: "flex", alignItems: "center", gap: "14px" }}>
-          {maPhotoUrl ? (
-            <img src={maPhotoUrl} alt="Photo" style={{ width: "52px", height: "52px", borderRadius: "12px", objectFit: "cover", border: "2px solid rgba(255,255,255,0.3)" }} />
-          ) : (
-            <div style={{ width: "52px", height: "52px", borderRadius: "12px", background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <Users size={22} color="#FAF6ED" />
-            </div>
-          )}
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "12px", color: "#B7CCBD" }}>Bonjour,</div>
-            <div style={{ fontSize: "18px", fontWeight: 700 }}>{nomComplet || "—"}</div>
-            <div style={{ fontSize: "11px", color: "#9DB3A6", marginTop: "2px" }}>{nomGroupe || "—"}</div>
-          </div>
-          {logoGroupeUrl && (
-            <img src={logoGroupeUrl} alt="Logo du groupe" style={{ width: "36px", height: "36px", borderRadius: "9px", objectFit: "cover", background: "#FFFFFF" }} />
-          )}
-        </div>
+    );
+  }
 
-        {erreurDetail && (
-          <div style={{ margin: "12px 20px 0", fontSize: "10.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px", wordBreak: "break-word" }}>
-            Détail technique : {erreurDetail}
-          </div>
-        )}
-
-        <div style={{ padding: "18px 20px" }}>
-          {chargement ? (
-            <div style={{ fontSize: "13px", color: C.sub, textAlign: "center", padding: "20px 0" }}>Chargement...</div>
-          ) : erreur ? (
-            <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>{erreur}</div>
-          ) : (
-            <>
-              <div style={{ display: "flex", gap: "10px", marginBottom: "14px" }}>
-                <div style={{ flex: 1, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px" }}>
-                  <div style={{ fontSize: "10.5px", color: C.sub }}>Rôle</div>
-                  <div style={{ fontSize: "13px", fontWeight: 700 }}>{monCompte?.role}</div>
-                </div>
-                <div style={{ flex: 1, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px" }}>
-                  <div style={{ fontSize: "10.5px", color: C.sub }}>Statut</div>
-                  <Badge bg={monCompte?.statut === "actif" ? C.ok : C.warnBg} fg={monCompte?.statut === "actif" ? C.accent2 : C.warn}>{monCompte?.statut}</Badge>
-                </div>
-              </div>
-
-              {monCompte?.statut === "en attente" && (
-                <div style={{ marginBottom: "12px", fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>
-                  Ton inscription est en attente de validation par le Président du groupe.
-                </div>
-              )}
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {tableauDeBord?.tontine && (
-                  <MiniCard
-                    icon={<Banknote size={16} color={C.accent2} />}
-                    label={`Tontine — ${tableauDeBord.tontine.nom}`}
-                    value={fmtFCFA(tableauDeBord.tontine.montantParTour)}
-                    note={
-                      tableauDeBord.tontine.tourEnCoursNumero
-                        ? `Tour ${tableauDeBord.tontine.tourEnCoursNumero} en cours — ${tableauDeBord.tontine.aCotiseCeTour ? "cotisation à jour" : "cotisation non reçue"}`
-                        : "Aucun tour en cours"
-                    }
-                    ok={tableauDeBord.tontine.aCotiseCeTour}
-                    warn={!tableauDeBord.tontine.aCotiseCeTour}
-                  />
-                )}
-                {tableauDeBord?.tontine?.monTourNumero && (
-                  <MiniCard icon={<CheckCircle2 size={16} color={C.accent2} />} label="Mon tour" value={`Tour ${tableauDeBord.tontine.monTourNumero}`} note={tableauDeBord.tontine.monTourStatut} ok />
-                )}
-
-                {tableauDeBord?.epargnes?.map((ep) => (
-                  <MiniCard key={ep.nom} icon={<PiggyBank size={16} color={C.accent2} />} label={ep.nom} value={fmtFCFA(ep.solde)} note="Solde collectif du groupe" />
-                ))}
-
-                {tableauDeBord?.assurance && (
-                  <CarteProgression
-                    icon={<HeartHandshake size={16} color={C.accent2} />}
-                    label="Assurance"
-                    solde={tableauDeBord.assurance.solde}
-                    cible={tableauDeBord.assurance.soldeMinimum}
-                  />
-                )}
-
-                {tableauDeBord?.mesPrets?.map((p, i) => (
-                  <MiniCard key={i} icon={<Wallet size={16} color={C.accent2} />} label="Prêt en cours" value={fmtFCFA(p.montant)} note={`Échéance ${p.dateFin}`} />
-                ))}
-
-                {mesFonds.filter((f) => f.cible > 0 || f.solde > 0).map((f) => (
-                  <CarteProgression
-                    key={f.typeFondsId}
-                    icon={<Wallet size={16} color={C.accent2} />}
-                    label={f.nom}
-                    solde={f.solde}
-                    cible={f.cible}
-                  />
-                ))}
-
-                {configAbonnementSms.prixMensuel > 0 && monAbonnementSmsActif && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", borderRadius: "12px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
-                    <div style={{ width: "34px", height: "34px", borderRadius: "9px", background: C.ok, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Repeat size={16} color={C.accent2} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: "11px", color: C.sub }}>Abonnement SMS mensuel</div>
-                      <div style={{ fontSize: "13px", fontWeight: 700 }}>{fmtFCFA(configAbonnementSms.prixMensuel)}/mois</div>
-                    </div>
-                    <Badge bg={C.ok} fg={C.accent2}>Abonné</Badge>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-
-        {tableauDeBord?.historique?.length > 0 && (
-          <div style={{ padding: "0 20px 20px" }}>
-            <div style={{ fontSize: "12px", fontWeight: 700, color: C.sub, margin: "6px 0 10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Historique récent</div>
-            {tableauDeBord.historique.map((h, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: i < tableauDeBord.historique.length - 1 ? `1px solid ${C.border}` : "none", fontSize: "12.5px" }}>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{h.label}</div>
-                  <div style={{ color: C.sub, fontSize: "11px" }}>{h.date}</div>
-                </div>
-                <div style={{ fontWeight: 700, color: h.montant < 0 ? C.warn : C.accent2 }}>
-                  {h.montant < 0 ? "-" : "+"}{fmtFCFA(Math.abs(h.montant))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function CarteProgression({ icon, label, solde, cible }) {
-  const fmtFCFA = (n) => `${Math.round(n || 0).toLocaleString("fr-FR")} FCFA`;
-  const complet = cible > 0 && solde >= cible;
-  const pourcentage = cible > 0 ? Math.min(100, (solde / cible) * 100) : 100;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", borderRadius: "12px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
-      <div style={{ width: "34px", height: "34px", borderRadius: "9px", background: complet ? C.ok : "#F9E4D8", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{icon}</div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: "11px", color: C.sub }}>{label}</div>
-        <div style={{ fontSize: "14px", fontWeight: 700 }}>{fmtFCFA(solde)}{cible > 0 ? ` / ${fmtFCFA(cible)}` : ""}</div>
-        {cible > 0 && (
+    <div className={`tdb ${chevauche ? "tdb-chevauche" : ""}`} data-theme="light">
+      {/* En-tête : identité du membre et du groupe */}
+      <header className="tdb-entete">
+        <div className="tdb-entete-inner">
+          {maPhotoUrl ? (
+            <img src={maPhotoUrl} alt="" className="tdb-avatar" />
+          ) : (
+            <div className="tdb-avatar tdb-avatar-initiales" aria-hidden="true">{initiales(nomComplet)}</div>
+          )}
+          <div className="tdb-identite">
+            <div className="tdb-bonjour">Bonjour,</div>
+            <h1 className="tdb-nom">{nomComplet || "—"}</h1>
+            <div className="tdb-groupe">{nomGroupe || "—"}</div>
+          </div>
+          {logoGroupeUrl && <img src={logoGroupeUrl} alt={`Logo de ${nomGroupe || "ton groupe"}`} className="tdb-logo-groupe" />}
+        </div>
+        {monCompte && (
+          <div className="tdb-entete-inner tdb-pastilles">
+            <span className="tdb-pastille">{monCompte.role}</span>
+            <span className={`tdb-pastille ${monCompte.statut === "actif" ? "tdb-pastille-ok" : "tdb-pastille-attente"}`}>
+              {monCompte.statut === "actif" ? <CheckCircle2 size={14} aria-hidden="true" /> : <Clock size={14} aria-hidden="true" />}
+              <span className="tdb-majuscule">{monCompte.statut}</span>
+            </span>
+          </div>
+        )}
+      </header>
+
+      <main className="tdb-contenu" aria-busy={chargement}>
+        {erreurDetail && (
+          <details className="message message-erreur tdb-detail-technique">
+            <summary>Certaines informations n'ont pas pu être chargées</summary>
+            <div className="tdb-detail-texte">{erreurDetail}</div>
+          </details>
+        )}
+
+        {chargement ? (
+          <div className="tdb-squelettes" aria-label="Chargement de ton tableau de bord">
+            <div className="tdb-squelette tdb-squelette-grand" />
+            <div className="tdb-squelette" />
+            <div className="tdb-squelette" />
+          </div>
+        ) : erreur ? (
+          <div className="message message-erreur" role="alert">
+            <AlertTriangle size={16} aria-hidden="true" /> {erreur}
+          </div>
+        ) : (
           <>
-            <div style={{ width: "100%", height: "5px", background: "#EEE", borderRadius: "3px", marginTop: "5px", marginBottom: "3px", overflow: "hidden" }}>
-              <div style={{ width: `${pourcentage}%`, height: "100%", background: complet ? C.accent2 : C.warn }} />
-            </div>
-            <div style={{ fontSize: "10.5px", fontWeight: 600, color: complet ? C.accent2 : C.warn }}>{complet ? "Complet" : "Incomplet"}</div>
+            {monCompte?.statut === "en attente" && (
+              <div className="message message-attente" role="status">
+                <Clock size={16} aria-hidden="true" />
+                Ton inscription est en attente de validation par le Président du groupe.
+              </div>
+            )}
+
+            {/* Carte principale : la tontine en cours */}
+            {tontine && (
+              <section className="tdb-carte tdb-tontine" aria-labelledby="tdb-tontine-titre">
+                <div className="tdb-carte-haut">
+                  <div className="tdb-surtitre" id="tdb-tontine-titre">
+                    <Banknote size={16} aria-hidden="true" /> Tontine — {tontine.nom}
+                  </div>
+                  {tontine.tourEnCoursNumero && (
+                    <span className="tdb-tour">Tour {tontine.tourEnCoursNumero}</span>
+                  )}
+                </div>
+                <div className="tdb-montant num">{fmtFCFA(tontine.montantParTour)}</div>
+                <div className="tdb-legende">par tour</div>
+
+                <div className="tdb-tontine-etats">
+                  {tontine.tourEnCoursNumero ? (
+                    <div className={`tdb-etat ${tontine.aCotiseCeTour ? "tdb-etat-ok" : "tdb-etat-alerte"}`}>
+                      {tontine.aCotiseCeTour
+                        ? <CheckCircle2 size={18} aria-hidden="true" />
+                        : <AlertTriangle size={18} aria-hidden="true" />}
+                      <div>
+                        <strong>{tontine.aCotiseCeTour ? "Cotisation à jour" : "Cotisation non reçue"}</strong>
+                        <span>Tour {tontine.tourEnCoursNumero} en cours</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="tdb-etat">
+                      <Clock size={18} aria-hidden="true" />
+                      <div><strong>Aucun tour en cours</strong></div>
+                    </div>
+                  )}
+                  {tontine.monTourNumero && (
+                    <div className="tdb-etat">
+                      <Calendar size={18} aria-hidden="true" />
+                      <div>
+                        <strong>Mon tour : n° {tontine.monTourNumero}</strong>
+                        {tontine.monTourStatut && <span className="tdb-majuscule">{tontine.monTourStatut}</span>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {aDesFonds && (
+              <section aria-labelledby="tdb-fonds-titre">
+                <h2 className="tdb-section-titre" id="tdb-fonds-titre">Mes fonds</h2>
+                <div className="tdb-grille">
+                  {tableauDeBord?.assurance && (
+                    <CarteFonds
+                      icon={<HeartHandshake size={18} />}
+                      label="Assurance"
+                      solde={tableauDeBord.assurance.solde}
+                      cible={soldeMinimumAssurance}
+                    />
+                  )}
+                  {fondsVisibles.map((f) => (
+                    <CarteFonds key={f.typeFondsId} icon={<Wallet size={18} />} label={f.nom} solde={f.solde} cible={f.cible} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {(aDesPrets || aDesEpargnes || aboSmsActif) && (
+              <section aria-labelledby="tdb-infos-titre">
+                <h2 className="tdb-section-titre" id="tdb-infos-titre">Prêts, épargne et services</h2>
+                <div className="tdb-carte tdb-liste">
+                  {tableauDeBord?.mesPrets?.map((p, i) => (
+                    <LigneInfo
+                      key={`pret-${i}`}
+                      icon={<Wallet size={18} />}
+                      label="Prêt en cours"
+                      value={fmtFCFA(p.montant)}
+                      note={p.dateFin ? `Échéance le ${fmtDate(p.dateFin)}` : null}
+                    />
+                  ))}
+                  {tableauDeBord?.epargnes?.map((ep) => (
+                    <LigneInfo
+                      key={`ep-${ep.nom}`}
+                      icon={<PiggyBank size={18} />}
+                      label={ep.nom}
+                      value={fmtFCFA(ep.solde)}
+                      note="Solde collectif du groupe"
+                    />
+                  ))}
+                  {aboSmsActif && (
+                    <LigneInfo
+                      icon={<Repeat size={18} />}
+                      label="Abonnement SMS"
+                      value={`${fmtFCFA(configAbonnementSms.prixMensuel)} / mois`}
+                      note="Abonnement actif"
+                    />
+                  )}
+                </div>
+              </section>
+            )}
+
+            {tableauDeBord?.historique?.length > 0 && (
+              <section aria-labelledby="tdb-histo-titre">
+                <h2 className="tdb-section-titre" id="tdb-histo-titre">Historique récent</h2>
+                <ul className="tdb-carte tdb-historique">
+                  {tableauDeBord.historique.map((h, i) => {
+                    const entree = h.montant >= 0;
+                    return (
+                      <li key={i}>
+                        <div className={`tdb-histo-icone ${entree ? "tdb-histo-entree" : ""}`} aria-hidden="true">
+                          {entree ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                        </div>
+                        <div className="tdb-histo-texte">
+                          <strong>{h.label}</strong>
+                          <span>{fmtDate(h.date)}</span>
+                        </div>
+                        <div className={`tdb-histo-montant num ${entree ? "tdb-histo-montant-entree" : ""}`}>
+                          <span className="sr-only">{entree ? "Entrée de " : "Sortie de "}</span>
+                          {entree ? "+" : "−"}{fmtFCFA(Math.abs(h.montant))}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
+
+            {rienAAfficher && (
+              <div className="tdb-carte tdb-vide">
+                <div className="tdb-vide-icone" aria-hidden="true"><Banknote size={22} /></div>
+                <strong>Rien à afficher pour l'instant</strong>
+                <p>Dès que ton groupe lance une tontine ou enregistre tes cotisations, tu les retrouveras ici.</p>
+              </div>
+            )}
           </>
         )}
-      </div>
+      </main>
     </div>
   );
 }
 
-function MiniCard({ icon, label, value, note, ok, warn }) {
+function initiales(nom) {
+  const mots = (nom || "").trim().split(/\s+/).filter(Boolean);
+  if (mots.length === 0) return "?";
+  return ((mots[0][0] || "") + (mots.length > 1 ? mots[mots.length - 1][0] : "")).toUpperCase();
+}
+
+function fmtDate(valeur) {
+  if (!valeur) return "—";
+  const d = new Date(valeur);
+  if (Number.isNaN(d.getTime())) return valeur;
+  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function CarteFonds({ icon, label, solde, cible }) {
+  const fmtFCFA = (n) => `${Math.round(n || 0).toLocaleString("fr-FR")} FCFA`;
+  const aUneCible = cible > 0;
+  const complet = aUneCible && solde >= cible;
+  const pourcentage = aUneCible ? Math.min(100, Math.round((solde / cible) * 100)) : 100;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", borderRadius: "12px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
-      <div style={{ width: "34px", height: "34px", borderRadius: "9px", background: warn ? "#F9E4D8" : C.ok, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{icon}</div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: "11px", color: C.sub }}>{label}</div>
-        <div style={{ fontSize: "14px", fontWeight: 700 }}>{value}</div>
-        <div style={{ fontSize: "10.5px", color: warn ? C.warn : C.sub, marginTop: "1px" }}>{note}</div>
+    <div className="tdb-carte tdb-fonds">
+      <div className="tdb-fonds-haut">
+        <div className={`tdb-icone ${complet || !aUneCible ? "tdb-icone-ok" : "tdb-icone-attente"}`} aria-hidden="true">{icon}</div>
+        <div className="tdb-fonds-label">{label}</div>
+        {aUneCible && (
+          <span className={`tdb-mini-statut ${complet ? "tdb-mini-ok" : "tdb-mini-attente"}`}>
+            {complet ? "Complet" : `${pourcentage} %`}
+          </span>
+        )}
       </div>
+      <div className="tdb-fonds-montant num">{fmtFCFA(solde)}</div>
+      {aUneCible && (
+        <>
+          <div
+            className="tdb-barre"
+            role="progressbar"
+            aria-label={`${label} : progression vers l'objectif`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={pourcentage}
+          >
+            <div className={`tdb-barre-remplie ${complet ? "tdb-barre-complete" : ""}`} style={{ width: `${pourcentage}%` }} />
+          </div>
+          <div className="tdb-legende num">
+            {complet ? `Objectif de ${fmtFCFA(cible)} atteint` : `Reste ${fmtFCFA(cible - solde)} sur ${fmtFCFA(cible)}`}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function LigneInfo({ icon, label, value, note }) {
+  return (
+    <div className="tdb-ligne">
+      <div className="tdb-icone tdb-icone-ok" aria-hidden="true">{icon}</div>
+      <div className="tdb-ligne-texte">
+        <span>{label}</span>
+        {note && <small>{note}</small>}
+      </div>
+      <strong className="num">{value}</strong>
     </div>
   );
 }
