@@ -56,8 +56,9 @@ Les 3 thèmes Super Admin (vert, bleu, violet) ne remplacent que `--primary`, `-
 et `--ring`, via `appliquerThemeCss()` dans `App.jsx`.
 
 **Règles couleur**
-- Montants positifs en `--success`, négatifs en `--danger`, **toujours avec le signe `+`/`−`**
-  (la couleur ne doit jamais être le seul indicateur).
+- Entrées d'argent en `--success` avec `+`, sorties en `--ink` avec `−` : payer sa cotisation
+  n'est pas une erreur, `--danger` est réservé aux retards et aux erreurs. Toujours un signe et
+  une icône de sens (la couleur ne doit jamais être le seul indicateur).
 - Pas de dégradé violet/rose. Un seul dégradé autorisé : vert → or, pour le logo.
 
 ## 3. Typographie
