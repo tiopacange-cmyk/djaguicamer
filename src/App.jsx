@@ -44,6 +44,7 @@ import {
   CreditCard, ScrollText, LayoutDashboard, Wallet, Shield, FileBarChart,
   Gavel, Bell, LogOut, Moon, Sun, Lock, ChevronLeft, CheckCircle2, Clock,
   Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat, Eye, EyeOff, AlertTriangle, ShoppingCart, Palette,
+  ShieldCheck, MessageSquareText, ListChecks, UserRound, Mail,
 } from "lucide-react";
 
 // ---------- Palette partagée ----------
@@ -78,6 +79,17 @@ const THEMES = {
   violet: { nom: "Violet moderne", accent: "#D97706", accent2: "#5B21B6", purple: "#9333EA" },
 };
 
+// Reporte les couleurs de marque du thème dans les tokens CSS du
+// design system (src/index.css), utilisés par les écrans qui ont
+// migré vers les classes CSS (ex. l'écran d'accueil).
+function appliquerThemeCss() {
+  const racine = document.documentElement.style;
+  racine.setProperty("--brand-panel", C.accent2);
+  racine.setProperty("--primary", C.accent2);
+  racine.setProperty("--gold", C.accent);
+  racine.setProperty("--ring", C.accent);
+}
+
 export default function AppPrototype() {
   const [chargementSession, setChargementSession] = useState(true);
   const [connecte, setConnecte] = useState(false);
@@ -96,6 +108,7 @@ export default function AppPrototype() {
       try {
         const theme = await fetchThemeActuel();
         Object.assign(C, THEMES[theme] || THEMES.vert);
+        appliquerThemeCss();
       } catch (eTheme) {
         console.error("Erreur de chargement du thème", eTheme);
       }
@@ -151,7 +164,7 @@ export default function AppPrototype() {
 
   if (chargementSession) {
     return (
-      <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", color: C.sub, fontFamily: "'Sora','Segoe UI',sans-serif" }}>
+      <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", color: C.sub, fontFamily: "var(--font-sans)" }}>
         Chargement...
       </div>
     );
@@ -159,7 +172,7 @@ export default function AppPrototype() {
 
   if (modeRecuperation) {
     return (
-      <div style={{ fontFamily: "'Sora','Segoe UI',sans-serif" }}>
+      <div style={{ fontFamily: "var(--font-sans)" }}>
         <ChangerMotDePasseScreen onDone={async () => { setModeRecuperation(false); await chargerSessionEtRole(); }} />
       </div>
     );
@@ -167,7 +180,7 @@ export default function AppPrototype() {
 
   if (!connecte) {
     return (
-      <div style={{ fontFamily: "'Sora','Segoe UI',sans-serif" }}>
+      <div style={{ fontFamily: "var(--font-sans)" }}>
         <ConnexionScreen onLoggedIn={chargerSessionEtRole} />
       </div>
     );
@@ -175,14 +188,14 @@ export default function AppPrototype() {
 
   if (monProfil?.doit_changer_mdp) {
     return (
-      <div style={{ fontFamily: "'Sora','Segoe UI',sans-serif" }}>
+      <div style={{ fontFamily: "var(--font-sans)" }}>
         <ChangerMotDePasseScreen onDone={chargerSessionEtRole} />
       </div>
     );
   }
 
   return (
-    <div style={{ fontFamily: "'Sora','Segoe UI',sans-serif", background: "#0E1210" }}>
+    <div style={{ fontFamily: "var(--font-sans)", background: "#0E1210" }}>
       {/* Barre de session — visible sur tous les écrans une fois connecté */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", background: "#0E1210" }}>
         <span style={{ fontSize: "12px", color: "#9AA69C" }}>
@@ -246,11 +259,6 @@ function ConnexionScreen({ onLoggedIn }) {
   const [oubliErreur, setOubliErreur] = useState("");
   const [oubliSuccess, setOubliSuccess] = useState(false);
   const [oubliChargement, setOubliChargement] = useState(false);
-  const bg = dark ? "#14181A" : C.bg;
-  const panelBg = dark ? "#1E2427" : C.panel;
-  const ink = dark ? "#F2EEE3" : C.ink;
-  const sub = dark ? "#9AA69C" : C.sub;
-  const border = dark ? "#2B3336" : C.border;
 
   const handleLogin = async () => {
     if (!identifiant.trim() || !password.trim()) {
@@ -288,136 +296,228 @@ function ConnexionScreen({ onLoggedIn }) {
     }
   };
 
+  const handleSubmitLogin = (e) => {
+    e.preventDefault();
+    handleLogin();
+  };
+
+  const handleSubmitOubli = (e) => {
+    e.preventDefault();
+    handleDemandeReinitialisation();
+  };
+
   return (
-    <div style={{ minHeight: "680px", background: bg, display: "flex", flexDirection: "column", position: "relative" }}>
-      <div style={{ height: "6px", background: `repeating-linear-gradient(90deg, ${C.accent} 0px, ${C.accent} 24px, ${C.accent2} 24px, ${C.accent2} 48px)` }} />
-      <button onClick={() => setDark(!dark)} style={{ position: "absolute", top: "24px", right: "24px", background: "transparent", border: `1px solid ${border}`, borderRadius: "999px", padding: "8px 14px", display: "flex", alignItems: "center", gap: "6px", color: sub, fontSize: "13px", cursor: "pointer" }}>
-        {dark ? <Sun size={14} /> : <Moon size={14} />} {dark ? "Clair" : "Sombre"}
-      </button>
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
-        <div style={{ width: "100%", maxWidth: "380px", background: panelBg, borderRadius: "18px", border: `1px solid ${border}`, padding: "40px 32px", boxShadow: dark ? "0 20px 60px rgba(0,0,0,0.4)" : "0 20px 50px rgba(27,67,50,0.08)" }}>
-          {!modeOubli ? (
-            <>
-              <div style={{ textAlign: "center", marginBottom: "28px" }}>
-                <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", borderRadius: "14px", background: `linear-gradient(135deg, ${C.accent2}, ${C.accent})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Users size={26} color="#FAF6ED" />
-                </div>
-                <div style={{ fontSize: "11px", letterSpacing: "0.12em", textTransform: "uppercase", color: C.accent, fontWeight: 600, marginBottom: "6px" }}>Connexion</div>
-                <h1 style={{ fontSize: "22px", fontWeight: 700, color: ink, margin: 0 }}>DJANGUI</h1>
-                <div style={{ fontSize: "10.5px", color: sub, marginTop: "4px", letterSpacing: "0.04em" }}>By 3TSOLUTION</div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                <div>
-                  <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>Identifiant</label>
-                  <input
-                    type="text"
-                    value={identifiant}
-                    onChange={(e) => setIdentifiant(e.target.value)}
-                    placeholder="Ex. jeanmballa42"
-                    style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>Mot de passe</label>
-                  <div style={{ position: "relative" }}>
-                    <Lock size={15} color={sub} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                      placeholder="••••••••"
-                      style={{ width: "100%", boxSizing: "border-box", padding: "12px 38px 12px 38px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
-                    />
-                    <div
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", cursor: "pointer", display: "flex" }}
-                    >
-                      {showPassword ? <EyeOff size={15} color={sub} /> : <Eye size={15} color={sub} />}
+    <div className="accueil" data-theme={dark ? "dark" : "light"}>
+      {/* Panneau de marque : mission + preuves de confiance */}
+      <section className="accueil-marque" aria-labelledby="accueil-titre">
+        <div className="accueil-logo">
+          <div className="accueil-logo-mark" aria-hidden="true">
+            <Users size={22} strokeWidth={2.2} />
+          </div>
+          <div>
+            <div className="accueil-logo-nom">DJANGUI</div>
+            <div className="accueil-logo-sub">par Three T Solutions</div>
+          </div>
+        </div>
+
+        <div>
+          <p id="accueil-titre" className="accueil-titre">
+            Votre tontine, <em>claire et sereine.</em>
+          </p>
+          <p className="accueil-intro">
+            Cotisations, tours, épargne, prêts et assurance de votre groupe réunis au même endroit, visibles par chaque membre.
+          </p>
+        </div>
+
+        <ul className="accueil-preuves">
+          <li className="accueil-preuve">
+            <div className="accueil-preuve-icone" aria-hidden="true"><ListChecks size={18} /></div>
+            <div>
+              <strong>Chaque franc est tracé</strong>
+              <span>Cotisations suivies tour par tour, soldes à jour pour tous.</span>
+            </div>
+          </li>
+          <li className="accueil-preuve">
+            <div className="accueil-preuve-icone" aria-hidden="true"><MessageSquareText size={18} /></div>
+            <div>
+              <strong>Confirmation par SMS</strong>
+              <span>Chaque opération sur votre compte vous est notifiée.</span>
+            </div>
+          </li>
+          <li className="accueil-preuve">
+            <div className="accueil-preuve-icone" aria-hidden="true"><ShieldCheck size={18} /></div>
+            <div>
+              <strong>Accès selon le rôle</strong>
+              <span>Président, trésorier ou membre : chacun voit ce qui le concerne.</span>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      {/* Colonne formulaire */}
+      <main className="accueil-form-col">
+        <div className="accueil-barre">
+          <button
+            type="button"
+            className="btn-pastille"
+            onClick={() => setDark(!dark)}
+            aria-label="Mode sombre"
+            aria-pressed={dark}
+          >
+            {dark ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
+            <span className="btn-pastille-texte">Mode sombre</span>
+          </button>
+        </div>
+
+        <div className="accueil-form-zone">
+          <div className="carte-auth">
+            {!modeOubli ? (
+              <>
+                <div className="carte-auth-surtitre">Espace membres</div>
+                <h1>Connexion</h1>
+                <p className="carte-auth-desc">Utilise l'identifiant fourni par le bureau de ton groupe.</p>
+
+                <form onSubmit={handleSubmitLogin} noValidate>
+                  <div className="champ">
+                    <label htmlFor="connexion-identifiant">Identifiant</label>
+                    <div className="champ-saisie">
+                      <UserRound size={18} aria-hidden="true" />
+                      <input
+                        id="connexion-identifiant"
+                        type="text"
+                        name="username"
+                        autoComplete="username"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        value={identifiant}
+                        onChange={(e) => setIdentifiant(e.target.value)}
+                        placeholder="Ex. jeanmballa42"
+                        aria-invalid={!!erreur}
+                        aria-describedby={erreur ? "connexion-erreur" : undefined}
+                      />
                     </div>
                   </div>
-                  <div style={{ textAlign: "right", marginTop: "6px" }}>
-                    <span
-                      onClick={() => { setModeOubli(true); setIdentifiantOubli(identifiant); setOubliErreur(""); setOubliSuccess(false); }}
-                      style={{ fontSize: "12px", color: C.accent, cursor: "pointer", fontWeight: 600 }}
-                    >
-                      Mot de passe oublié ?
-                    </span>
-                  </div>
-                </div>
 
-                {erreur && (
-                  <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
-                    {erreur}
+                  <div className="champ">
+                    <label htmlFor="connexion-mdp">Mot de passe</label>
+                    <div className="champ-saisie avec-action">
+                      <Lock size={18} aria-hidden="true" />
+                      <input
+                        id="connexion-mdp"
+                        type={showPassword ? "text" : "password"}
+                        name="password"
+                        autoComplete="current-password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Ton mot de passe"
+                        aria-invalid={!!erreur}
+                        aria-describedby={erreur ? "connexion-erreur" : undefined}
+                      />
+                      <button
+                        type="button"
+                        className="btn-icone"
+                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                        aria-pressed={showPassword}
+                      >
+                        {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                      </button>
+                    </div>
                   </div>
-                )}
 
-                <button
-                  onClick={handleLogin}
-                  disabled={chargement}
-                  style={{ marginTop: "10px", width: "100%", padding: "13px", borderRadius: "10px", border: "none", background: C.accent2, color: "#FAF6ED", fontSize: "14px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", cursor: chargement ? "default" : "pointer", opacity: chargement ? 0.7 : 1 }}
-                >
-                  {chargement ? "Connexion..." : "Se connecter"} <ChevronRight size={16} />
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div style={{ textAlign: "center", marginBottom: "24px" }}>
-                <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", borderRadius: "14px", background: `linear-gradient(135deg, ${C.accent2}, ${C.accent})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <KeyRound size={26} color="#FAF6ED" />
+                  <button
+                    type="button"
+                    className="lien-discret"
+                    onClick={() => { setModeOubli(true); setIdentifiantOubli(identifiant); setOubliErreur(""); setOubliSuccess(false); }}
+                  >
+                    Mot de passe oublié ?
+                  </button>
+
+                  {erreur && (
+                    <div id="connexion-erreur" className="message message-erreur" role="alert">
+                      <AlertTriangle size={16} aria-hidden="true" /> {erreur}
+                    </div>
+                  )}
+
+                  <button type="submit" className="btn-principal" disabled={chargement}>
+                    {chargement ? "Connexion…" : "Se connecter"}
+                    {!chargement && <ChevronRight size={18} aria-hidden="true" />}
+                  </button>
+                </form>
+
+                <div className="accueil-securite">
+                  <Lock size={14} aria-hidden="true" /> Connexion chiffrée
                 </div>
-                <h1 style={{ fontSize: "19px", fontWeight: 700, color: ink, margin: 0 }}>Mot de passe oublié</h1>
-                <p style={{ fontSize: "12.5px", color: sub, marginTop: "8px" }}>
-                  Indique ton identifiant, on t'envoie un lien par email pour choisir un nouveau mot de passe.
+              </>
+            ) : (
+              <>
+                <div className="carte-auth-surtitre">Récupération</div>
+                <h1>Mot de passe oublié</h1>
+                <p className="carte-auth-desc">
+                  Indique ton identifiant : on t'envoie par email un lien pour choisir un nouveau mot de passe.
                 </p>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                <div>
-                  <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>Identifiant</label>
-                  <input
-                    type="text"
-                    value={identifiantOubli}
-                    onChange={(e) => setIdentifiantOubli(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleDemandeReinitialisation()}
-                    placeholder="Ex. jeanmballa42"
-                    style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }}
-                  />
-                </div>
 
-                {oubliErreur && (
-                  <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
-                    {oubliErreur}
+                <form onSubmit={handleSubmitOubli} noValidate>
+                  <div className="champ">
+                    <label htmlFor="oubli-identifiant">Identifiant</label>
+                    <div className="champ-saisie">
+                      <UserRound size={18} aria-hidden="true" />
+                      <input
+                        id="oubli-identifiant"
+                        type="text"
+                        name="username"
+                        autoComplete="username"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        value={identifiantOubli}
+                        onChange={(e) => setIdentifiantOubli(e.target.value)}
+                        placeholder="Ex. jeanmballa42"
+                        aria-invalid={!!oubliErreur}
+                        aria-describedby={oubliErreur ? "oubli-erreur" : undefined}
+                      />
+                    </div>
                   </div>
-                )}
-                {oubliSuccess && (
-                  <div style={{ fontSize: "12px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
-                    Email envoyé ! Vérifie ta boîte mail et clique sur le lien reçu pour choisir un nouveau mot de passe.
-                  </div>
-                )}
 
-                <button
-                  onClick={handleDemandeReinitialisation}
-                  disabled={oubliChargement || oubliSuccess}
-                  style={{ marginTop: "6px", width: "100%", padding: "13px", borderRadius: "10px", border: "none", background: C.accent2, color: "#FAF6ED", fontSize: "14px", fontWeight: 600, cursor: (oubliChargement || oubliSuccess) ? "default" : "pointer", opacity: (oubliChargement || oubliSuccess) ? 0.7 : 1 }}
-                >
-                  {oubliChargement ? "Envoi..." : "Envoyer le lien de réinitialisation"}
-                </button>
+                  {oubliErreur && (
+                    <div id="oubli-erreur" className="message message-erreur" role="alert">
+                      <AlertTriangle size={16} aria-hidden="true" /> {oubliErreur}
+                    </div>
+                  )}
+                  {oubliSuccess && (
+                    <div className="message message-succes" role="status">
+                      <Mail size={16} aria-hidden="true" />
+                      Email envoyé ! Ouvre le lien reçu pour choisir un nouveau mot de passe.
+                    </div>
+                  )}
 
-                <button
-                  onClick={() => { setModeOubli(false); setOubliErreur(""); setOubliSuccess(false); }}
-                  style={{ background: "transparent", border: "none", color: sub, fontSize: "12.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "5px" }}
-                >
-                  <ChevronLeft size={14} /> Retour à la connexion
-                </button>
-              </div>
-            </>
-          )}
+                  <button type="submit" className="btn-principal" disabled={oubliChargement || oubliSuccess}>
+                    {oubliChargement ? "Envoi…" : "Envoyer le lien"}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="lien-retour"
+                    onClick={() => { setModeOubli(false); setOubliErreur(""); setOubliSuccess(false); }}
+                  >
+                    <ChevronLeft size={16} aria-hidden="true" /> Retour à la connexion
+                  </button>
+                </form>
+              </>
+            )}
+          </div>
+
+          {/* Sur mobile, les preuves de confiance passent sous le formulaire */}
+          <ul className="accueil-preuves-mobile">
+            <li><ListChecks size={18} aria-hidden="true" /> Cotisations suivies tour par tour</li>
+            <li><MessageSquareText size={18} aria-hidden="true" /> Confirmation SMS à chaque opération</li>
+            <li><ShieldCheck size={18} aria-hidden="true" /> Accès sécurisé selon ton rôle</li>
+          </ul>
         </div>
-      </div>
-      <div style={{ textAlign: "center", padding: "18px", fontSize: "12px", color: sub }}>
-        Application créée par <span style={{ color: C.accent, fontWeight: 600 }}>Three T Solutions</span> — 2026
-      </div>
+
+        <footer className="accueil-pied">
+          Application créée par <strong>Three T Solutions</strong> — 2026
+        </footer>
+      </main>
     </div>
   );
 }
