@@ -168,8 +168,8 @@ export default function AppPrototype() {
 
   if (chargementSession) {
     return (
-      <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", color: C.sub, fontFamily: "var(--font-sans)" }}>
-        Chargement...
+      <div className="page-centree" role="status">
+        <span className="page-centree-texte">Chargement…</span>
       </div>
     );
   }
@@ -199,34 +199,41 @@ export default function AppPrototype() {
   }
 
   return (
-    <div style={{ fontFamily: "var(--font-sans)", background: "#0E1210" }}>
+    <div style={{ fontFamily: "var(--font-sans)", background: "var(--bg)" }}>
       {/* Barre de session — visible sur tous les écrans une fois connecté */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", background: "#0E1210" }}>
-        <span style={{ fontSize: "12px", color: "#9AA69C" }}>
-          Connecté : {monProfil?.nom_complet || "—"} {estSuperAdmin ? "(Super Admin)" : ""}
+      <header className="barre-session">
+        <div className="barre-session-qui">
+          <span className="barre-session-avatar" aria-hidden="true" title={monProfil?.nom_complet || ""}>{initiales(monProfil?.nom_complet)}</span>
+          <span className="barre-session-texte">
+            <span className="barre-session-prefixe">Connecté : </span>
+            <strong>{monProfil?.nom_complet || "—"}</strong>
+            {estSuperAdmin && <span className="barre-session-pastille">Super Admin</span>}
+          </span>
           {!estSuperAdmin && statutAbonnement && !statutAbonnement.expire && statutAbonnement.joursRestants <= 7 && (
-            <span style={{ color: C.accent, marginLeft: "10px" }}>
-              — {statutAbonnement.joursRestants} jour(s) restant(s) sur l'abonnement
+            <span className="barre-session-alerte">
+              <Clock size={14} aria-hidden="true" /> {statutAbonnement.joursRestants} jour(s) restant(s) sur l'abonnement
             </span>
           )}
-        </span>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        </div>
+        <div className="barre-session-actions">
           {groupeAdmin && !estSuperAdmin && (
             <button
+              type="button"
               onClick={() => setVueEspacePersonnel(!vueEspacePersonnel)}
-              style={{ display: "flex", alignItems: "center", gap: "6px", background: vueEspacePersonnel ? C.accent : "#1D2420", color: vueEspacePersonnel ? "#1B2420" : "#9AA69C", border: "none", borderRadius: "8px", padding: "6px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+              className={`barre-session-btn${vueEspacePersonnel ? " est-actif" : ""}`}
+              aria-pressed={vueEspacePersonnel}
             >
-              <Users size={13} /> {vueEspacePersonnel ? "Retour à l'administration" : "Mon espace personnel"}
+              <Users size={16} aria-hidden="true" />
+              <span className="barre-libelle-long">{vueEspacePersonnel ? "Retour à l'administration" : "Mon espace personnel"}</span>
+              <span className="barre-libelle-court">{vueEspacePersonnel ? "Administration" : "Mon espace"}</span>
             </button>
           )}
-          <button
-            onClick={handleDeconnexion}
-            style={{ display: "flex", alignItems: "center", gap: "6px", background: "#1D2420", color: "#9AA69C", border: "none", borderRadius: "8px", padding: "6px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
-          >
-            <LogOut size={13} /> Déconnexion
+          <button type="button" onClick={handleDeconnexion} className="barre-session-btn">
+            <LogOut size={16} aria-hidden="true" />
+            <span>Déconnexion</span>
           </button>
         </div>
-      </div>
+      </header>
 
       <div style={{ minHeight: "680px" }}>
         {estSuperAdmin ? (
@@ -238,9 +245,15 @@ export default function AppPrototype() {
         ) : groupeMembreSimple ? (
           <MembreScreen groupId={groupeMembreSimple.group?.id} nomGroupe={groupeMembreSimple.group?.nom} profileId={monProfil?.id} nomComplet={monProfil?.nom_complet} />
         ) : (
-          <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", color: C.sub, padding: "20px", textAlign: "center" }}>
-            Ton compte est connecté, mais tu n'as pas encore de rôle actif dans un groupe.
-            <br />Contacte l'admin de ton groupe ou le Super Admin.
+          <div className="page-centree">
+            <div className="carte-auth carte-info">
+              <div className="page-centree-icone" aria-hidden="true"><Users size={24} /></div>
+              <h1>Aucun rôle actif</h1>
+              <p className="carte-auth-desc">
+                Ton compte est connecté, mais tu n'as pas encore de rôle actif dans un groupe.
+                Contacte l'admin de ton groupe ou le Super Admin.
+              </p>
+            </div>
           </div>
         )}
       </div>
@@ -568,50 +581,57 @@ function ChangerMotDePasseScreen({ onDone }) {
   };
 
   return (
-    <div style={{ minHeight: "680px", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
-      <div style={{ width: "100%", maxWidth: "380px", background: C.panel, borderRadius: "18px", border: `1px solid ${C.border}`, padding: "40px 32px", boxShadow: "0 20px 50px rgba(27,67,50,0.08)" }}>
-        <div style={{ textAlign: "center", marginBottom: "24px" }}>
-          <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", borderRadius: "14px", background: `linear-gradient(135deg, ${C.accent2}, ${C.accent})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <KeyRound size={26} color="#FAF6ED" />
-          </div>
-          <h1 style={{ fontSize: "19px", fontWeight: 700, color: C.ink, margin: 0 }}>Choisis ton nouveau mot de passe</h1>
-          <p style={{ fontSize: "12.5px", color: C.sub, marginTop: "8px" }}>
-            Ton mot de passe a été réinitialisé. Choisis-en un nouveau pour continuer.
-          </p>
+    <div className="page-centree" data-theme="light">
+      <div className="carte-auth">
+        <div className="page-centree-icone" aria-hidden="true">
+          <KeyRound size={24} />
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-          <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Nouveau mot de passe</label>
-            <input
-              type="password"
-              value={motDePasse}
-              onChange={(e) => setMotDePasse(e.target.value)}
-              placeholder="Au moins 6 caractères"
-              style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "14px", outline: "none" }}
-            />
+        <div className="carte-auth-surtitre">Sécurité du compte</div>
+        <h1>Choisis ton nouveau mot de passe</h1>
+        <p className="carte-auth-desc">
+          Ton mot de passe a été réinitialisé. Choisis-en un nouveau pour continuer.
+        </p>
+        <div className="carte-auth-champs">
+          <div className="champ">
+            <label htmlFor="nouveau-mdp">Nouveau mot de passe</label>
+            <div className="champ-saisie">
+              <Lock size={18} aria-hidden="true" />
+              <input
+                id="nouveau-mdp"
+                type="password"
+                autoComplete="new-password"
+                value={motDePasse}
+                onChange={(e) => setMotDePasse(e.target.value)}
+                placeholder="Au moins 6 caractères"
+                aria-invalid={!!erreur}
+                aria-describedby={erreur ? "nouveau-mdp-erreur" : undefined}
+              />
+            </div>
           </div>
-          <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Confirme le mot de passe</label>
-            <input
-              type="password"
-              value={confirmation}
-              onChange={(e) => setConfirmation(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleValider()}
-              placeholder="Retape le même mot de passe"
-              style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "14px", outline: "none" }}
-            />
+          <div className="champ">
+            <label htmlFor="confirmation-mdp">Confirme le mot de passe</label>
+            <div className="champ-saisie">
+              <Lock size={18} aria-hidden="true" />
+              <input
+                id="confirmation-mdp"
+                type="password"
+                autoComplete="new-password"
+                value={confirmation}
+                onChange={(e) => setConfirmation(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleValider()}
+                placeholder="Retape le même mot de passe"
+                aria-invalid={!!erreur}
+                aria-describedby={erreur ? "nouveau-mdp-erreur" : undefined}
+              />
+            </div>
           </div>
           {erreur && (
-            <div style={{ fontSize: "12px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
-              {erreur}
+            <div id="nouveau-mdp-erreur" className="message message-erreur" role="alert">
+              <AlertTriangle size={16} aria-hidden="true" /> {erreur}
             </div>
           )}
-          <button
-            onClick={handleValider}
-            disabled={chargement}
-            style={{ marginTop: "8px", width: "100%", padding: "13px", borderRadius: "10px", border: "none", background: C.accent2, color: "#FAF6ED", fontSize: "14px", fontWeight: 600, cursor: chargement ? "default" : "pointer", opacity: chargement ? 0.7 : 1 }}
-          >
-            {chargement ? "Enregistrement..." : "Valider et continuer"}
+          <button type="button" className="btn-principal" onClick={handleValider} disabled={chargement}>
+            {chargement ? "Enregistrement…" : "Valider et continuer"}
           </button>
         </div>
       </div>
@@ -777,18 +797,18 @@ function SuperAdminScreen() {
       <div className="app-main" style={{ flex: 1, minWidth: 0 }}>
         {view === "dashboard" && (
           <>
-            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Tableau de bord</h1>
-            <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>Vue d'ensemble de toute la plateforme, tous groupes confondus.</p>
+            <h1 className="adm-titre">Tableau de bord</h1>
+            <p className="adm-sous-titre adm-sous-titre-espace">Vue d'ensemble de toute la plateforme, tous groupes confondus.</p>
 
             {chargementStats ? (
-              <div style={{ fontSize: "13px", color: C.sub, textAlign: "center", padding: "30px 0" }}>Chargement...</div>
+              <div className="adm-vide">Chargement...</div>
             ) : !statsPlateforme ? (
-              <div style={{ fontSize: "12.5px", color: C.warn }}>Erreur de chargement des statistiques.</div>
+              <div style={{ fontSize: "13.5px", color: C.warn }}>Erreur de chargement des statistiques.</div>
             ) : (
               <>
                 <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginBottom: "22px" }}>
-                  <div style={{ flex: "1 1 220px", background: `linear-gradient(135deg, ${C.accent2}, ${C.accent})`, borderRadius: "14px", padding: "18px 20px", color: "#FFFFFF" }}>
-                    <div style={{ fontSize: "11px", opacity: 0.85 }}>Revenu total encaissé</div>
+                  <div style={{ flex: "1 1 220px", background: C.accent2, borderRadius: "14px", padding: "18px 20px", color: "#FFFFFF" }}>
+                    <div style={{ fontSize: "12px", opacity: 0.85 }}>Revenu total encaissé</div>
                     <div style={{ fontSize: "24px", fontWeight: 700, marginTop: "4px" }}>{fmtFCFA(statsPlateforme.revenuTotal)}</div>
                   </div>
                   <StatCard label="Abonnements plateforme" value={fmtFCFA(statsPlateforme.revenuAbonnements)} icon={<CreditCard size={16} />} />
@@ -810,21 +830,21 @@ function SuperAdminScreen() {
                     <StatCard key={formule} label={formule} value={nb} icon={<CreditCard size={16} />} />
                   ))}
                   {Object.keys(statsPlateforme.parFormule).length === 0 && (
-                    <div style={{ fontSize: "12.5px", color: C.sub }}>Aucun groupe pour l'instant.</div>
+                    <div style={{ fontSize: "13.5px", color: C.sub }}>Aucun groupe pour l'instant.</div>
                   )}
                 </div>
 
                 <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", marginTop: "26px" }}>
                   <div style={{ flex: "1 1 320px" }}>
-                    <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px" }}>Expirent bientôt (7 jours)</h2>
+                    <h2 className="adm-h2">Expirent bientôt (7 jours)</h2>
                     {statsPlateforme.expirentBientot.length === 0 ? (
-                      <div style={{ fontSize: "12.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "14px", textAlign: "center" }}>
+                      <div style={{ fontSize: "13.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "14px", textAlign: "center" }}>
                         Aucun groupe n'expire dans les 7 prochains jours.
                       </div>
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                         {statsPlateforme.expirentBientot.map((g, i) => (
-                          <div key={i} style={{ display: "flex", justifyContent: "space-between", background: C.warnBg, border: `1px solid ${C.warn}33`, borderRadius: "8px", padding: "8px 12px", fontSize: "12.5px" }}>
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", background: C.warnBg, border: `1px solid ${C.warn}33`, borderRadius: "8px", padding: "8px 12px", fontSize: "13.5px" }}>
                             <span><b>{g.nom}</b> — {g.formule}</span>
                             <span style={{ color: C.warn, fontWeight: 600 }}>{new Date(g.dateExpiration).toLocaleDateString("fr-FR")}</span>
                           </div>
@@ -834,10 +854,10 @@ function SuperAdminScreen() {
                   </div>
 
                   <div style={{ flex: "1 1 320px" }}>
-                    <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px" }}>Groupes récents</h2>
+                    <h2 className="adm-h2">Groupes récents</h2>
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                       {statsPlateforme.groupesRecents.map((g, i) => (
-                        <div key={i} style={{ display: "flex", justifyContent: "space-between", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 12px", fontSize: "12.5px" }}>
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 12px", fontSize: "13.5px" }}>
                           <span>{g.nom}</span>
                           <span style={{ color: C.sub }}>{new Date(g.date).toLocaleDateString("fr-FR")}</span>
                         </div>
@@ -852,10 +872,10 @@ function SuperAdminScreen() {
 
         {view === "groupes" && (
           <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+            <div className="adm-entete">
               <div>
-                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Groupes enregistrés</h1>
-                <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 0" }}>
+                <h1 className="adm-titre">Groupes enregistrés</h1>
+                <p className="adm-sous-titre">
                   {chargement ? "Chargement..." : `${groupes.length} groupe(s).`} Création + abonnement uniquement — aucune visibilité sur les données internes.
                 </p>
               </div>
@@ -893,7 +913,7 @@ function SuperAdminScreen() {
             </div>
 
             {erreur && (
-              <div style={{ marginTop: "16px", fontSize: "12.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px" }}>
+              <div className="adm-msg adm-msg-erreur adm-espace-haut" role="alert">
                 {erreur}
               </div>
             )}
@@ -909,14 +929,14 @@ function SuperAdminScreen() {
                   <b>{g.nom}</b>,
                   admin ? (
                     <div>
-                      <div style={{ fontSize: "12.5px", fontWeight: 600 }}>{admin.nom}</div>
-                      <div style={{ fontSize: "11px", color: C.sub }}>{admin.identifiant} · {admin.role}</div>
+                      <div style={{ fontSize: "13.5px", fontWeight: 600 }}>{admin.nom}</div>
+                      <div style={{ fontSize: "12px", color: C.sub }}>{admin.identifiant} · {admin.role}</div>
                     </div>
-                  ) : <span style={{ color: C.sub, fontSize: 12 }}>—</span>,
+                  ) : <span style={{ color: C.sub, fontSize: 13 }}>—</span>,
                   abo ? (
-                    <span><span style={{ color: planColor[abo.formule] || C.sub, fontWeight: 700 }}>{abo.formule}</span> {abo.periodicite && <span style={{ color: C.sub, fontSize: 11 }}>· {abo.periodicite}</span>}</span>
+                    <span><span style={{ color: planColor[abo.formule] || C.sub, fontWeight: 700 }}>{abo.formule}</span> {abo.periodicite && <span style={{ color: C.sub, fontSize: 12 }}>· {abo.periodicite}</span>}</span>
                   ) : "—",
-                  abo?.date_expiration ? <span style={{ color: C.sub, fontSize: 12 }}>{new Date(abo.date_expiration).toLocaleDateString("fr-FR")}</span> : "—",
+                  abo?.date_expiration ? <span style={{ color: C.sub, fontSize: 13 }}>{new Date(abo.date_expiration).toLocaleDateString("fr-FR")}</span> : "—",
                   <span
                     onClick={async () => {
                       setShowGererSms(g);
@@ -931,7 +951,7 @@ function SuperAdminScreen() {
                         console.error("Erreur de chargement des crédits SMS", e);
                       }
                     }}
-                    style={{ fontWeight: 700, color: C.vifBleu, cursor: "pointer", textDecoration: "underline", fontSize: "12px" }}
+                    style={{ fontWeight: 700, color: C.vifBleu, cursor: "pointer", textDecoration: "underline", fontSize: "13px" }}
                   >
                     {g.sms_credits ?? 0}
                   </span>,
@@ -945,7 +965,7 @@ function SuperAdminScreen() {
                         setRenouvelerErreur("");
                         setRenouvelerSuccess(false);
                       }}
-                      style={{ background: "transparent", color: C.vifVert, border: `1px solid ${C.vifVert}66`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                      className="adm-btn-ligne"
                     >
                       Renouveler
                     </button>
@@ -962,7 +982,7 @@ function SuperAdminScreen() {
                           console.error("Erreur de chargement du logo", e);
                         }
                       }}
-                      style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}66`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                      className="adm-btn-ligne"
                     >
                       Modifier
                     </button>
@@ -980,7 +1000,7 @@ function SuperAdminScreen() {
                         }
                       }}
                       disabled={suspensionEnCours === g.id}
-                      style={{ background: "transparent", color: abo?.statut === "suspendu" ? C.accent2 : C.warn, border: `1px solid ${abo?.statut === "suspendu" ? C.accent2 : C.warn}66`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                      className={`adm-btn-ligne ${abo?.statut === "suspendu" ? "adm-btn-ligne-plein" : "adm-btn-ligne-danger"}`}
                     >
                       {suspensionEnCours === g.id ? "..." : abo?.statut === "suspendu" ? "Réactiver" : "Suspendre"}
                     </button>
@@ -993,8 +1013,8 @@ function SuperAdminScreen() {
 
         {view === "sms" && (
           <>
-            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>SMS</h1>
-            <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>
+            <h1 className="adm-titre">SMS</h1>
+            <p className="adm-sous-titre adm-sous-titre-espace">
               Gère les crédits SMS, le nom d'expéditeur, et le comportement à solde épuisé, pour chaque groupe.
             </p>
 
@@ -1008,7 +1028,7 @@ function SuperAdminScreen() {
               rows={groupes.map((g) => [
                 <b>{g.nom}</b>,
                 <span style={{ fontWeight: 700, color: (g.sms_credits || 0) <= 0 ? C.warn : C.accent2 }}>{g.sms_credits ?? 0}</span>,
-                g.sms_sender_id ? <span style={{ fontSize: 12 }}>{g.sms_sender_id}</span> : <span style={{ color: C.sub, fontSize: 12 }}>Par défaut</span>,
+                g.sms_sender_id ? <span style={{ fontSize: 13 }}>{g.sms_sender_id}</span> : <span style={{ color: C.sub, fontSize: 13 }}>Par défaut</span>,
                 <Badge bg={g.sms_bloquer_si_epuise === false ? C.warnBg : C.ok} fg={g.sms_bloquer_si_epuise === false ? C.warn : C.accent2}>
                   {g.sms_bloquer_si_epuise === false ? "Avertit seulement" : "Bloque"}
                 </Badge>,
@@ -1026,7 +1046,7 @@ function SuperAdminScreen() {
                       console.error("Erreur de chargement des crédits SMS", e);
                     }
                   }}
-                  style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}66`, borderRadius: "7px", padding: "6px 10px", fontSize: "11px", fontWeight: 600, cursor: "pointer" }}
+                  className="adm-btn-ligne"
                 >
                   Gérer
                 </button>,
@@ -1037,8 +1057,8 @@ function SuperAdminScreen() {
 
         {view === "tarifs" && (
           <>
-            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Politique tarifaire</h1>
-            <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>
+            <h1 className="adm-titre">Politique tarifaire</h1>
+            <p className="adm-sous-titre adm-sous-titre-espace">
               {chargementPlans ? "Chargement..." : "Modifie les prix et limites de chaque formule — appliqué immédiatement aux nouvelles souscriptions."}
             </p>
 
@@ -1056,7 +1076,7 @@ function SuperAdminScreen() {
                           setEditLimiteMembres(p.limite_membres != null ? String(p.limite_membres) : "");
                           setEditDescription(p.description || "");
                         }}
-                        style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "7px", padding: "5px 10px", fontSize: "11px", fontWeight: 600, color: C.accent2, cursor: "pointer" }}
+                        className="adm-btn-ligne"
                       >
                         Modifier
                       </button>
@@ -1066,20 +1086,20 @@ function SuperAdminScreen() {
                   {editPlanId === p.id ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       <div>
-                        <label style={{ fontSize: "10.5px", color: C.sub, display: "block", marginBottom: "3px" }}>Prix mensuel (FCFA)</label>
-                        <input value={editPrixMensuel} onChange={(e) => setEditPrixMensuel(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.border}`, fontSize: "12px", outline: "none" }} />
+                        <label className="adm-label adm-label-compact">Prix mensuel (FCFA)</label>
+                        <input value={editPrixMensuel} onChange={(e) => setEditPrixMensuel(e.target.value)} className="adm-input adm-input-compact" />
                       </div>
                       <div>
-                        <label style={{ fontSize: "10.5px", color: C.sub, display: "block", marginBottom: "3px" }}>Prix annuel (FCFA)</label>
-                        <input value={editPrixAnnuel} onChange={(e) => setEditPrixAnnuel(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.border}`, fontSize: "12px", outline: "none" }} />
+                        <label className="adm-label adm-label-compact">Prix annuel (FCFA)</label>
+                        <input value={editPrixAnnuel} onChange={(e) => setEditPrixAnnuel(e.target.value)} className="adm-input adm-input-compact" />
                       </div>
                       <div>
-                        <label style={{ fontSize: "10.5px", color: C.sub, display: "block", marginBottom: "3px" }}>Limite de membres (vide = illimité)</label>
-                        <input value={editLimiteMembres} onChange={(e) => setEditLimiteMembres(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.border}`, fontSize: "12px", outline: "none" }} />
+                        <label className="adm-label adm-label-compact">Limite de membres (vide = illimité)</label>
+                        <input value={editLimiteMembres} onChange={(e) => setEditLimiteMembres(e.target.value)} className="adm-input adm-input-compact" />
                       </div>
                       <div>
-                        <label style={{ fontSize: "10.5px", color: C.sub, display: "block", marginBottom: "3px" }}>Description</label>
-                        <input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.border}`, fontSize: "12px", outline: "none" }} />
+                        <label className="adm-label adm-label-compact">Description</label>
+                        <input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="adm-input adm-input-compact" />
                       </div>
                       <div style={{ display: "flex", gap: "6px", marginTop: "4px", flexWrap: "wrap" }}>
                         <button
@@ -1101,13 +1121,13 @@ function SuperAdminScreen() {
                               setSavingPlan(false);
                             }
                           }}
-                          style={{ flex: 1, background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "7px", padding: "8px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                          style={{ flex: 1, background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "7px", padding: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
                         >
                           {savingPlan ? "..." : "Enregistrer"}
                         </button>
                         <button
                           onClick={() => setEditPlanId(null)}
-                          style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "7px", padding: "8px 10px", fontSize: "12px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+                          style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "7px", padding: "8px 10px", fontSize: "13px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
                         >
                           Annuler
                         </button>
@@ -1116,15 +1136,15 @@ function SuperAdminScreen() {
                   ) : (
                     <>
                       <div style={{ fontSize: "20px", fontWeight: 700 }}>
-                        {Number(p.prix_mensuel).toLocaleString("fr-FR")} <span style={{ fontSize: "12px", fontWeight: 500, color: C.sub }}>FCFA / mois</span>
+                        {Number(p.prix_mensuel).toLocaleString("fr-FR")} <span style={{ fontSize: "13px", fontWeight: 500, color: C.sub }}>FCFA / mois</span>
                       </div>
-                      <div style={{ fontSize: "11.5px", color: C.sub, marginTop: "2px" }}>
+                      <div style={{ fontSize: "12.5px", color: C.sub, marginTop: "2px" }}>
                         ou {Number(p.prix_annuel).toLocaleString("fr-FR")} FCFA / an
                       </div>
-                      <div style={{ fontSize: "11.5px", color: C.sub, marginTop: "10px" }}>
+                      <div style={{ fontSize: "12.5px", color: C.sub, marginTop: "10px" }}>
                         {p.limite_membres ? `Jusqu'à ${p.limite_membres} membres` : "Membres illimités"}
                       </div>
-                      <div style={{ fontSize: "11.5px", color: C.sub, marginTop: "4px" }}>{p.description}</div>
+                      <div style={{ fontSize: "12.5px", color: C.sub, marginTop: "4px" }}>{p.description}</div>
                     </>
                   )}
                 </div>
@@ -1135,12 +1155,12 @@ function SuperAdminScreen() {
 
         {view === "audit" && (
           <>
-            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Journal d'audit</h1>
-            <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>
+            <h1 className="adm-titre">Journal d'audit</h1>
+            <p className="adm-sous-titre adm-sous-titre-espace">
               Historique en lecture seule des actions Super Admin.
             </p>
             {erreurAudit && (
-              <div style={{ fontSize: "12.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px", marginBottom: "16px" }}>
+              <div style={{ fontSize: "13.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "10px 12px", marginBottom: "16px" }}>
                 {erreurAudit}
               </div>
             )}
@@ -1151,23 +1171,23 @@ function SuperAdminScreen() {
                 chargementAudit
                   ? []
                   : auditLog.map((e) => [
-                      <span style={{ color: C.sub, fontSize: 12 }}>{new Date(e.created_at).toLocaleString("fr-FR")}</span>,
+                      <span style={{ color: C.sub, fontSize: 13 }}>{new Date(e.created_at).toLocaleString("fr-FR")}</span>,
                       <b>{e.action}</b>,
-                      <span style={{ color: C.sub, fontSize: 12 }}>{e.detail}</span>,
+                      <span style={{ color: C.sub, fontSize: 13 }}>{e.detail}</span>,
                       e.type ? <Badge bg={(typeStyle[e.type] || typeStyle["création"]).bg} fg={(typeStyle[e.type] || typeStyle["création"]).fg}>{e.type}</Badge> : "—",
                     ])
               }
             />
             {!chargementAudit && auditLog.length === 0 && (
-              <div style={{ fontSize: "12.5px", color: C.sub, marginTop: "12px" }}>Aucune action enregistrée pour l'instant.</div>
+              <div style={{ fontSize: "13.5px", color: C.sub, marginTop: "12px" }}>Aucune action enregistrée pour l'instant.</div>
             )}
           </>
         )}
 
         {view === "theme" && (
           <>
-            <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0 }}>Thème de la plateforme</h1>
-            <p style={{ fontSize: "13px", color: C.sub, margin: "6px 0 22px" }}>
+            <h1 className="adm-titre">Thème de la plateforme</h1>
+            <p className="adm-sous-titre adm-sous-titre-espace">
               S'applique à toute l'application, pour tous les groupes. La page se recharge après le choix pour appliquer le nouveau thème.
             </p>
 
@@ -1190,8 +1210,8 @@ function SuperAdminScreen() {
                 >
                   <div style={{ height: "70px", background: `linear-gradient(135deg, ${t.accent2}, ${t.accent})` }} />
                   <div style={{ padding: "12px" }}>
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: C.ink }}>{t.nom}</div>
-                    <div style={{ fontSize: "11px", color: C.sub, marginTop: "4px" }}>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: C.ink }}>{t.nom}</div>
+                    <div style={{ fontSize: "12px", color: C.sub, marginTop: "4px" }}>
                       {themeEnCours === key ? "Application..." : "Cliquer pour appliquer"}
                     </div>
                   </div>
@@ -1205,41 +1225,41 @@ function SuperAdminScreen() {
       {showRenouveler && (
         <Modal onClose={() => setShowRenouveler(null)} title={`Renouveler — ${showRenouveler.nom}`} icon={<CreditCard />} accentColor={C.vifVert}>
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Formule</label>
+            <label className="adm-label">Formule</label>
             <select
               value={renouvelerFormule}
               onChange={(e) => setRenouvelerFormule(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               {plans.filter((p) => p.formule !== "Essai").map((p) => <option key={p.id} value={p.formule}>{p.formule}</option>)}
               {plans.length === 0 && <><option>Basic</option><option>Standard</option><option>Pro</option></>}
             </select>
           </div>
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Périodicité</label>
+            <label className="adm-label">Périodicité</label>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {["Mensuel", "Annuel"].map((p) => (
                 <div
                   key={p}
                   onClick={() => setRenouvelerPeriodicite(p)}
-                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${renouvelerPeriodicite === p ? C.vifVert : C.border}`, background: renouvelerPeriodicite === p ? `${C.vifVert}14` : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: renouvelerPeriodicite === p ? C.vifVert : C.sub, cursor: "pointer" }}
+                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${renouvelerPeriodicite === p ? C.vifVert : C.border}`, background: renouvelerPeriodicite === p ? `${C.vifVert}14` : "#FBFAF6", fontSize: "13px", fontWeight: 600, color: renouvelerPeriodicite === p ? C.vifVert : C.sub, cursor: "pointer" }}
                 >
                   {p}
                 </div>
               ))}
             </div>
           </div>
-          <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Prolonge l'accès de {renouvelerPeriodicite === "Annuel" ? "365 jours" : "30 jours"}, à partir d'aujourd'hui (ou de la date d'expiration actuelle si elle n'est pas encore dépassée).
           </div>
 
           {renouvelerErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {renouvelerErreur}
             </div>
           )}
           {renouvelerSuccess && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               <CheckCircle2 size={14} /> Abonnement renouvelé.
             </div>
           )}
@@ -1247,7 +1267,7 @@ function SuperAdminScreen() {
           {!renouvelerSuccess && (
             <button
               disabled={renouvelerEnCours}
-              style={{ marginTop: "6px", background: C.vifVert, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: renouvelerEnCours ? "default" : "pointer" }}
+              style={{ marginTop: "6px", background: C.vifVert, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: renouvelerEnCours ? "default" : "pointer" }}
               onClick={async () => {
                 setRenouvelerEnCours(true);
                 setRenouvelerErreur("");
@@ -1272,11 +1292,11 @@ function SuperAdminScreen() {
       {showGererSms && (
         <Modal onClose={() => setShowGererSms(null)} title={`Crédits SMS — ${showGererSms.nom}`} icon={<Repeat />} accentColor={C.vifBleu}>
           <div style={{ background: C.ok, borderRadius: "10px", padding: "12px" }}>
-            <div style={{ fontSize: "10.5px", color: C.accent2 }}>Solde actuel</div>
+            <div style={{ fontSize: "12px", color: C.accent2 }}>Solde actuel</div>
             <div style={{ fontSize: "20px", fontWeight: 700, color: C.accent2 }}>{smsSoldeActuel?.solde ?? 0} SMS</div>
           </div>
 
-          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: C.sub, cursor: "pointer" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: C.sub, cursor: "pointer" }}>
             <input
               type="checkbox"
               checked={smsSoldeActuel?.bloquerSiEpuise ?? true}
@@ -1292,8 +1312,8 @@ function SuperAdminScreen() {
             Bloquer l'envoi de SMS quand le solde est épuisé (sinon, laisse passer en avertissant seulement)
           </label>
 
-          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: "6px" }}>Nom d'expéditeur (Sender ID)</div>
-          <div style={{ fontSize: "10.5px", color: C.sub, marginTop: "-8px" }}>
+          <div className="adm-surtitre adm-surtitre-espace">Nom d'expéditeur (Sender ID)</div>
+          <div style={{ fontSize: "12px", color: C.sub, marginTop: "-8px" }}>
             Doit être validé au préalable auprès de LMT Group pour fonctionner. Laisse vide pour utiliser le nom par défaut de la plateforme.
           </div>
           <div style={{ display: "flex", gap: "6px" }}>
@@ -1302,7 +1322,7 @@ function SuperAdminScreen() {
               onChange={(e) => setSmsSenderIdInput(e.target.value)}
               placeholder="Ex. TONTINE1 (11 caractères max)"
               maxLength={11}
-              style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "12.5px", outline: "none" }}
+              className="adm-input adm-input-compact adm-flex"
             />
             <button
               disabled={smsSenderIdEnCours}
@@ -1316,23 +1336,23 @@ function SuperAdminScreen() {
                   setSmsSenderIdEnCours(false);
                 }
               }}
-              style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
+              style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer" }}
             >
               {smsSenderIdEnCours ? "..." : "Enregistrer"}
             </button>
           </div>
 
-          <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: "6px" }}>Vendre des crédits</div>
+          <div className="adm-surtitre adm-surtitre-espace">Vendre des crédits</div>
           <FormField label="Quantité de SMS" placeholder="Ex. 100" value={smsVenteQuantite} onChange={(e) => setSmsVenteQuantite(e.target.value)} />
           <FormField label="Prix payé (FCFA, optionnel)" placeholder="Ex. 5 000" value={smsVentePrix} onChange={(e) => setSmsVentePrix(e.target.value)} />
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Mode de paiement</label>
+            <label className="adm-label">Mode de paiement</label>
             <div style={{ display: "flex", gap: "6px" }}>
               {["Espèces", "Mobile Money", "Virement"].map((mode) => (
                 <div
                   key={mode}
                   onClick={() => setSmsVenteMode(mode)}
-                  style={{ flex: 1, textAlign: "center", padding: "7px 4px", borderRadius: "7px", border: `1px solid ${smsVenteMode === mode ? C.vifBleu : C.border}`, background: smsVenteMode === mode ? `${C.vifBleu}14` : "#FBFAF6", fontSize: "10.5px", fontWeight: 600, color: smsVenteMode === mode ? C.vifBleu : C.sub, cursor: "pointer" }}
+                  style={{ flex: 1, textAlign: "center", padding: "7px 4px", borderRadius: "7px", border: `1px solid ${smsVenteMode === mode ? C.vifBleu : C.border}`, background: smsVenteMode === mode ? `${C.vifBleu}14` : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: smsVenteMode === mode ? C.vifBleu : C.sub, cursor: "pointer" }}
                 >
                   {mode}
                 </div>
@@ -1342,14 +1362,14 @@ function SuperAdminScreen() {
           <FormField label="Note (optionnel)" placeholder="Ex. Payé par le président" value={smsVenteNote} onChange={(e) => setSmsVenteNote(e.target.value)} />
 
           {smsVenteErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {smsVenteErreur}
             </div>
           )}
 
           <button
             disabled={smsVenteEnCours}
-            style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: smsVenteEnCours ? "default" : "pointer" }}
+            style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: smsVenteEnCours ? "default" : "pointer" }}
             onClick={async () => {
               const quantite = parseInt(smsVenteQuantite.replace(/[^\d]/g, ""), 10);
               if (!quantite || quantite <= 0) { setSmsVenteErreur("Saisis une quantité valide."); return; }
@@ -1376,10 +1396,10 @@ function SuperAdminScreen() {
 
           {smsHistorique.length > 0 && (
             <>
-              <div style={{ fontSize: "11px", fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: "6px" }}>Historique</div>
+              <div className="adm-surtitre adm-surtitre-espace">Historique</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "180px", overflowY: "auto" }}>
                 {smsHistorique.map((h) => (
-                  <div key={h.id} style={{ display: "flex", justifyContent: "space-between", background: "#FBFAF6", borderRadius: "7px", padding: "6px 10px", fontSize: "11.5px" }}>
+                  <div key={h.id} style={{ display: "flex", justifyContent: "space-between", background: "#FBFAF6", borderRadius: "7px", padding: "6px 10px", fontSize: "12.5px" }}>
                     <span>{h.type === "achat" ? `Achat${h.mode_paiement ? ` (${h.mode_paiement})` : ""}` : "Envoi SMS"}</span>
                     <b style={{ color: h.quantite >= 0 ? C.accent2 : C.warn }}>{h.quantite >= 0 ? "+" : ""}{h.quantite}</b>
                   </div>
@@ -1395,7 +1415,7 @@ function SuperAdminScreen() {
           <FormField label="Nom du groupe" placeholder="Ex. Tontine Les Bâtisseurs" value={modifierGroupeNom} onChange={(e) => setModifierGroupeNom(e.target.value)} />
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Logo du groupe</label>
+            <label className="adm-label">Logo du groupe</label>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               {modifierGroupeLogo ? (
                 <img src={modifierGroupeLogo} alt="Logo" style={{ width: "44px", height: "44px", borderRadius: "9px", objectFit: "cover", border: `1px solid ${C.border}` }} />
@@ -1427,7 +1447,7 @@ function SuperAdminScreen() {
               <button
                 disabled={modifierLogoEnCours}
                 onClick={() => modifierLogoInputRef.current?.click()}
-                style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}55`, borderRadius: "7px", padding: "7px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                className="adm-btn-ligne"
               >
                 {modifierLogoEnCours ? "Envoi..." : modifierGroupeLogo ? "Remplacer" : "Ajouter"}
               </button>
@@ -1435,14 +1455,14 @@ function SuperAdminScreen() {
           </div>
 
           {modifierGroupeErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {modifierGroupeErreur}
             </div>
           )}
 
           <button
             disabled={modifierGroupeEnCours}
-            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 700, cursor: modifierGroupeEnCours ? "default" : "pointer" }}
+            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: modifierGroupeEnCours ? "default" : "pointer" }}
             onClick={async () => {
               if (!modifierGroupeNom.trim()) { setModifierGroupeErreur("Le nom du groupe est obligatoire."); return; }
               setModifierGroupeEnCours(true);
@@ -1472,11 +1492,11 @@ function SuperAdminScreen() {
               <FormField label="Email de l'administrateur" placeholder="Ex. jean.mballa@exemple.com" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
 
               <div>
-                <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Formule</label>
+                <label className="adm-label">Formule</label>
                 <select
                   value={creationFormule}
                   onChange={(e) => setCreationFormule(e.target.value)}
-                  style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+                  className="adm-input"
                 >
                   {plans.length === 0 && <option value="Essai">Essai</option>}
                   {plans.map((p) => <option key={p.id} value={p.formule}>{p.formule} ({Number(p.prix_mensuel).toLocaleString("fr-FR")} FCFA/mois)</option>)}
@@ -1485,13 +1505,13 @@ function SuperAdminScreen() {
 
               {creationFormule !== "Essai" && (
                 <div>
-                  <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Périodicité</label>
+                  <label className="adm-label">Périodicité</label>
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     {["Mensuel", "Annuel"].map((p) => (
                       <div
                         key={p}
                         onClick={() => setCreationPeriodicite(p)}
-                        style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${creationPeriodicite === p ? C.accent2 : C.border}`, background: creationPeriodicite === p ? C.ok : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: creationPeriodicite === p ? C.accent2 : C.sub, cursor: "pointer" }}
+                        style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${creationPeriodicite === p ? C.accent2 : C.border}`, background: creationPeriodicite === p ? C.ok : "#FBFAF6", fontSize: "13px", fontWeight: 600, color: creationPeriodicite === p ? C.accent2 : C.sub, cursor: "pointer" }}
                       >
                         {p}
                       </div>
@@ -1500,7 +1520,7 @@ function SuperAdminScreen() {
                 </div>
               )}
 
-              <div style={{ fontSize: "11px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+              <div className="adm-msg adm-msg-info">
                 {creationFormule === "Essai"
                   ? "Accès gratuit pendant 14 jours."
                   : `Accès activé pour ${creationPeriodicite === "Annuel" ? "365 jours (1 an)" : "30 jours (1 mois)"} à partir d'aujourd'hui.`}
@@ -1509,14 +1529,14 @@ function SuperAdminScreen() {
               <FormField label="Crédit SMS offert au départ (optionnel)" placeholder="Ex. 20 — laisse vide pour 0" value={creationCreditSms} onChange={(e) => setCreationCreditSms(e.target.value)} />
 
               {creationErreur && (
-                <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+                <div className="adm-msg adm-msg-erreur" role="alert">
                   {creationErreur}
                 </div>
               )}
 
               <button
                 disabled={creationEnCours}
-                style={{ marginTop: "8px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: creationEnCours ? "default" : "pointer", opacity: creationEnCours ? 0.7 : 1 }}
+                style={{ marginTop: "8px", background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, cursor: creationEnCours ? "default" : "pointer", opacity: creationEnCours ? 0.7 : 1 }}
                 onClick={async () => {
                   if (!nomGroupe.trim() || !adminNom.trim() || !adminEmail.trim()) {
                     setCreationErreur("Tous les champs sont obligatoires.");
@@ -1549,19 +1569,19 @@ function SuperAdminScreen() {
             </>
           ) : (
             <>
-              <div style={{ fontSize: "12.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "10px 12px", display: "flex", gap: "8px", alignItems: "flex-start" }}>
+              <div style={{ fontSize: "13.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "10px 12px", display: "flex", gap: "8px", alignItems: "flex-start" }}>
                 <CheckCircle2 size={16} style={{ flexShrink: 0, marginTop: "2px" }} />
                 <div>
                   Groupe <b>{resultatCreation.groupe.nom}</b> créé avec succès.
                 </div>
               </div>
-              <div style={{ fontSize: "12px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "12px" }}>
+              <div style={{ fontSize: "13px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "12px" }}>
                 <div style={{ marginBottom: "6px" }}>Identifiants de l'administrateur à lui communiquer :</div>
                 <div><b>Identifiant de connexion :</b> {resultatCreation.identifiant}</div>
                 <div><b>Mot de passe temporaire :</b> {resultatCreation.motDePasseTemp}</div>
-                <div style={{ color: C.sub, fontSize: "11px", marginTop: "4px" }}>(Email associé : {resultatCreation.adminEmail})</div>
+                <div style={{ color: C.sub, fontSize: "12px", marginTop: "4px" }}>(Email associé : {resultatCreation.adminEmail})</div>
               </div>
-              <div style={{ fontSize: "12px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "12px" }}>
+              <div style={{ fontSize: "13px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "12px" }}>
                 <div style={{ marginBottom: "8px" }}>Logo du groupe (optionnel)</div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   {logoGroupeUrl && (
@@ -1590,14 +1610,14 @@ function SuperAdminScreen() {
                   <button
                     disabled={logoEnCours}
                     onClick={() => logoInputRef.current?.click()}
-                    style={{ background: "transparent", color: C.vifBleu, border: `1px solid ${C.vifBleu}55`, borderRadius: "7px", padding: "7px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                    className="adm-btn-ligne"
                   >
                     {logoEnCours ? "Envoi..." : logoGroupeUrl ? "Remplacer" : "Ajouter un logo"}
                   </button>
                 </div>
               </div>
               <button
-                style={{ marginTop: "8px", background: C.accent2, color: "#FAF6ED", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+                style={{ marginTop: "8px", background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}
                 onClick={() => setShowCreateGroupe(false)}
               >
                 Terminer
@@ -1609,17 +1629,17 @@ function SuperAdminScreen() {
 
       {showResetAccess && (
         <Modal onClose={() => setShowResetAccess(false)} title="Accès d'urgence — réinitialiser un mot de passe">
-          <div style={{ fontSize: "11.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+          <div className="adm-msg adm-msg-info">
             Réservé aux cas d'urgence (compte bloqué, admin/président injoignable). Un nouveau mot de passe temporaire est généré immédiatement, et la personne devra en choisir un nouveau à sa prochaine connexion. Action tracée dans le journal d'audit.
           </div>
 
           <div>
-            <label style={{ fontSize: "12px", color: C.sub, marginBottom: "6px", display: "block" }}>Admin / Président à réinitialiser</label>
+            <label className="adm-label">Admin / Président à réinitialiser</label>
             <select
               value={resetSelection}
               onChange={(e) => setResetSelection(e.target.value)}
               disabled={chargementAdmins}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.border}`, background: "#FBFAF6", fontSize: "13px", outline: "none" }}
+              className="adm-input"
             >
               <option value="">{chargementAdmins ? "Chargement..." : "Sélectionner une personne"}</option>
               {adminsList.map((a, i) => (
@@ -1627,22 +1647,22 @@ function SuperAdminScreen() {
               ))}
             </select>
             {!chargementAdmins && adminsList.length === 0 && (
-              <div style={{ fontSize: "11px", color: C.sub, marginTop: "5px" }}>Aucun admin/président trouvé.</div>
+              <div className="adm-aide">Aucun admin/président trouvé.</div>
             )}
           </div>
 
           {resetErreur && (
-            <div style={{ fontSize: "11.5px", color: C.warn, background: C.warnBg, border: `1px solid ${C.warn}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-erreur" role="alert">
               {resetErreur}
             </div>
           )}
           {resetMotDePasseTemp && (
-            <div style={{ fontSize: "11.5px", color: C.accent2, background: C.ok, border: `1px solid ${C.accent2}44`, borderRadius: "8px", padding: "8px 10px" }}>
+            <div className="adm-msg adm-msg-succes" role="status">
               <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
                 <CheckCircle2 size={14} /> Mot de passe réinitialisé.
               </div>
               <div>Nouveau mot de passe temporaire : <b>{resetMotDePasseTemp}</b></div>
-              <div style={{ color: C.sub, fontSize: "10.5px", marginTop: "4px" }}>
+              <div style={{ color: C.sub, fontSize: "12px", marginTop: "4px" }}>
                 À sa prochaine connexion, la personne devra choisir un nouveau mot de passe définitif.
               </div>
             </div>
@@ -1650,7 +1670,7 @@ function SuperAdminScreen() {
 
           <button
             disabled={resetEnCours}
-            style={{ marginTop: "6px", background: C.warn, color: "#FFF6EE", border: "none", borderRadius: "10px", padding: "12px", fontSize: "13px", fontWeight: 600, cursor: resetEnCours ? "default" : "pointer", opacity: resetEnCours ? 0.7 : 1 }}
+            style={{ marginTop: "6px", background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, cursor: resetEnCours ? "default" : "pointer", opacity: resetEnCours ? 0.7 : 1 }}
             onClick={async () => {
               if (resetSelection === "") {
                 setResetErreur("Sélectionne une personne à réinitialiser.");
@@ -2842,7 +2862,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     s.date,
                     s.lieu || "—",
                     <span style={{ color: C.sub, fontSize: 13 }}>{s.ordreDuJour || "—"}</span>,
-                    <Badge bg={s.statut === "terminée" ? C.ok : C.warnBg} fg={s.statut === "terminée" ? C.accent2 : C.warn}>{s.statut}</Badge>,
+                    <Badge bg={s.statut === "terminée" ? C.ok : "#FBF1DC"} fg={s.statut === "terminée" ? C.accent2 : C.vifOr}>{s.statut}</Badge>,
                     <button
                       onClick={async () => {
                         setShowDetailSeance(s);
@@ -7418,7 +7438,9 @@ function Sidebar({ role, sub, items, active, onSelect, logoUrl }) {
 function Table({ cols, widths, rows }) {
   return (
     <div className="table-scroll">
-      <div className="tableau" role="table">
+      {/* Largeur minimale selon le nombre de colonnes : sur petit écran le
+          tableau défile dans son cadre au lieu de couper les mots */}
+      <div className="tableau" role="table" style={{ minWidth: `${cols.length * 105}px` }}>
         <div className="tableau-entete" role="row" style={{ gridTemplateColumns: widths }}>
           {cols.map((c, j) => <div key={`${c}-${j}`} role="columnheader">{c}</div>)}
         </div>

@@ -1053,7 +1053,7 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 }
 .tableau-ligne + .tableau-ligne { border-top: 1px solid var(--border); }
 .tableau-ligne:hover { background: color-mix(in srgb, var(--surface-sunken) 70%, var(--border)); }
-.tableau-ligne > div { min-width: 0; overflow-wrap: anywhere; }
+.tableau-ligne > div { min-width: 0; overflow-wrap: break-word; }
 
 /* --- Badge --- */
 .badge {
@@ -1183,3 +1183,131 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 @media (pointer: coarse) {
   .adm-btn-ligne { min-height: 44px; }
 }
+
+/* ============================================================
+   PAGES CENTRÉES (changement de mot de passe, chargement…)
+   ============================================================ */
+.page-centree {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6) var(--space-4);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+.page-centree :focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.page-centree-icone {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: var(--primary);
+  color: #FFFFFF;
+  margin-bottom: var(--space-4);
+}
+.carte-auth-champs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+.page-centree-texte { font-size: 15px; color: var(--muted); }
+
+/* ============================================================
+   BARRE DE SESSION (haut de page, une fois connecté)
+   ============================================================ */
+.barre-session {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-4);
+  background: #0E1411;
+  color: #D7E3DA;
+  font-family: var(--font-sans);
+  border-bottom: 1px solid #22302A;
+}
+.barre-session :focus-visible { outline: 3px solid #E0B24A; outline-offset: 2px; }
+.barre-session-qui { display: flex; align-items: center; gap: var(--space-3); min-width: 0; flex-wrap: wrap; }
+.barre-session-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--gold);
+  color: #0F2A1C;
+  font-size: 13px;
+  font-weight: 700;
+}
+.barre-session-texte { font-size: 14px; color: #A3B1A7; min-width: 0; }
+.barre-session-texte strong { color: #EEF2EC; font-weight: 600; }
+.barre-session-pastille {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(224, 178, 74, 0.16);
+  color: #E0B24A;
+}
+.barre-session-alerte {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #E0B24A;
+}
+.barre-session-actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+.barre-session-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid #2E3D36;
+  background: #17211C;
+  color: #D7E3DA;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.barre-session-btn:hover { background: #22302A; color: #FFFFFF; }
+.barre-session-btn.est-actif { background: #E0B24A; border-color: transparent; color: #0F2A1C; }
+.barre-libelle-court { display: none; }
+.carte-info { text-align: left; }
+
+@media (max-width: 640px) {
+  .barre-session { padding: var(--space-2) var(--space-3); }
+  .barre-session-prefixe { display: none; }
+  .barre-libelle-long { display: none; }
+  .barre-libelle-court { display: inline; }
+  .barre-session-btn { padding: 0 10px; min-height: 44px; }
+}
+@media (max-width: 640px) {
+  /* Le nom reste lisible par les lecteurs d'écran, l'avatar suffit à l'œil */
+  .barre-session-texte {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .barre-session-alerte { font-size: 12px; }
+}
+
+.adm-sous-titre-espace { margin-bottom: var(--space-5); }
+.adm-label-compact { font-size: 13px; margin-bottom: 4px; }
+.adm-espace-haut { margin-top: var(--space-4); }
