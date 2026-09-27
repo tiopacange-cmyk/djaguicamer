@@ -382,7 +382,8 @@ export default function AppPrototype() {
 // ÉCRAN 1 — CONNEXION
 // ============================================================
 function ConnexionScreen({ onLoggedIn }) {
-  const [dark, setDark] = useState(false);
+  // Mode sombre par défaut, à la demande du client ; le bouton permet de repasser en clair.
+  const [dark, setDark] = useState(true);
   const [identifiant, setIdentifiant] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -483,11 +484,10 @@ function ConnexionScreen({ onLoggedIn }) {
             type="button"
             className="btn-pastille"
             onClick={() => setDark(!dark)}
-            aria-label="Mode sombre"
-            aria-pressed={dark}
+            aria-label={dark ? "Passer en mode clair" : "Passer en mode sombre"}
           >
             {dark ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
-            <span className="btn-pastille-texte">Mode sombre</span>
+            <span className="btn-pastille-texte">{dark ? "Mode clair" : "Mode sombre"}</span>
           </button>
         </div>
 

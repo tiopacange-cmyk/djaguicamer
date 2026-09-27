@@ -28,4 +28,6 @@ seul cet écran est allégé en bleu, à la demande du client.
 
 - Pas de photo : l'illustration est vectorielle (légère en 3G, nette partout, sans droits d'auteur).
   Une vraie photo pourra la remplacer si le client fournit un fichier dont il a les droits.
-- Mode sombre : le panneau suit les tokens (`--surface`), le titre de la carte passe en `--ink`.
+- **Mode sombre par défaut** (choix du client). Le bouton en haut à droite propose l'action inverse
+  (« Mode clair » en sombre, « Mode sombre » en clair). Le panneau suit les tokens (`--surface`),
+  le titre de la carte passe en `--ink`.
