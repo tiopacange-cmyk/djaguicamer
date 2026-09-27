@@ -50,16 +50,12 @@ droite, l'action or toujours en dernier. Sous 600px, l'action or passe en tête 
 largeur et les autres se rangent deux par deux. Boutons de 48px (44px compacts, 36px dans
 les tableaux, 44px sur écran tactile).
 
-### Révision « moins de bleu » et nom officiel
+### Nom officiel et affichage par taille d'écran
 
 - **Nom** : « DJANGUI CMR », signature « By 3Tsolution Sarl » (connexion, pied de page, menu, onglet du navigateur).
-- **Grandes surfaces claires** : barre de session et menu en blanc, en-têtes de tableaux en sable `#F1EBDD`
-  (texte `#6B5530`, 5,95:1), fond de page `#F6F3EC`. Le motif Ndop passe en version claire
-  (`--ndop-clair` : traits indigo à 16 % et points or sur sable) sur la connexion, les pages centrées,
-  la bande du menu et l'en-tête membre.
-- **Indigo réservé** : texte des boutons secondaires, élément sélectionné, carte tontine du membre.
-  Les titres sont en encre `--ink`, plus en couleur de marque.
-- **Thème Super Admin** : « Bleu dynamique » et « Violet moderne » recolorent encore les accents
+- **Couleurs** : l'identité Ndop ci-dessus reste en vigueur. Une variante « moins de bleu »
+  (surfaces blanches et sable) a été essayée puis abandonnée : elle manquait de caractère.
+- **Thème Super Admin** : « Bleu dynamique » et « Violet moderne » recolorent les accents
   (`--primary`, `--action`) ; « Ndop indigo & or » est le thème de référence.
 - **Tailles d'écran** : PC ≥ 1280px, petit PC / tablette horizontale 901–1279px (menu de 208px),
   tablette verticale 601–900px (menu en bande), téléphone ≤ 600px. Colonnes de tableau d'au moins
