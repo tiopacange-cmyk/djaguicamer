@@ -351,8 +351,8 @@ function ConnexionScreen({ onLoggedIn }) {
             <MarqueCauri taille={30} couleur="#16225A" fond="#FFFFFF" />
           </div>
           <div>
-            <div className="accueil-logo-nom">DJANGUI</div>
-            <div className="accueil-logo-sub">par Three T Solutions</div>
+            <div className="accueil-logo-nom">DJANGUI CMR</div>
+            <div className="accueil-logo-sub">By 3Tsolution Sarl</div>
           </div>
         </div>
 
@@ -552,7 +552,7 @@ function ConnexionScreen({ onLoggedIn }) {
         </div>
 
         <footer className="accueil-pied">
-          Application créée par <strong>Three T Solutions</strong> — 2026
+          <strong>DJANGUI CMR</strong> · By 3Tsolution Sarl — 2026
         </footer>
       </main>
     </div>
@@ -7450,7 +7450,7 @@ function Sidebar({ role, sub, items, active, onSelect, logoUrl }) {
           </li>
         ))}
       </ul>
-      <div className="sidebar-footer">Three T Solutions — 2026</div>
+      <div className="sidebar-footer">DJANGUI CMR · By 3Tsolution Sarl</div>
     </nav>
   );
 }
@@ -7458,9 +7458,9 @@ function Sidebar({ role, sub, items, active, onSelect, logoUrl }) {
 function Table({ cols, widths, rows }) {
   return (
     <div className="table-scroll">
-      {/* Largeur minimale selon le nombre de colonnes : sur petit écran le
+      {/* Largeur minimale selon le nombre de colonnes (120px chacune) : sur petit écran le
           tableau défile dans son cadre au lieu de couper les mots */}
-      <div className="tableau" role="table" style={{ minWidth: `${cols.length * 105}px` }}>
+      <div className="tableau" role="table" style={{ minWidth: `${cols.length * 120}px` }}>
         <div className="tableau-entete" role="row" style={{ gridTemplateColumns: widths }}>
           {cols.map((c, j) => <div key={`${c}-${j}`} role="columnheader">{c}</div>)}
         </div>
