@@ -97,6 +97,105 @@ function appliquerThemeCss() {
   racine.setProperty("--action", C.accent);
 }
 
+// Illustration de l'écran de connexion : l'épargne d'une tontine sur
+// téléphone, un graphique en hausse, des pièces, des cauris et le cercle
+// des membres. Dessinée en SVG : légère en 3G et nette sur tout écran.
+function IllustrationFinance() {
+  const police = "Manrope, 'Segoe UI', sans-serif";
+  const cauri = (x, y, r) => (
+    <g transform={`translate(${x} ${y}) rotate(${r})`}>
+      <ellipse rx="9" ry="13" fill="#FFFFFF" stroke="#C9A24A" strokeWidth="1.6" />
+      <path d="M0 -9 C2.5 -3 -2.5 3 0 9" fill="none" stroke="#16225A" strokeWidth="1.8" strokeLinecap="round" />
+    </g>
+  );
+  const pile = (x, y, n) => (
+    <g transform={`translate(${x} ${y})`}>
+      {Array.from({ length: n }).map((_, i) => (
+        <g key={i} transform={`translate(0 ${-i * 9})`}>
+          <ellipse cx="0" cy="4" rx="30" ry="10" fill="#B8860B" />
+          <ellipse cx="0" cy="0" rx="30" ry="10" fill="#D9A521" />
+        </g>
+      ))}
+      <ellipse cx="0" cy={-(n - 1) * 9} rx="20" ry="6" fill="#F2CD6B" />
+      <text x="0" y={-(n - 1) * 9 + 4} textAnchor="middle" fontFamily={police} fontSize="10" fontWeight="800" fill="#8A6410">F</text>
+    </g>
+  );
+  return (
+    <svg viewBox="0 0 520 420" role="img" aria-label="Illustration : l'épargne d'une tontine suivie sur téléphone, avec un graphique en hausse, des pièces et des cauris">
+      <defs>
+        <linearGradient id="illu-aire" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#D9A521" stopOpacity="0.28" />
+          <stop offset="1" stopColor="#D9A521" stopOpacity="0" />
+        </linearGradient>
+        <filter id="illu-ombre" x="-20%" y="-20%" width="140%" height="160%">
+          <feDropShadow dx="0" dy="10" stdDeviation="12" floodColor="#16225A" floodOpacity="0.16" />
+        </filter>
+      </defs>
+
+      {/* Fonds doux */}
+      <circle cx="320" cy="200" r="175" fill="#FBF1DC" />
+      <circle cx="140" cy="300" r="95" fill="#E9ECF6" />
+
+      {/* Courbe de croissance */}
+      <path d="M30 340 L120 290 L190 305 L280 225 L370 195 L480 95 L480 360 L30 360 Z" fill="url(#illu-aire)" />
+      <polyline points="30,340 120,290 190,305 280,225 370,195 480,95" fill="none" stroke="#D9A521" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M458 92 L484 90 L478 116 Z" fill="#D9A521" />
+
+      {/* Cercle des membres (la tontine) */}
+      <g transform="translate(118 92)">
+        <circle r="46" fill="none" stroke="#16225A" strokeOpacity="0.28" strokeWidth="2" strokeDasharray="5 6" />
+        {[["#D9A521", "PE", 0, -46], ["#127A55", "JM", 46, 0], ["#B3261E", "AB", 0, 46], ["#16225A", "SN", -46, 0]].map(([c, t, x, y]) => (
+          <g key={t} transform={`translate(${x} ${y})`}>
+            <circle r="17" fill={c} stroke="#FFFFFF" strokeWidth="3" />
+            <text y="4" textAnchor="middle" fontFamily={police} fontSize="10" fontWeight="800" fill="#FFFFFF">{t}</text>
+          </g>
+        ))}
+        <circle r="19" fill="#FFFFFF" />
+        <text y="5" textAnchor="middle" fontFamily={police} fontSize="13" fontWeight="800" fill="#16225A">4/4</text>
+      </g>
+
+      {/* Téléphone */}
+      <g transform="translate(262 36)" filter="url(#illu-ombre)">
+        <rect width="176" height="336" rx="30" fill="#16225A" />
+        <rect x="10" y="12" width="156" height="312" rx="22" fill="#FFFFFF" />
+        <rect x="66" y="20" width="44" height="6" rx="3" fill="#E6E3DB" />
+        <rect x="22" y="38" width="132" height="84" rx="16" fill="#16225A" />
+        <text x="36" y="62" fontFamily={police} fontSize="10" fontWeight="700" fill="#B7BEE0">Mon épargne</text>
+        <text x="36" y="90" fontFamily={police} fontSize="21" fontWeight="800" fill="#FFFFFF">274 000 F</text>
+        <rect x="36" y="100" width="46" height="14" rx="7" fill="#D9A521" />
+        <text x="59" y="110" textAnchor="middle" fontFamily={police} fontSize="9" fontWeight="800" fill="#16225A">+12 %</text>
+        {[[34, 36], [58, 52], [82, 44], [106, 66], [130, 84]].map(([x, h], i) => (
+          <rect key={x} x={x} y={222 - h} width="16" height={h} rx="4" fill={i === 4 ? "#D9A521" : "#C9CEE8"} />
+        ))}
+        <rect x="22" y="236" width="132" height="34" rx="10" fill="#F6F5F1" />
+        <circle cx="40" cy="253" r="9" fill="#E1F1E8" />
+        <rect x="56" y="246" width="56" height="6" rx="3" fill="#8C92AD" />
+        <rect x="56" y="256" width="36" height="5" rx="2.5" fill="#C9CEE8" />
+        <rect x="22" y="276" width="132" height="34" rx="10" fill="#F6F5F1" />
+        <circle cx="40" cy="293" r="9" fill="#FBF1DC" />
+        <rect x="56" y="286" width="64" height="6" rx="3" fill="#8C92AD" />
+        <rect x="56" y="296" width="30" height="5" rx="2.5" fill="#C9CEE8" />
+      </g>
+
+      {/* Notification « cotisation reçue » */}
+      <g transform="translate(52 176)" filter="url(#illu-ombre)">
+        <rect width="206" height="66" rx="16" fill="#FFFFFF" />
+        <circle cx="33" cy="33" r="18" fill="#E1F1E8" />
+        <path d="M25 33 L31 39 L42 27" fill="none" stroke="#127A55" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+        <text x="62" y="29" fontFamily={police} fontSize="12" fontWeight="700" fill="#141A33">Cotisation reçue</text>
+        <text x="62" y="49" fontFamily={police} fontSize="15" fontWeight="800" fill="#127A55">+50 000 FCFA</text>
+      </g>
+
+      {/* Pièces et cauris */}
+      {pile(96, 372, 5)}
+      {pile(170, 386, 3)}
+      {cauri(222, 382, 30)}
+      {cauri(246, 394, -20)}
+      {cauri(58, 396, 60)}
+    </svg>
+  );
+}
+
 // Logo Djangui : un cauri, l'ancienne monnaie de l'Ouest Cameroun.
 function MarqueCauri({ taille = 24, couleur = "#16225A", fond = "#F4EFE4" }) {
   return (
@@ -344,50 +443,36 @@ function ConnexionScreen({ onLoggedIn }) {
   return (
     <div className="accueil" data-theme={dark ? "dark" : "light"}>
       {/* Panneau de marque : mission + preuves de confiance */}
-      <section className="accueil-marque" aria-labelledby="accueil-titre">
-        <div className="accueil-marque-bloc">
-        <div className="accueil-logo">
-          <div className="accueil-logo-mark" aria-hidden="true">
-            <MarqueCauri taille={30} couleur="#16225A" fond="#FFFFFF" />
+      <section className="accueil-marque accueil-v3" aria-labelledby="accueil-titre">
+        <div className="accueil-contenu">
+          <div className="accueil-logo">
+            <div className="accueil-logo-mark" aria-hidden="true">
+              <MarqueCauri taille={30} couleur="#16225A" fond="#FFFFFF" />
+            </div>
+            <div>
+              <div className="accueil-logo-nom">DJANGUI CMR</div>
+              <div className="accueil-logo-sub">By 3Tsolution Sarl</div>
+            </div>
           </div>
-          <div>
-            <div className="accueil-logo-nom">DJANGUI CMR</div>
-            <div className="accueil-logo-sub">By 3Tsolution Sarl</div>
+
+          <div className="accueil-texte">
+            <p id="accueil-titre" className="accueil-titre">
+              Votre tontine, <em>claire et sereine.</em>
+            </p>
+            <p className="accueil-intro">
+              Cotisations, tours, épargne, prêts et assurance de votre groupe réunis au même endroit, visibles par chaque membre.
+            </p>
           </div>
-        </div>
 
-        <div>
-          <p id="accueil-titre" className="accueil-titre">
-            Votre tontine, <em>claire et sereine.</em>
-          </p>
-          <p className="accueil-intro">
-            Cotisations, tours, épargne, prêts et assurance de votre groupe réunis au même endroit, visibles par chaque membre.
-          </p>
-        </div>
+          <figure className="accueil-illustration">
+            <IllustrationFinance />
+          </figure>
 
-        <ul className="accueil-preuves">
-          <li className="accueil-preuve">
-            <div className="accueil-preuve-icone" aria-hidden="true"><ListChecks size={18} /></div>
-            <div>
-              <strong>Chaque franc est tracé</strong>
-              <span>Cotisations suivies tour par tour, soldes à jour pour tous.</span>
-            </div>
-          </li>
-          <li className="accueil-preuve">
-            <div className="accueil-preuve-icone" aria-hidden="true"><MessageSquareText size={18} /></div>
-            <div>
-              <strong>Confirmation par SMS</strong>
-              <span>Chaque opération sur votre compte vous est notifiée.</span>
-            </div>
-          </li>
-          <li className="accueil-preuve">
-            <div className="accueil-preuve-icone" aria-hidden="true"><ShieldCheck size={18} /></div>
-            <div>
-              <strong>Accès selon le rôle</strong>
-              <span>Président, trésorier ou membre : chacun voit ce qui le concerne.</span>
-            </div>
-          </li>
-        </ul>
+          <ul className="accueil-puces">
+            <li><ListChecks size={16} aria-hidden="true" /> Chaque franc tracé</li>
+            <li><MessageSquareText size={16} aria-hidden="true" /> Confirmation par SMS</li>
+            <li><ShieldCheck size={16} aria-hidden="true" /> Accès selon le rôle</li>
+          </ul>
         </div>
       </section>
 
