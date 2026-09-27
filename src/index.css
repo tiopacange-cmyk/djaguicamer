@@ -5,51 +5,65 @@
    le thème choisi par le Super Admin (appliquerThemeCss, App.jsx).
    ============================================================ */
 :root {
-  --font-sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-sans: 'Manrope', 'Segoe UI', system-ui, sans-serif;
+  --font-titre: 'Unbounded', 'Manrope', 'Segoe UI', system-ui, sans-serif;
 
-  --bg: #F7F5EF;
+  /* Palette « Ndop » : indigo du tissu royal bamiléké, or, rouge Toghu */
+  --bg: #F6F5F1;
   --surface: #FFFFFF;
-  --surface-sunken: #FBFAF6;
-  --ink: #14201A;
-  --muted: #56645B;
-  --border: #E3DED0;
-  --border-strong: #858F87;
-  --primary: #0F5132;
+  --surface-sunken: #FAF9F6;
+  --ink: #141A33;
+  --muted: #5A6180;
+  --border: #E6E3DB;
+  --border-strong: #8C92AD;
+  --primary: #16225A;            /* indigo Ndop : structure, sélection */
   --primary-hover: color-mix(in srgb, var(--primary) 82%, black);
   --on-primary: #FFFFFF;
-  --gold: #C9971D;
+  --action: #D9A521;             /* or : action principale */
+  --action-hover: #C8951A;
+  --on-action: #16225A;
+  --gold: #D9A521;
   --gold-text: #8A6410;
-  --danger: #A4331F;
-  --danger-bg: #FBE9E4;
-  --success: #0F5132;
-  --success-bg: #E4EFE6;
-  --ring: #C9971D;
+  --danger: #B3261E;             /* rouge Toghu */
+  --danger-bg: #FBE7E4;
+  --success: #127A55;
+  --success-bg: #E1F1E8;
+  --ring: #D9A521;
+  --indigo-clair: #EEF0F8;
+
+  /* Motifs de l'Ouest Cameroun, dessinés pour l'application */
+  --ndop: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'><rect width='72' height='72' fill='%2316225A'/><g fill='none' stroke='%23F4EFE4' stroke-width='2.6'><rect x='3' y='3' width='66' height='66'/><circle cx='36' cy='36' r='12'/><path d='M3 3L25 25M69 3L47 25M3 69L25 47M69 69L47 47'/></g><circle cx='36' cy='36' r='4' fill='%23F4EFE4'/><g fill='%23F4EFE4'><circle cx='36' cy='11' r='2.4'/><circle cx='36' cy='61' r='2.4'/><circle cx='11' cy='36' r='2.4'/><circle cx='61' cy='36' r='2.4'/></g></svg>");
+  --ndop-leger: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'><g fill='none' stroke='%23FFFFFF' stroke-opacity='0.09' stroke-width='2.6'><rect x='3' y='3' width='66' height='66'/><circle cx='36' cy='36' r='12'/><path d='M3 3L25 25M69 3L47 25M3 69L25 47M69 69L47 47'/></g><circle cx='36' cy='36' r='4' fill='%23FFFFFF' fill-opacity='0.09'/></svg>");
+  --araignee: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'><g fill='none' stroke='%23F4EFE4' stroke-width='3' stroke-linecap='round'><path d='M40 42L24 30L14 34M40 48L20 46L10 54M40 54L24 64L20 76M44 58L36 74L38 86'/><path d='M56 42L72 30L82 34M56 48L76 46L86 54M56 54L72 64L76 76M52 58L60 74L58 86'/></g><ellipse cx='48' cy='48' rx='10' ry='13' fill='%23F4EFE4'/><circle cx='48' cy='31' r='6' fill='%23F4EFE4'/></svg>");
+  --toghu: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='14' viewBox='0 0 48 14'><rect width='48' height='14' fill='%23141414'/><path d='M0 14L6 2L12 14Z' fill='%23D62828'/><path d='M12 14L18 2L24 14Z' fill='%23F2B705'/><path d='M24 14L30 2L36 14Z' fill='%23108A4A'/><path d='M36 14L42 2L48 14Z' fill='%23E96B1D'/><rect y='0' width='48' height='2' fill='%23F4EFE4'/></svg>");
 
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
   --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px;
-  --radius-control: 10px;
-  --radius-card: 16px;
-  --shadow-card: 0 1px 2px rgba(20, 32, 26, 0.06), 0 12px 32px rgba(20, 32, 26, 0.08);
+  --radius-control: 12px;
+  --radius-card: 18px;
+  --shadow-card: 0 1px 2px rgba(22, 34, 90, 0.06), 0 12px 32px rgba(22, 34, 90, 0.08);
   --dur-fast: 150ms;
   --dur-base: 200ms;
 }
 
 [data-theme="dark"] {
-  --bg: #0E1411;
-  --surface: #161E1A;
-  --surface-sunken: #111814;
-  --ink: #EEF2EC;
-  --muted: #A3B1A7;
-  --border: #2A3530;
-  --border-strong: #66756B;
+  --bg: #0E1124;
+  --surface: #171B33;
+  --surface-sunken: #12162B;
+  --ink: #ECEEF7;
+  --muted: #A9AECB;
+  --border: #2A2F4D;
+  --border-strong: #6A7092;
+  --primary: #3A4DA8;
   --primary-hover: color-mix(in srgb, var(--primary) 85%, white);
-  --gold: #E0B24A;
-  --gold-text: #E0B24A;
-  --danger: #F2A08E;
-  --danger-bg: #2A1712;
-  --success: #8FD1A8;
-  --success-bg: #14281D;
-  --ring: #E0B24A;
+  --gold: #E7BC4F;
+  --gold-text: #E7BC4F;
+  --danger: #FFB4A8;
+  --danger-bg: #3A1512;
+  --success: #8FE0B5;
+  --success-bg: #12291F;
+  --ring: #E7BC4F;
+  --indigo-clair: #222849;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px rgba(0, 0, 0, 0.35);
 }
 
@@ -57,7 +71,7 @@
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background: #0E1210;
+  background: #0F1840;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -1311,3 +1325,214 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 .adm-sous-titre-espace { margin-bottom: var(--space-5); }
 .adm-label-compact { font-size: 13px; margin-bottom: 4px; }
 .adm-espace-haut { margin-top: var(--space-4); }
+
+/* ================================================================
+   IDENTITÉ NDOP (Ouest Cameroun) — direction « A + C discrète »
+   Voir design-system/djangui/MASTER.md, section « Identité Ndop ».
+   Placée en fin de feuille : elle remplace l'habillage précédent
+   sans toucher à la structure.
+   ================================================================ */
+
+/* ---------- Titres : Unbounded, large et solennelle ---------- */
+.adm-titre, .modal-titre, .tdb-nom, .accueil-titre, .carte-auth h1,
+.sidebar-role, .accueil-logo-nom, .page-centree h1 {
+  font-family: var(--font-titre);
+  letter-spacing: 0;
+}
+.adm-titre { font-size: 24px; font-weight: 500; color: var(--primary); line-height: 1.25; }
+.adm-h2 { color: var(--primary); }
+.modal-titre { font-size: 17px; font-weight: 500; color: var(--primary); }
+.carte-auth h1 { font-size: 22px; font-weight: 500; color: var(--primary); }
+.tdb-nom { font-weight: 500; font-size: clamp(20px, 4.6vw, 26px); }
+.sidebar-role { font-size: 14px; font-weight: 500; }
+
+/* ---------- Boutons : une règle pour toute l'application ----------
+   or = action principale · indigo = validation secondaire / sélection
+   blanc bordé = annuler, action secondaire · rouge Toghu = destructif */
+.adm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: var(--radius-control);
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  white-space: normal;
+}
+.adm-btn-compact { min-height: 40px; padding: 0 16px; font-size: 14px; }
+.adm-btn-action { background: var(--action); color: var(--on-action); }
+.adm-btn-primaire { background: var(--primary); color: var(--on-primary); }
+.adm-btn-danger { background: var(--danger); color: #FFFFFF; }
+.adm-btn-secondaire { background: var(--surface); color: var(--primary); border-color: var(--border-strong); }
+.adm-btn-valider { background: var(--action); color: var(--on-action); font-weight: 700; min-height: 48px; }
+.adm-btn-mini { background: var(--primary); }
+.adm-btn-ligne-plein { background: var(--primary); }
+.btn-principal { background: var(--action); color: var(--on-action); font-weight: 800; }
+.btn-principal:hover:not(:disabled) { background: var(--action-hover); box-shadow: 0 6px 16px rgba(217, 165, 33, 0.35); }
+.app-main button:not(:disabled):active, .modal button:not(:disabled):active { transform: translateY(1px); }
+
+/* Disposition de l'en-tête de page : titre à gauche, actions à droite,
+   l'action principale (or) toujours en dernier ; sur mobile, elle passe
+   en tête et prend toute la largeur. */
+.adm-entete { align-items: flex-end; row-gap: var(--space-4); }
+.adm-entete > :first-child { flex: 1 1 320px; min-width: 0; }
+.adm-entete > :last-child:not(:first-child) {
+  display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; align-items: center;
+}
+.adm-entete button[style*="var(--action)"] { order: 10; }
+
+/* Rangée de deux boutons dans les fenêtres (Annuler / Confirmer) */
+.modal-corps > div[style*="display: flex"] > .adm-btn { flex: 1 1 0; }
+
+@media (max-width: 600px) {
+  .adm-entete > :last-child:not(:first-child) { width: 100%; justify-content: stretch; }
+  .adm-entete > :last-child:not(:first-child) > button { flex: 1 1 calc(50% - var(--space-2)); justify-content: center; white-space: normal; text-align: center; }
+  .adm-entete button[style*="var(--action)"] { order: -1; flex-basis: 100% !important; }
+}
+
+/* ---------- Barre de session ---------- */
+.barre-session { background: #0F1840; border-bottom: none; position: relative; }
+.barre-session::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 6px; z-index: 2;
+  background: var(--toghu); background-size: 30px 6px;
+}
+.barre-session-btn { background: #1A2658; border-color: #2B3973; color: #DDE1F3; }
+.barre-session-btn:hover { background: #24326E; }
+.barre-session-btn.est-actif { background: var(--action); color: var(--on-action); }
+.barre-session-texte { color: #B7BEE0; }
+
+/* ---------- Menu latéral : coiffé d'une bande Ndop et d'une frise Toghu ---------- */
+.app-sidebar { background: var(--brand-panel, #16225A); padding-top: calc(72px + 8px + var(--space-5)); }
+.app-sidebar::before {
+  height: 72px; inset: 0 0 auto 0;
+  background: var(--ndop); background-size: 36px 36px;
+}
+.app-sidebar::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 72px; height: 8px;
+  background: var(--toghu); background-size: 28px 8px;
+}
+.sidebar-item { color: #C6CBE6; }
+.sidebar-item.est-actif { background: rgba(255, 255, 255, 0.1); }
+.sidebar-item.est-actif::before { background: var(--gold); }
+.sidebar-item.est-actif .sidebar-icone { color: #F2CD6B; }
+.sidebar-sub { color: #B7BEE0; }
+.sidebar-footer { color: #9AA3CF; }
+.sidebar-logo-defaut { background: #FFFFFF; }
+@media (max-width: 900px) {
+  .app-sidebar { padding-top: calc(36px + 6px + var(--space-3)); }
+  .app-sidebar::before { height: 36px; background-size: 36px 36px; }
+  .app-sidebar::after { top: 36px; height: 6px; background-size: 24px 6px; }
+}
+
+/* ---------- Tableaux : en-tête indigo ---------- */
+.tableau-entete { background: var(--primary); color: #D8DCF0; border-bottom: none; }
+.tableau-ligne:hover { background: var(--indigo-clair); }
+.tableau { border-color: var(--border); }
+
+/* ---------- Cartes de statistiques ---------- */
+.stat-icone { background: var(--indigo-clair); color: var(--primary); }
+.stat-valeur { color: var(--primary); }
+.stat-carte { position: relative; overflow: hidden; }
+.stat-carte::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--gold); }
+
+/* ---------- Fenêtres modales : frise Toghu en tête ---------- */
+.modal::before {
+  content: ""; display: block; height: 6px;
+  margin: calc(var(--space-5) * -1) calc(var(--space-5) * -1) var(--space-4);
+  background: var(--toghu); background-size: 28px 6px;
+}
+@media (max-width: 600px) {
+  .modal::before { margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) var(--space-4); }
+}
+
+/* ---------- Écran de connexion : panneau Ndop ---------- */
+.accueil-marque {
+  background: var(--ndop); background-size: 64px 64px;
+  justify-content: center;
+}
+.accueil-marque::before {
+  inset: auto 0 0 0; height: 14px;
+  background: var(--toghu); background-size: 48px 14px;
+}
+.accueil-marque::after { display: none; }
+.accueil-marque-bloc {
+  position: relative; z-index: 1;
+  background: #16225A; color: #F4EFE4;
+  border-radius: 24px;
+  padding: clamp(24px, 4vw, 44px);
+  box-shadow: 0 0 0 10px #16225A, 0 30px 60px rgba(0, 0, 0, 0.35);
+  display: flex; flex-direction: column; gap: var(--space-6);
+  max-width: 560px;
+}
+.accueil-logo-mark { background: #FFFFFF; }
+.accueil-logo-nom { font-weight: 700; letter-spacing: 0.08em; }
+.accueil-titre { font-weight: 700; }
+.accueil-titre em { color: #F2CD6B; }
+.accueil-intro { color: #C9CEE8; }
+.accueil-preuve-icone { color: #F2CD6B; }
+.accueil-preuve span, .accueil-logo-sub { color: #B7BEE0; }
+@media (max-width: 900px) {
+  .accueil-marque { padding: var(--space-5) var(--space-4) calc(var(--space-5) + 14px); }
+  .accueil-marque-bloc { padding: var(--space-5); gap: var(--space-4); box-shadow: 0 0 0 6px #16225A; }
+}
+
+/* ---------- Pages centrées (mot de passe, chargement, sans rôle) ---------- */
+.page-centree { background: var(--ndop); background-size: 64px 64px; }
+.page-centree .carte-auth { box-shadow: 0 0 0 8px rgba(22, 34, 90, 0.9), 0 30px 60px rgba(0, 0, 0, 0.35); }
+.page-centree-icone { background: var(--primary); }
+.page-centree-texte { background: #16225A; color: #FFFFFF; padding: 10px 18px; border-radius: 999px; font-weight: 700; }
+
+/* ---------- Espace membre ---------- */
+.tdb-entete { background: #16225A var(--ndop-leger); background-size: 56px 56px; }
+.tdb-entete::before {
+  inset: auto 0 0 0; height: 10px;
+  background: var(--toghu); background-size: 34px 10px;
+}
+.tdb-avatar-initiales { background: var(--gold); color: #16225A; }
+.tdb-pastille { background: rgba(255, 255, 255, 0.1); }
+.tdb-section-titre { color: var(--primary); }
+
+/* Carte tontine : la « carte de solde » indigo, araignée en filigrane */
+.tdb-tontine {
+  position: relative; overflow: hidden; color: #FFFFFF;
+  background: linear-gradient(135deg, #22327A 0%, #16225A 70%);
+  border-color: transparent;
+  box-shadow: 0 16px 32px rgba(22, 34, 90, 0.35);
+}
+.tdb-tontine::after {
+  content: ""; position: absolute; right: -28px; bottom: -28px; width: 170px; height: 170px;
+  background: var(--araignee); background-size: 170px 170px; opacity: 0.16; pointer-events: none;
+}
+.tdb-tontine > * { position: relative; z-index: 1; }
+.tdb-tontine .tdb-surtitre { color: #F2CD6B; }
+.tdb-tontine .tdb-tour { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.2); color: #FFFFFF; }
+.tdb-tontine .tdb-legende { color: #B7BEE0; }
+.tdb-tontine .tdb-montant { font-family: var(--font-sans); font-weight: 800; }
+.tdb-tontine .tdb-etat { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.16); color: #DDE1F3; }
+.tdb-tontine .tdb-etat strong { color: #FFFFFF; }
+.tdb-tontine .tdb-etat span { color: #B7BEE0; }
+.tdb-tontine .tdb-etat-ok { background: rgba(18, 122, 85, 0.35); border-color: rgba(143, 224, 181, 0.4); color: #A8EBC6; }
+.tdb-tontine .tdb-etat-ok strong { color: #C9F4DC; }
+.tdb-tontine .tdb-etat-alerte { background: rgba(179, 38, 30, 0.4); border-color: rgba(255, 180, 168, 0.45); color: #FFD1C9; }
+.tdb-tontine .tdb-etat-alerte strong { color: #FFE3DE; }
+.tdb-icone-ok { background: var(--indigo-clair); color: var(--primary); }
+.tdb-barre-complete { background: var(--success); }
+
+/* Logo cauri : coquillage blanc sur pastille or */
+.accueil-logo-mark, .sidebar-logo-defaut { background: var(--gold) !important; }
+
+/* Boutons dans les lignes de tableau : toujours compacts */
+.tableau-ligne .adm-btn { min-height: 36px; padding: 0 12px; font-size: 13px; white-space: nowrap; gap: 6px; }
+@media (pointer: coarse) { .tableau-ligne .adm-btn { min-height: 44px; } }
+
+/* Connexion mobile : le bouton clair/sombre repose sur le motif, au-dessus du bloc */
+@media (max-width: 900px) {
+  .accueil-marque { padding-top: calc(var(--space-4) + 44px + var(--space-3)); }
+  .accueil-barre { top: var(--space-4); }
+}

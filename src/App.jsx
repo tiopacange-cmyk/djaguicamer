@@ -65,9 +65,9 @@ function msgOperation(nom, operation, montant, solde, details) {
 // design-system/djangui/MASTER.md). Restent en hexadécimal car le code
 // y concatène des suffixes d'opacité (ex. `${C.warn}44`).
 const C = {
-  ink: "#14201A", sub: "#56645B", accent: "#C9971D", accent2: "#0F5132",
-  border: "#E3DED0", borderFort: "#858F87", bg: "#F7F5EF", panel: "#FFFFFF", purple: "#5B4B9A",
-  warn: "#A4331F", warnBg: "#FBE9E4", ok: "#E4EFE6",
+  ink: "#141A33", sub: "#5A6180", accent: "#D9A521", accent2: "#16225A",
+  border: "#E6E3DB", borderFort: "#8C92AD", bg: "#F6F5F1", panel: "#FFFFFF", purple: "#5B4B9A",
+  warn: "#B3261E", warnBg: "#FBE7E4", ok: "#E1F1E8",
   // Couleur par module, pour distinguer les formulaires d'un coup d'œil.
   // Toutes lisibles en texte sur blanc et sur leur teinte claire (AA).
   vifOr: "#8A6410", vifVert: "#166534", vifBleu: "#1D4ED8", vifRose: "#BE185D", vifViolet: "#6D28D9", vifCorail: "#B43C0B",
@@ -78,7 +78,9 @@ const C = {
 // (texte, fond, succès, alerte) restent identiques pour garder une
 // bonne lisibilité quel que soit le thème choisi.
 const THEMES = {
-  vert: { nom: "Vert profond", accent: "#C9971D", accent2: "#0F5132", purple: "#6B5FA6" },
+  // « vert » reste la clé par défaut enregistrée en base : elle porte désormais
+  // l'identité Ndop (indigo + or) pour que tous les groupes la reçoivent.
+  vert: { nom: "Ndop indigo & or", accent: "#D9A521", accent2: "#16225A", purple: "#5B4B9A" },
   bleu: { nom: "Bleu dynamique", accent: "#F59E0B", accent2: "#1E40AF", purple: "#6B5FA6" },
   violet: { nom: "Violet moderne", accent: "#D97706", accent2: "#5B21B6", purple: "#9333EA" },
 };
@@ -92,6 +94,22 @@ function appliquerThemeCss() {
   racine.setProperty("--primary", C.accent2);
   racine.setProperty("--gold", C.accent);
   racine.setProperty("--ring", C.accent);
+  racine.setProperty("--action", C.accent);
+}
+
+// Logo Djangui : un cauri, l'ancienne monnaie de l'Ouest Cameroun.
+function MarqueCauri({ taille = 24, couleur = "#16225A", fond = "#F4EFE4" }) {
+  return (
+    <svg width={taille} height={taille} viewBox="0 0 56 56" aria-hidden="true" focusable="false">
+      <g transform="translate(28 28) rotate(35)">
+        <ellipse rx="12" ry="18" fill={fond} />
+        <path d="M0 -13 C3.5 -4 -3.5 4 0 13" fill="none" stroke={couleur} strokeWidth="3" strokeLinecap="round" />
+        <g stroke={couleur} strokeWidth="2" strokeLinecap="round">
+          <path d="M-4 -7h2.5M1.5 -3h2.5M-4 1h2.5M1.5 5h2.5" />
+        </g>
+      </g>
+    </svg>
+  );
 }
 
 export default function AppPrototype() {
@@ -327,9 +345,10 @@ function ConnexionScreen({ onLoggedIn }) {
     <div className="accueil" data-theme={dark ? "dark" : "light"}>
       {/* Panneau de marque : mission + preuves de confiance */}
       <section className="accueil-marque" aria-labelledby="accueil-titre">
+        <div className="accueil-marque-bloc">
         <div className="accueil-logo">
           <div className="accueil-logo-mark" aria-hidden="true">
-            <Users size={22} strokeWidth={2.2} />
+            <MarqueCauri taille={30} couleur="#16225A" fond="#FFFFFF" />
           </div>
           <div>
             <div className="accueil-logo-nom">DJANGUI</div>
@@ -369,6 +388,7 @@ function ConnexionScreen({ onLoggedIn }) {
             </div>
           </li>
         </ul>
+        </div>
       </section>
 
       {/* Colonne formulaire */}
@@ -1121,13 +1141,13 @@ function SuperAdminScreen() {
                               setSavingPlan(false);
                             }
                           }}
-                          style={{ flex: 1, background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "7px", padding: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+                          className="adm-btn adm-btn-action" style={{ flex: 1, cursor: "pointer" }}
                         >
                           {savingPlan ? "..." : "Enregistrer"}
                         </button>
                         <button
                           onClick={() => setEditPlanId(null)}
-                          style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "7px", padding: "8px 10px", fontSize: "13px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+                          className="adm-btn adm-btn-secondaire" style={{ cursor: "pointer" }}
                         >
                           Annuler
                         </button>
@@ -1267,7 +1287,7 @@ function SuperAdminScreen() {
           {!renouvelerSuccess && (
             <button
               disabled={renouvelerEnCours}
-              style={{ marginTop: "6px", background: C.vifVert, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: renouvelerEnCours ? "default" : "pointer" }}
+              className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: renouvelerEnCours ? "default" : "pointer" }}
               onClick={async () => {
                 setRenouvelerEnCours(true);
                 setRenouvelerErreur("");
@@ -1336,7 +1356,7 @@ function SuperAdminScreen() {
                   setSmsSenderIdEnCours(false);
                 }
               }}
-              style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer" }}
+              className="adm-btn adm-btn-compact adm-btn-primaire" style={{ cursor: "pointer" }}
             >
               {smsSenderIdEnCours ? "..." : "Enregistrer"}
             </button>
@@ -1369,7 +1389,7 @@ function SuperAdminScreen() {
 
           <button
             disabled={smsVenteEnCours}
-            style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: smsVenteEnCours ? "default" : "pointer" }}
+            className="adm-btn adm-btn-action" style={{ cursor: smsVenteEnCours ? "default" : "pointer" }}
             onClick={async () => {
               const quantite = parseInt(smsVenteQuantite.replace(/[^\d]/g, ""), 10);
               if (!quantite || quantite <= 0) { setSmsVenteErreur("Saisis une quantité valide."); return; }
@@ -1462,7 +1482,7 @@ function SuperAdminScreen() {
 
           <button
             disabled={modifierGroupeEnCours}
-            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: modifierGroupeEnCours ? "default" : "pointer" }}
+            className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: modifierGroupeEnCours ? "default" : "pointer" }}
             onClick={async () => {
               if (!modifierGroupeNom.trim()) { setModifierGroupeErreur("Le nom du groupe est obligatoire."); return; }
               setModifierGroupeEnCours(true);
@@ -1536,7 +1556,7 @@ function SuperAdminScreen() {
 
               <button
                 disabled={creationEnCours}
-                style={{ marginTop: "8px", background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, cursor: creationEnCours ? "default" : "pointer", opacity: creationEnCours ? 0.7 : 1 }}
+                className="adm-btn adm-btn-action" style={{ marginTop: "8px", cursor: creationEnCours ? "default" : "pointer", opacity: creationEnCours ? 0.7 : 1 }}
                 onClick={async () => {
                   if (!nomGroupe.trim() || !adminNom.trim() || !adminEmail.trim()) {
                     setCreationErreur("Tous les champs sont obligatoires.");
@@ -1617,7 +1637,7 @@ function SuperAdminScreen() {
                 </div>
               </div>
               <button
-                style={{ marginTop: "8px", background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}
+                className="adm-btn adm-btn-action" style={{ marginTop: "8px", cursor: "pointer" }}
                 onClick={() => setShowCreateGroupe(false)}
               >
                 Terminer
@@ -1670,7 +1690,7 @@ function SuperAdminScreen() {
 
           <button
             disabled={resetEnCours}
-            style={{ marginTop: "6px", background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, cursor: resetEnCours ? "default" : "pointer", opacity: resetEnCours ? 0.7 : 1 }}
+            className="adm-btn adm-btn-danger" style={{ marginTop: "6px", cursor: resetEnCours ? "default" : "pointer", opacity: resetEnCours ? 0.7 : 1 }}
             onClick={async () => {
               if (resetSelection === "") {
                 setResetErreur("Sélectionne une personne à réinitialiser.");
@@ -2610,7 +2630,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       t.mode === "Enchères" && !t.beneficiaireId ? (
                         <button
                           onClick={() => { setEnchereTour(t); setEnchereBeneficiaire(""); setEnchereMontant(""); setEnchereErreur(""); setShowEnchere(true); }}
-                          style={{ background: C.vifViolet, color: "#FFFFFF", border: "none", borderRadius: "7px", padding: "6px 12px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}
+                          className="adm-btn adm-btn-action" style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}
                         >
                           <Gavel size={13} /> Enregistrer l'enchère
                         </button>
@@ -2626,8 +2646,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   ])} />
 
                 {tourEnCours && tourEnCours.mode === "Enchères" && (
-                  <div style={{ marginTop: "18px", background: "#EBE6F5", border: `1px solid ${C.purple}44`, borderRadius: "12px", padding: "14px 18px", fontSize: "13.5px", color: C.purple, display: "flex", gap: "8px", alignItems: "center" }}>
-                    <Gavel size={16} /> Commission d'enchères de ce tour : <b>{fmtFCFA(tourEnCours.commissionEncheres || 0)}</b> — redistribuée aux membres à la clôture.
+                  <div style={{ marginTop: "18px", background: "#EBE6F5", border: `1px solid ${C.purple}44`, borderRadius: "12px", padding: "14px 18px", fontSize: "14px", lineHeight: 1.5, color: C.purple }}>
+                    <Gavel size={16} style={{ verticalAlign: "-3px", marginRight: "6px" }} aria-hidden="true" />Commission d'enchères de ce tour : <b>{fmtFCFA(tourEnCours.commissionEncheres || 0)}</b> — redistribuée aux membres à la clôture.
                   </div>
                 )}
 
@@ -3117,14 +3137,14 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 />
               </div>
               <button
-                style={{ background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "9px 16px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
+                className="adm-btn adm-btn-action" style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
               >
                 <Search size={14} /> Rechercher
               </button>
               {(filtreDateDebut || filtreDateFin) && (
                 <button
                   onClick={() => { setFiltreDateDebut(""); setFiltreDateFin(""); }}
-                  style={{ background: "transparent", color: C.sub, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "9px 12px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer" }}
+                  className="adm-btn adm-btn-secondaire" style={{ cursor: "pointer" }}
                 >
                   Réinitialiser
                 </button>
@@ -3636,7 +3656,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}
+            className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: "pointer" }}
             onClick={async () => {
               const soldeNum = parseInt(configSoldeMinimum.replace(/[^\d]/g, ""), 10);
               const delaiNum = parseInt(configDelaiJours.replace(/[^\d]/g, ""), 10);
@@ -3996,7 +4016,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
               <button
                 disabled={clotureApercu.membres.length === 0}
-                style={{ marginTop: "6px", background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: clotureApercu.membres.length === 0 ? "default" : "pointer", opacity: clotureApercu.membres.length === 0 ? 0.6 : 1 }}
+                className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: clotureApercu.membres.length === 0 ? "default" : "pointer", opacity: clotureApercu.membres.length === 0 ? 0.6 : 1 }}
                 onClick={() => setClotureEtape(2)}
               >
                 Continuer
@@ -4040,12 +4060,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               )}
 
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                <button onClick={() => setClotureEtape(1)} style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, color: C.sub, cursor: "pointer" }}>
+                <button onClick={() => setClotureEtape(1)} className="adm-btn adm-btn-secondaire" style={{ flex: 1, cursor: "pointer" }}>
                   Retour
                 </button>
                 <button
                   disabled={clotureEnCours}
-                  style={{ flex: 2, background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: clotureEnCours ? "default" : "pointer" }}
+                  className="adm-btn adm-btn-action" style={{ flex: 2, cursor: clotureEnCours ? "default" : "pointer" }}
                   onClick={async () => {
                     setClotureEnCours(true);
                     setClotureErreur("");
@@ -4413,7 +4433,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               )}
               <button
                 disabled={rapportJourChargement}
-                style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: rapportJourChargement ? "default" : "pointer" }}
+                className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: rapportJourChargement ? "default" : "pointer" }}
                 onClick={async () => {
                   const iso = versDateISO(rapportJourDate);
                   if (!iso) { setRapportJourErreur("Saisis une date valide (jj/mm/aaaa)."); return; }
@@ -4522,7 +4542,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
               <button
                 onClick={() => { setRapportJour(null); setRapportJourDate(""); }}
-                style={{ marginTop: "6px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+                className="adm-btn adm-btn-secondaire" style={{ marginTop: "6px", cursor: "pointer" }}
               >
                 Choisir une autre date
               </button>
@@ -4559,7 +4579,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               )}
               <button
                 disabled={rapportMoisChargement}
-                style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: rapportMoisChargement ? "default" : "pointer" }}
+                className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: rapportMoisChargement ? "default" : "pointer" }}
                 onClick={async () => {
                   setRapportMoisChargement(true);
                   setRapportMoisErreur("");
@@ -4621,7 +4641,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
               <button
                 onClick={() => setRapportMois(null)}
-                style={{ marginTop: "6px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+                className="adm-btn adm-btn-secondaire" style={{ marginTop: "6px", cursor: "pointer" }}
               >
                 Choisir un autre mois
               </button>
@@ -4653,7 +4673,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <button
             disabled={exportEnCours}
-            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: exportEnCours ? "default" : "pointer" }}
+            className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: exportEnCours ? "default" : "pointer" }}
             onClick={async () => {
               setExportEnCours(true);
               setExportErreur("");
@@ -5000,7 +5020,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 console.error("Erreur de création du type de fonds", e);
               }
             }}
-            style={{ background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "10px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn adm-btn-action" style={{ cursor: "pointer" }}
           >
             Ajouter ce type de fonds
           </button>
@@ -5062,7 +5082,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <button
             disabled={cotisationFondsEnCours}
-            style={{ marginTop: "6px", background: C.vifOr, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: cotisationFondsEnCours ? "default" : "pointer" }}
+            className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: cotisationFondsEnCours ? "default" : "pointer" }}
             onClick={async () => {
               if (!cotisationFondsTypeId) { setCotisationFondsErreur("Sélectionne un type de fonds."); return; }
               if (!cotisationFondsDate.trim()) { setCotisationFondsErreur("La date du versement est obligatoire."); return; }
@@ -5298,7 +5318,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           {!resetMembreMotDePasse && (
             <button
               disabled={resetMembreEnCours}
-              style={{ marginTop: "6px", background: C.vifViolet, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: resetMembreEnCours ? "default" : "pointer" }}
+              className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: resetMembreEnCours ? "default" : "pointer" }}
               onClick={async () => {
                 if (!resetMembreId) { setResetMembreErreur("Sélectionne un membre."); return; }
                 setResetMembreEnCours(true);
@@ -5336,7 +5356,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
             <button
               onClick={() => setShowDeleteMembre(null)}
-              style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+              className="adm-btn adm-btn-secondaire" style={{ flex: 1, cursor: "pointer" }}
             >
               Annuler
             </button>
@@ -5356,7 +5376,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   setDeleteEnCours(false);
                 }
               }}
-              style={{ flex: 1, background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, cursor: deleteEnCours ? "default" : "pointer", opacity: deleteEnCours ? 0.7 : 1 }}
+              className="adm-btn adm-btn-danger" style={{ flex: 1, cursor: deleteEnCours ? "default" : "pointer", opacity: deleteEnCours ? 0.7 : 1 }}
             >
               {deleteEnCours ? "Suppression..." : "Supprimer définitivement"}
             </button>
@@ -5394,7 +5414,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}
+            className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: "pointer" }}
             onClick={async () => {
               if (!sigMembreId) { setSigError("Sélectionnez un membre."); return; }
               try {
@@ -5454,7 +5474,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}
+            className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: "pointer" }}
             onClick={async () => {
               if (!compteNom.trim()) { setCompteError("Le nom du compte est obligatoire."); return; }
               try {
@@ -5791,7 +5811,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 setAmendeError(e.message || "Erreur lors de l'application de l'amende.");
               }
             }}
-            style={{ marginTop: "6px", background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn adm-btn-danger" style={{ marginTop: "6px", cursor: "pointer" }}
           >
             Appliquer l'amende
           </button>
@@ -5840,7 +5860,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.vifViolet, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}
+            className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: "pointer" }}
             onClick={async () => {
               const montantNum = parseInt(enchereMontant.replace(/[^\d]/g, ""), 10);
               if (!enchereBeneficiaire) { setEnchereErreur("Sélectionne le gagnant de l'enchère."); return; }
@@ -6016,7 +6036,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               {!redistributionSuccess && (
                 <button
                   disabled={redistributionEnCours}
-                  style={{ marginTop: "6px", background: C.vifRose, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: redistributionEnCours ? "default" : "pointer" }}
+                  className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: redistributionEnCours ? "default" : "pointer" }}
                   onClick={async () => {
                     setRedistributionEnCours(true);
                     setRedistributionErreur("");
@@ -6112,7 +6132,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 console.error("Erreur de création du type d'amende", e);
               }
             }}
-            style={{ background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "10px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn adm-btn-action" style={{ cursor: "pointer" }}
           >
             Ajouter ce type d'amende
           </button>
@@ -6139,7 +6159,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
           )}
           <button
-            style={{ marginTop: "6px", background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: "pointer" }}
+            className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: "pointer" }}
             onClick={async () => {
               const dateISO = versDateISO(seanceDate);
               if (!dateISO) { setSeanceCreationErreur("Date invalide (jj/mm/aaaa)."); return; }
@@ -6197,7 +6217,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 console.error("Erreur d'enregistrement des présences", e);
               }
             }}
-            style={{ background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "9px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn adm-btn-action" style={{ cursor: "pointer" }}
           >
             Enregistrer la présence
           </button>
@@ -6257,7 +6277,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         <div style={{ display: "flex", gap: "6px" }}>
                           <button
                             onClick={() => setPaiementAmendeId(null)}
-                            style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "7px", fontSize: "12px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+                            className="adm-btn adm-btn-secondaire" style={{ flex: 1, cursor: "pointer" }}
                           >
                             Annuler
                           </button>
@@ -6286,7 +6306,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                                 setPaiementEnCours(false);
                               }
                             }}
-                            style={{ flex: 1, background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "6px", padding: "7px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                            className="adm-btn adm-btn-action" style={{ flex: 1, cursor: "pointer" }}
                           >
                             {paiementEnCours ? "..." : "Confirmer"}
                           </button>
@@ -6348,7 +6368,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   console.error("Erreur d'application de l'amende", e);
                 }
               }}
-              style={{ background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}
+              className="adm-btn adm-btn-compact adm-btn-danger" style={{ cursor: "pointer" }}
             >
               Appliquer
             </button>
@@ -6372,7 +6392,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 console.error("Erreur d'enregistrement du compte-rendu", e);
               }
             }}
-            style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "10px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer" }}
+            className="adm-btn adm-btn-action" style={{ cursor: "pointer" }}
           >
             Enregistrer et clôturer la séance
           </button>
@@ -6459,7 +6479,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <button
             disabled={rafraEnCours}
-            style={{ marginTop: "6px", background: C.vifOr, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: rafraEnCours ? "default" : "pointer" }}
+            className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: rafraEnCours ? "default" : "pointer" }}
             onClick={async () => {
               const dateISO = versDateISO(rafraDate);
               if (!dateISO) { setRafraErreur("Date invalide (jj/mm/aaaa)."); return; }
@@ -6537,7 +6557,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   console.error("Erreur de création du type de dépense", e);
                 }
               }}
-              style={{ background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "13.5px", fontWeight: 600, cursor: "pointer" }}
+              className="adm-btn adm-btn-compact adm-btn-primaire" style={{ cursor: "pointer" }}
             >
               Ajouter
             </button>
@@ -6607,7 +6627,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <button
             disabled={depenseEnCours}
-            style={{ marginTop: "6px", background: C.warn, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "12px", fontSize: "14px", fontWeight: 700, cursor: depenseEnCours ? "default" : "pointer" }}
+            className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: depenseEnCours ? "default" : "pointer" }}
             onClick={async () => {
               const montant = parseInt(depenseMontant.replace(/[^\d]/g, ""), 10);
               const dateISO = versDateISO(depenseDate);
@@ -6683,7 +6703,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   setAbonnementSmsTarifEnCours(false);
                 }
               }}
-              style={{ background: C.vifBleu, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "0 14px", fontSize: "13px", fontWeight: 600, cursor: abonnementSmsTarifEnCours ? "default" : "pointer" }}
+              className="adm-btn adm-btn-compact adm-btn-primaire" style={{ cursor: abonnementSmsTarifEnCours ? "default" : "pointer" }}
             >
               {abonnementSmsTarifEnCours ? "..." : "Fixer"}
             </button>
@@ -6774,7 +6794,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       <div style={{ display: "flex", gap: "6px" }}>
                         <button
                           onClick={() => setPrelevementSmsMembreId(null)}
-                          style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "7px", fontSize: "12px", fontWeight: 600, color: C.sub, cursor: "pointer" }}
+                          className="adm-btn adm-btn-secondaire" style={{ flex: 1, cursor: "pointer" }}
                         >
                           Annuler
                         </button>
@@ -6806,7 +6826,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                               setPrelevementSmsEnCours(false);
                             }
                           }}
-                          style={{ flex: 1, background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "6px", padding: "7px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                          className="adm-btn adm-btn-action" style={{ flex: 1, cursor: "pointer" }}
                         >
                           {prelevementSmsEnCours ? "..." : "Confirmer"}
                         </button>
@@ -6931,7 +6951,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
                 <button
                   onClick={genererDatesAuto}
-                  style={{ background: C.vifOr, color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "9px", fontSize: "13.5px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                  className="adm-btn adm-btn-action" style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                 >
                   <Calendar size={14} /> Générer les dates avec le mode "{newMode}"
                 </button>
@@ -6983,7 +7003,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           )}
 
           <button
-            style={{ marginTop: "6px", background: C.accent2, color: "#FFFFFF", border: "none", borderRadius: "10px", padding: "13px", fontSize: "14.5px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}
+            className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}
             onClick={async () => {
               if (!tontineNom.trim()) { setTontineError("Le nom de la tontine est obligatoire."); setTontineSuccess(false); return; }
               if (!tontineMontant.trim()) { setTontineError("Le montant cotisé par tour est obligatoire."); setTontineSuccess(false); return; }
@@ -7407,7 +7427,7 @@ function Sidebar({ role, sub, items, active, onSelect, logoUrl }) {
           <img src={logoUrl} alt="" className="sidebar-logo" />
         ) : (
           <div className="sidebar-logo sidebar-logo-defaut" aria-hidden="true">
-            <LayoutDashboard size={18} />
+            <MarqueCauri taille={28} couleur="#16225A" fond="#FFFFFF" />
           </div>
         )}
         <div className="sidebar-titres">
@@ -7533,5 +7553,5 @@ function StatCard({ label, value, sub, icon }) {
 // Boutons des écrans d'administration. Objets de style (et non classes)
 // car les écrans les étendent en ligne : { ...btnPrimary, marginTop: "18px" }.
 // Les couleurs passent par les tokens CSS, donc suivent le thème choisi.
-const btnPrimary = { background: "var(--primary)", color: "var(--on-primary)", border: "1px solid transparent", borderRadius: "var(--radius-control)", minHeight: "44px", padding: "0 18px", fontSize: "14px", fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", boxShadow: "0 1px 2px rgba(20,32,26,0.12)", fontFamily: "inherit" };
+const btnPrimary = { background: "var(--action)", color: "var(--on-action)", border: "1px solid transparent", borderRadius: "var(--radius-control)", minHeight: "44px", padding: "0 18px", fontSize: "14px", fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", boxShadow: "0 1px 2px rgba(20,32,26,0.12)", fontFamily: "inherit" };
 const btnSecondary = { background: "var(--surface)", color: "var(--primary)", border: "1px solid var(--border-strong)", borderRadius: "var(--radius-control)", minHeight: "44px", padding: "0 16px", fontSize: "14px", fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" };
