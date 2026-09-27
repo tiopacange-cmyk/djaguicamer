@@ -8,6 +8,48 @@
 > + recherches `color`, `typography`, `product`, `ux`), puis ajusté à la marque
 > Djangui existante et vérifié en contraste WCAG.
 
+## 0. Identité « Ndop » (en vigueur, remplace les couleurs et polices des sections 2 et 3)
+
+Choisie après comparaison de trois directions (Coffre-fort, Mobile Money, Wax & Indigo) :
+**fusion A + C, intensité discrète**. La rigueur d'une banque, habillée des motifs des
+Grassfields de l'Ouest Cameroun, berceau du njangi.
+
+| Rôle | Token | Valeur | Contraste |
+|---|---|---|---|
+| Structure, sélection | `--primary` | `#16225A` indigo Ndop | blanc 14,9:1 |
+| Action principale | `--action` / `--on-action` | `#D9A521` or / texte `#16225A` | 6,6:1 |
+| Destructif, à payer | `--danger` | `#B3261E` rouge Toghu | blanc 6,5:1 |
+| Payé, à jour | `--success` | `#127A55` | sur `#E1F1E8` 4,55:1 |
+| Texte / secondaire | `--ink` / `--muted` | `#141A33` / `#5A6180` | 15,7:1 / 6,1:1 |
+| Fond / bordure champ | `--bg` / `--border-strong` | `#F6F5F1` / `#8C92AD` | bordure 3,07:1 |
+
+**Polices** : Unbounded (titres, marque) + Manrope (texte, montants).
+
+**Motifs** (SVG en data URI dans `index.css`, interprétations simplifiées) :
+
+| Motif | Sens | Où, et seulement là |
+|---|---|---|
+| Ndop (`--ndop`, `--ndop-leger`) | Communauté, tissu royal | Connexion, pages centrées, bande du menu, filigrane de l'en-tête membre |
+| Araignée (`--araignee`) | Sagesse, confiance | Filigrane de la carte tontine du membre |
+| Cauri (`MarqueCauri`) | Monnaie, prospérité | Logo (connexion, menu) |
+| Frise Toghu (`--toghu`) | Fête, réussite | Filets sous la barre de session, le menu, l'en-tête membre, en tête des fenêtres |
+
+Jamais de motif derrière du texte courant : le texte repose toujours sur un aplat indigo ou blanc.
+
+**Boutons** — une règle pour toute l'application :
+
+| Classe | Apparence | Usage |
+|---|---|---|
+| `btnPrimary`, `.adm-btn-action`, `.adm-btn-valider`, `.btn-principal` | Or, texte indigo | L'action principale d'une page ou d'un formulaire (une seule par zone) |
+| `.adm-btn-primaire`, `.adm-btn-ligne-plein`, `.adm-btn-mini` | Indigo, texte blanc | Validation secondaire, action principale d'une ligne |
+| `btnSecondary`, `.adm-btn-secondaire`, `.adm-btn-ligne` | Blanc, bordure `--border-strong` | Annuler, actions secondaires |
+| `.adm-btn-danger`, `.adm-btn-ligne-danger` | Rouge Toghu | Supprimer, réinitialiser, appliquer une amende |
+
+**Disposition** : dans l'en-tête de page (`.adm-entete`), titre à gauche, actions alignées à
+droite, l'action or toujours en dernier. Sous 600px, l'action or passe en tête sur toute la
+largeur et les autres se rangent deux par deux. Boutons de 48px (44px compacts, 36px dans
+les tableaux, 44px sur écran tactile).
+
 ## 1. Positionnement
 
 | | |
