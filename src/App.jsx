@@ -68,10 +68,43 @@ const C = {
   ink: "#141A33", sub: "#5A6180", accent: "#D9A521", accent2: "#16225A",
   border: "#E6E3DB", borderFort: "#8C92AD", bg: "#F6F5F1", panel: "#FFFFFF", purple: "#5B4B9A",
   warn: "#B3261E", warnBg: "#FBE7E4", ok: "#E1F1E8",
+  // Surfaces et teintes de fond (remplacent les couleurs écrites en dur)
+  surface: "#FFFFFF", sunken: "#FBFAF6", orBg: "#FBF1DC", purpleBg: "#EBE6F5", neutreBg: "#EFECE4", trait: "#E3DED0",
   // Couleur par module, pour distinguer les formulaires d'un coup d'œil.
   // Toutes lisibles en texte sur blanc et sur leur teinte claire (AA).
   vifOr: "#8A6410", vifVert: "#166534", vifBleu: "#1D4ED8", vifRose: "#BE185D", vifViolet: "#6D28D9", vifCorail: "#B43C0B",
 };
+
+// Mode clair / sombre de toute l'application. Le code des écrans lit ses
+// couleurs dans C à chaque affichage : on bascule C entre ces deux jeux
+// (neutres, états, couleurs de module), puis l'application se réaffiche.
+// accent / accent2 restent ceux du thème (MARQUE) en clair ; en sombre,
+// accent2 sert de couleur de texte et passe en indigo clair lisible.
+const MODE_CLAIR = {
+  ink: "#141A33", sub: "#5A6180", border: "#E6E3DB", borderFort: "#8C92AD", bg: "#F6F5F1", panel: "#FFFFFF",
+  purple: "#5B4B9A", warn: "#B3261E", warnBg: "#FBE7E4", ok: "#E1F1E8",
+  surface: "#FFFFFF", sunken: "#FBFAF6", orBg: "#FBF1DC", purpleBg: "#EBE6F5", neutreBg: "#EFECE4", trait: "#E3DED0",
+  vifOr: "#8A6410", vifVert: "#166534", vifBleu: "#1D4ED8", vifRose: "#BE185D", vifViolet: "#6D28D9", vifCorail: "#B43C0B",
+};
+const MODE_SOMBRE = {
+  ink: "#ECEEF7", sub: "#A9AECB", border: "#2A2F4D", borderFort: "#6A7092", bg: "#0E1124", panel: "#171B33",
+  purple: "#C4B8F5", warn: "#FFB4A8", warnBg: "#3A1512", ok: "#12291F",
+  surface: "#171B33", sunken: "#12162B", orBg: "#33290D", purpleBg: "#28244A", neutreBg: "#232842", trait: "#2A2F4D",
+  vifOr: "#E7BC4F", vifVert: "#7FDDA5", vifBleu: "#9DB8FF", vifRose: "#F79AC0", vifViolet: "#C3B0FF", vifCorail: "#FFA982",
+  accent2: "#A8B4F2",
+};
+let MARQUE = { accent: "#D9A521", accent2: "#16225A", purple: "#5B4B9A" };
+function appliquerMode(sombre) {
+  Object.assign(C, sombre ? MODE_SOMBRE : { ...MODE_CLAIR, accent2: MARQUE.accent2 });
+  C.accent = MARQUE.accent;
+  if (typeof document !== "undefined") document.documentElement.dataset.theme = sombre ? "dark" : "light";
+}
+function lireModeSombre() {
+  try { return localStorage.getItem("djangui-mode") !== "clair"; } catch { return true; }
+}
+function ecrireModeSombre(sombre) {
+  try { localStorage.setItem("djangui-mode", sombre ? "sombre" : "clair"); } catch { /* stockage indisponible */ }
+}
 
 // Les 3 thèmes disponibles ne changent que les couleurs de marque
 // (accent, accent2, purple) — les couleurs neutres et sémantiques
@@ -90,11 +123,110 @@ const THEMES = {
 // migré vers les classes CSS (ex. l'écran d'accueil).
 function appliquerThemeCss() {
   const racine = document.documentElement.style;
-  racine.setProperty("--brand-panel", C.accent2);
-  racine.setProperty("--primary", C.accent2);
-  racine.setProperty("--gold", C.accent);
-  racine.setProperty("--ring", C.accent);
-  racine.setProperty("--action", C.accent);
+  racine.setProperty("--brand-panel", MARQUE.accent2);
+  racine.setProperty("--primary", MARQUE.accent2);
+  racine.setProperty("--gold", MARQUE.accent);
+  racine.setProperty("--ring", MARQUE.accent);
+  racine.setProperty("--action", MARQUE.accent);
+}
+
+// Illustration de l'écran de connexion : l'épargne d'une tontine sur
+// téléphone, un graphique en hausse, des pièces, des cauris et le cercle
+// des membres. Dessinée en SVG : légère en 3G et nette sur tout écran.
+function IllustrationFinance() {
+  const police = "Manrope, 'Segoe UI', sans-serif";
+  const cauri = (x, y, r) => (
+    <g transform={`translate(${x} ${y}) rotate(${r})`}>
+      <ellipse rx="9" ry="13" fill="#FFFFFF" stroke="#C9A24A" strokeWidth="1.6" />
+      <path d="M0 -9 C2.5 -3 -2.5 3 0 9" fill="none" stroke="#16225A" strokeWidth="1.8" strokeLinecap="round" />
+    </g>
+  );
+  const pile = (x, y, n) => (
+    <g transform={`translate(${x} ${y})`}>
+      {Array.from({ length: n }).map((_, i) => (
+        <g key={i} transform={`translate(0 ${-i * 9})`}>
+          <ellipse cx="0" cy="4" rx="30" ry="10" fill="#B8860B" />
+          <ellipse cx="0" cy="0" rx="30" ry="10" fill="#D9A521" />
+        </g>
+      ))}
+      <ellipse cx="0" cy={-(n - 1) * 9} rx="20" ry="6" fill="#F2CD6B" />
+      <text x="0" y={-(n - 1) * 9 + 4} textAnchor="middle" fontFamily={police} fontSize="10" fontWeight="800" fill="#8A6410">F</text>
+    </g>
+  );
+  return (
+    <svg viewBox="0 0 520 420" role="img" aria-label="Illustration : l'épargne d'une tontine suivie sur téléphone, avec un graphique en hausse, des pièces et des cauris">
+      <defs>
+        <linearGradient id="illu-aire" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#D9A521" stopOpacity="0.28" />
+          <stop offset="1" stopColor="#D9A521" stopOpacity="0" />
+        </linearGradient>
+        <filter id="illu-ombre" x="-20%" y="-20%" width="140%" height="160%">
+          <feDropShadow dx="0" dy="10" stdDeviation="12" floodColor="#16225A" floodOpacity="0.16" />
+        </filter>
+      </defs>
+
+      {/* Fonds doux */}
+      <circle cx="320" cy="200" r="175" fill="#FBF1DC" />
+      <circle cx="140" cy="300" r="95" fill="#E9ECF6" />
+
+      {/* Courbe de croissance */}
+      <path d="M30 340 L120 290 L190 305 L280 225 L370 195 L480 95 L480 360 L30 360 Z" fill="url(#illu-aire)" />
+      <polyline points="30,340 120,290 190,305 280,225 370,195 480,95" fill="none" stroke="#D9A521" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M458 92 L484 90 L478 116 Z" fill="#D9A521" />
+
+      {/* Cercle des membres (la tontine) */}
+      <g transform="translate(118 92)">
+        <circle r="46" fill="none" stroke="#16225A" strokeOpacity="0.28" strokeWidth="2" strokeDasharray="5 6" />
+        {[["#D9A521", "PE", 0, -46], ["#127A55", "JM", 46, 0], ["#B3261E", "AB", 0, 46], ["#16225A", "SN", -46, 0]].map(([c, t, x, y]) => (
+          <g key={t} transform={`translate(${x} ${y})`}>
+            <circle r="17" fill={c} stroke="#FFFFFF" strokeWidth="3" />
+            <text y="4" textAnchor="middle" fontFamily={police} fontSize="10" fontWeight="800" fill="#FFFFFF">{t}</text>
+          </g>
+        ))}
+        <circle r="19" fill="#FFFFFF" />
+        <text y="5" textAnchor="middle" fontFamily={police} fontSize="13" fontWeight="800" fill="#16225A">4/4</text>
+      </g>
+
+      {/* Téléphone */}
+      <g transform="translate(262 36)" filter="url(#illu-ombre)">
+        <rect width="176" height="336" rx="30" fill="#16225A" />
+        <rect x="10" y="12" width="156" height="312" rx="22" fill="#FFFFFF" />
+        <rect x="66" y="20" width="44" height="6" rx="3" fill="#E6E3DB" />
+        <rect x="22" y="38" width="132" height="84" rx="16" fill="#16225A" />
+        <text x="36" y="62" fontFamily={police} fontSize="10" fontWeight="700" fill="#B7BEE0">Mon épargne</text>
+        <text x="36" y="90" fontFamily={police} fontSize="21" fontWeight="800" fill="#FFFFFF">274 000 F</text>
+        <rect x="36" y="100" width="46" height="14" rx="7" fill="#D9A521" />
+        <text x="59" y="110" textAnchor="middle" fontFamily={police} fontSize="9" fontWeight="800" fill="#16225A">+12 %</text>
+        {[[34, 36], [58, 52], [82, 44], [106, 66], [130, 84]].map(([x, h], i) => (
+          <rect key={x} x={x} y={222 - h} width="16" height={h} rx="4" fill={i === 4 ? "#D9A521" : "#C9CEE8"} />
+        ))}
+        <rect x="22" y="236" width="132" height="34" rx="10" fill="#F6F5F1" />
+        <circle cx="40" cy="253" r="9" fill="#E1F1E8" />
+        <rect x="56" y="246" width="56" height="6" rx="3" fill="#8C92AD" />
+        <rect x="56" y="256" width="36" height="5" rx="2.5" fill="#C9CEE8" />
+        <rect x="22" y="276" width="132" height="34" rx="10" fill="#F6F5F1" />
+        <circle cx="40" cy="293" r="9" fill="#FBF1DC" />
+        <rect x="56" y="286" width="64" height="6" rx="3" fill="#8C92AD" />
+        <rect x="56" y="296" width="30" height="5" rx="2.5" fill="#C9CEE8" />
+      </g>
+
+      {/* Notification « cotisation reçue » */}
+      <g transform="translate(52 176)" filter="url(#illu-ombre)">
+        <rect width="206" height="66" rx="16" fill="#FFFFFF" />
+        <circle cx="33" cy="33" r="18" fill="#E1F1E8" />
+        <path d="M25 33 L31 39 L42 27" fill="none" stroke="#127A55" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+        <text x="62" y="29" fontFamily={police} fontSize="12" fontWeight="700" fill="#141A33">Cotisation reçue</text>
+        <text x="62" y="49" fontFamily={police} fontSize="15" fontWeight="800" fill="#127A55">+50 000 FCFA</text>
+      </g>
+
+      {/* Pièces et cauris */}
+      {pile(96, 372, 5)}
+      {pile(170, 386, 3)}
+      {cauri(222, 382, 30)}
+      {cauri(246, 394, -20)}
+      {cauri(58, 396, 60)}
+    </svg>
+  );
 }
 
 // Logo Djangui : un cauri, l'ancienne monnaie de l'Ouest Cameroun.
@@ -113,6 +245,10 @@ function MarqueCauri({ taille = 24, couleur = "#16225A", fond = "#F4EFE4" }) {
 }
 
 export default function AppPrototype() {
+  // Mode sombre par défaut pour toute l'application, mémorisé sur l'appareil.
+  const [sombre, setSombre] = useState(lireModeSombre);
+  appliquerMode(sombre);
+  const basculerMode = () => setSombre((v) => { ecrireModeSombre(!v); return !v; });
   const [chargementSession, setChargementSession] = useState(true);
   const [connecte, setConnecte] = useState(false);
   const [monProfil, setMonProfil] = useState(null);
@@ -129,7 +265,8 @@ export default function AppPrototype() {
       // l'application tourne, donc aucun risque lié aux couleurs.
       try {
         const theme = await fetchThemeActuel();
-        Object.assign(C, THEMES[theme] || THEMES.vert);
+        MARQUE = { ...(THEMES[theme] || THEMES.vert) };
+        Object.assign(C, MARQUE);
         appliquerThemeCss();
       } catch (eTheme) {
         console.error("Erreur de chargement du thème", eTheme);
@@ -203,7 +340,7 @@ export default function AppPrototype() {
   if (!connecte) {
     return (
       <div style={{ fontFamily: "var(--font-sans)" }}>
-        <ConnexionScreen onLoggedIn={chargerSessionEtRole} />
+        <ConnexionScreen onLoggedIn={chargerSessionEtRole} sombre={sombre} onBasculerMode={basculerMode} />
       </div>
     );
   }
@@ -234,6 +371,15 @@ export default function AppPrototype() {
           )}
         </div>
         <div className="barre-session-actions">
+          <button
+            type="button"
+            onClick={basculerMode}
+            className="barre-session-btn barre-session-mode"
+            aria-label={sombre ? "Passer en mode clair" : "Passer en mode sombre"}
+            title={sombre ? "Mode clair" : "Mode sombre"}
+          >
+            {sombre ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
+          </button>
           {groupeAdmin && !estSuperAdmin && (
             <button
               type="button"
@@ -282,8 +428,9 @@ export default function AppPrototype() {
 // ============================================================
 // ÉCRAN 1 — CONNEXION
 // ============================================================
-function ConnexionScreen({ onLoggedIn }) {
-  const [dark, setDark] = useState(false);
+function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
+  // Le mode (sombre par défaut) est celui de toute l'application.
+  const dark = sombre;
   const [identifiant, setIdentifiant] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -344,50 +491,36 @@ function ConnexionScreen({ onLoggedIn }) {
   return (
     <div className="accueil" data-theme={dark ? "dark" : "light"}>
       {/* Panneau de marque : mission + preuves de confiance */}
-      <section className="accueil-marque" aria-labelledby="accueil-titre">
-        <div className="accueil-marque-bloc">
-        <div className="accueil-logo">
-          <div className="accueil-logo-mark" aria-hidden="true">
-            <MarqueCauri taille={30} couleur="#16225A" fond="#FFFFFF" />
+      <section className="accueil-marque accueil-v3" aria-labelledby="accueil-titre">
+        <div className="accueil-contenu">
+          <div className="accueil-logo">
+            <div className="accueil-logo-mark" aria-hidden="true">
+              <MarqueCauri taille={30} couleur="#16225A" fond="#FFFFFF" />
+            </div>
+            <div>
+              <div className="accueil-logo-nom">DJANGUI CMR</div>
+              <div className="accueil-logo-sub">By 3Tsolution Sarl</div>
+            </div>
           </div>
-          <div>
-            <div className="accueil-logo-nom">DJANGUI CMR</div>
-            <div className="accueil-logo-sub">By 3Tsolution Sarl</div>
+
+          <div className="accueil-texte">
+            <p id="accueil-titre" className="accueil-titre">
+              Votre tontine, <em>claire et sereine.</em>
+            </p>
+            <p className="accueil-intro">
+              Cotisations, tours, épargne, prêts et assurance de votre groupe réunis au même endroit, visibles par chaque membre.
+            </p>
           </div>
-        </div>
 
-        <div>
-          <p id="accueil-titre" className="accueil-titre">
-            Votre tontine, <em>claire et sereine.</em>
-          </p>
-          <p className="accueil-intro">
-            Cotisations, tours, épargne, prêts et assurance de votre groupe réunis au même endroit, visibles par chaque membre.
-          </p>
-        </div>
+          <figure className="accueil-illustration">
+            <IllustrationFinance />
+          </figure>
 
-        <ul className="accueil-preuves">
-          <li className="accueil-preuve">
-            <div className="accueil-preuve-icone" aria-hidden="true"><ListChecks size={18} /></div>
-            <div>
-              <strong>Chaque franc est tracé</strong>
-              <span>Cotisations suivies tour par tour, soldes à jour pour tous.</span>
-            </div>
-          </li>
-          <li className="accueil-preuve">
-            <div className="accueil-preuve-icone" aria-hidden="true"><MessageSquareText size={18} /></div>
-            <div>
-              <strong>Confirmation par SMS</strong>
-              <span>Chaque opération sur votre compte vous est notifiée.</span>
-            </div>
-          </li>
-          <li className="accueil-preuve">
-            <div className="accueil-preuve-icone" aria-hidden="true"><ShieldCheck size={18} /></div>
-            <div>
-              <strong>Accès selon le rôle</strong>
-              <span>Président, trésorier ou membre : chacun voit ce qui le concerne.</span>
-            </div>
-          </li>
-        </ul>
+          <ul className="accueil-puces">
+            <li><ListChecks size={16} aria-hidden="true" /> Chaque franc tracé</li>
+            <li><MessageSquareText size={16} aria-hidden="true" /> Confirmation par SMS</li>
+            <li><ShieldCheck size={16} aria-hidden="true" /> Accès selon le rôle</li>
+          </ul>
         </div>
       </section>
 
@@ -397,12 +530,11 @@ function ConnexionScreen({ onLoggedIn }) {
           <button
             type="button"
             className="btn-pastille"
-            onClick={() => setDark(!dark)}
-            aria-label="Mode sombre"
-            aria-pressed={dark}
+            onClick={onBasculerMode}
+            aria-label={dark ? "Passer en mode clair" : "Passer en mode sombre"}
           >
             {dark ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
-            <span className="btn-pastille-texte">Mode sombre</span>
+            <span className="btn-pastille-texte">{dark ? "Mode clair" : "Mode sombre"}</span>
           </button>
         </div>
 
@@ -563,7 +695,7 @@ function Field({ label, placeholder, border, dark, sub, ink }) {
   return (
     <div>
       <label style={{ fontSize: "12px", color: sub, marginBottom: "6px", display: "block" }}>{label}</label>
-      <input placeholder={placeholder} style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : "#FBFAF6", color: ink, fontSize: "14px", outline: "none" }} />
+      <input placeholder={placeholder} style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", borderRadius: "10px", border: `1px solid ${border}`, background: dark ? "#171C1E" : C.sunken, color: ink, fontSize: "14px", outline: "none" }} />
     </div>
   );
 }
@@ -601,7 +733,7 @@ function ChangerMotDePasseScreen({ onDone }) {
   };
 
   return (
-    <div className="page-centree" data-theme="light">
+    <div className="page-centree">
       <div className="carte-auth">
         <div className="page-centree-icone" aria-hidden="true">
           <KeyRound size={24} />
@@ -797,8 +929,8 @@ function SuperAdminScreen() {
   }, []);
 
   const planColor = { Basic: C.sub, Standard: C.accent2, Pro: C.accent, Essai: C.purple };
-  const statusStyle = { actif: { bg: C.ok, fg: C.accent2 }, "en retard": { bg: C.warnBg, fg: C.warn }, essai: { bg: "#EBE6F5", fg: C.purple } };
-  const typeStyle = { urgence: { bg: "#FBF1DC", fg: C.accent }, "création": { bg: C.ok, fg: C.accent2 }, abonnement: { bg: "#EBE6F5", fg: C.purple } };
+  const statusStyle = { actif: { bg: C.ok, fg: C.accent2 }, "en retard": { bg: C.warnBg, fg: C.warn }, essai: { bg: C.purpleBg, fg: C.purple } };
+  const typeStyle = { urgence: { bg: C.orBg, fg: C.accent }, "création": { bg: C.ok, fg: C.accent2 }, abonnement: { bg: C.purpleBg, fg: C.purple } };
 
   return (
     <div className="app-layout" style={{ minHeight: "680px", background: C.bg, display: "flex", color: C.ink }}>
@@ -827,7 +959,7 @@ function SuperAdminScreen() {
             ) : (
               <>
                 <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginBottom: "22px" }}>
-                  <div style={{ flex: "1 1 220px", background: C.accent2, borderRadius: "14px", padding: "18px 20px", color: "#FFFFFF" }}>
+                  <div style={{ flex: "1 1 220px", background: "var(--primary)", borderRadius: "14px", padding: "18px 20px", color: "#FFFFFF" }}>
                     <div style={{ fontSize: "12px", opacity: 0.85 }}>Revenu total encaissé</div>
                     <div style={{ fontSize: "24px", fontWeight: 700, marginTop: "4px" }}>{fmtFCFA(statsPlateforme.revenuTotal)}</div>
                   </div>
@@ -858,7 +990,7 @@ function SuperAdminScreen() {
                   <div style={{ flex: "1 1 320px" }}>
                     <h2 className="adm-h2">Expirent bientôt (7 jours)</h2>
                     {statsPlateforme.expirentBientot.length === 0 ? (
-                      <div style={{ fontSize: "13.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "14px", textAlign: "center" }}>
+                      <div style={{ fontSize: "13.5px", color: C.sub, background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "14px", textAlign: "center" }}>
                         Aucun groupe n'expire dans les 7 prochains jours.
                       </div>
                     ) : (
@@ -877,7 +1009,7 @@ function SuperAdminScreen() {
                     <h2 className="adm-h2">Groupes récents</h2>
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                       {statsPlateforme.groupesRecents.map((g, i) => (
-                        <div key={i} style={{ display: "flex", justifyContent: "space-between", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 12px", fontSize: "13.5px" }}>
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 12px", fontSize: "13.5px" }}>
                           <span>{g.nom}</span>
                           <span style={{ color: C.sub }}>{new Date(g.date).toLocaleDateString("fr-FR")}</span>
                         </div>
@@ -1262,7 +1394,7 @@ function SuperAdminScreen() {
                 <div
                   key={p}
                   onClick={() => setRenouvelerPeriodicite(p)}
-                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${renouvelerPeriodicite === p ? C.vifVert : C.border}`, background: renouvelerPeriodicite === p ? `${C.vifVert}14` : "#FBFAF6", fontSize: "13px", fontWeight: 600, color: renouvelerPeriodicite === p ? C.vifVert : C.sub, cursor: "pointer" }}
+                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${renouvelerPeriodicite === p ? C.vifVert : C.border}`, background: renouvelerPeriodicite === p ? `${C.vifVert}14` : C.sunken, fontSize: "13px", fontWeight: 600, color: renouvelerPeriodicite === p ? C.vifVert : C.sub, cursor: "pointer" }}
                 >
                   {p}
                 </div>
@@ -1372,7 +1504,7 @@ function SuperAdminScreen() {
                 <div
                   key={mode}
                   onClick={() => setSmsVenteMode(mode)}
-                  style={{ flex: 1, textAlign: "center", padding: "7px 4px", borderRadius: "7px", border: `1px solid ${smsVenteMode === mode ? C.vifBleu : C.border}`, background: smsVenteMode === mode ? `${C.vifBleu}14` : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: smsVenteMode === mode ? C.vifBleu : C.sub, cursor: "pointer" }}
+                  style={{ flex: 1, textAlign: "center", padding: "7px 4px", borderRadius: "7px", border: `1px solid ${smsVenteMode === mode ? C.vifBleu : C.border}`, background: smsVenteMode === mode ? `${C.vifBleu}14` : C.sunken, fontSize: "12px", fontWeight: 600, color: smsVenteMode === mode ? C.vifBleu : C.sub, cursor: "pointer" }}
                 >
                   {mode}
                 </div>
@@ -1419,7 +1551,7 @@ function SuperAdminScreen() {
               <div className="adm-surtitre adm-surtitre-espace">Historique</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "180px", overflowY: "auto" }}>
                 {smsHistorique.map((h) => (
-                  <div key={h.id} style={{ display: "flex", justifyContent: "space-between", background: "#FBFAF6", borderRadius: "7px", padding: "6px 10px", fontSize: "12.5px" }}>
+                  <div key={h.id} style={{ display: "flex", justifyContent: "space-between", background: C.sunken, borderRadius: "7px", padding: "6px 10px", fontSize: "12.5px" }}>
                     <span>{h.type === "achat" ? `Achat${h.mode_paiement ? ` (${h.mode_paiement})` : ""}` : "Envoi SMS"}</span>
                     <b style={{ color: h.quantite >= 0 ? C.accent2 : C.warn }}>{h.quantite >= 0 ? "+" : ""}{h.quantite}</b>
                   </div>
@@ -1440,7 +1572,7 @@ function SuperAdminScreen() {
               {modifierGroupeLogo ? (
                 <img src={modifierGroupeLogo} alt="Logo" style={{ width: "44px", height: "44px", borderRadius: "9px", objectFit: "cover", border: `1px solid ${C.border}` }} />
               ) : (
-                <div style={{ width: "44px", height: "44px", borderRadius: "9px", background: "#FBFAF6", border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: "44px", height: "44px", borderRadius: "9px", background: C.sunken, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Building2 size={18} color={C.sub} />
                 </div>
               )}
@@ -1531,7 +1663,7 @@ function SuperAdminScreen() {
                       <div
                         key={p}
                         onClick={() => setCreationPeriodicite(p)}
-                        style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${creationPeriodicite === p ? C.accent2 : C.border}`, background: creationPeriodicite === p ? C.ok : "#FBFAF6", fontSize: "13px", fontWeight: 600, color: creationPeriodicite === p ? C.accent2 : C.sub, cursor: "pointer" }}
+                        style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${creationPeriodicite === p ? C.accent2 : C.border}`, background: creationPeriodicite === p ? C.ok : C.sunken, fontSize: "13px", fontWeight: 600, color: creationPeriodicite === p ? C.accent2 : C.sub, cursor: "pointer" }}
                       >
                         {p}
                       </div>
@@ -1595,13 +1727,13 @@ function SuperAdminScreen() {
                   Groupe <b>{resultatCreation.groupe.nom}</b> créé avec succès.
                 </div>
               </div>
-              <div style={{ fontSize: "13px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "12px" }}>
+              <div style={{ fontSize: "13px", background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "12px" }}>
                 <div style={{ marginBottom: "6px" }}>Identifiants de l'administrateur à lui communiquer :</div>
                 <div><b>Identifiant de connexion :</b> {resultatCreation.identifiant}</div>
                 <div><b>Mot de passe temporaire :</b> {resultatCreation.motDePasseTemp}</div>
                 <div style={{ color: C.sub, fontSize: "12px", marginTop: "4px" }}>(Email associé : {resultatCreation.adminEmail})</div>
               </div>
-              <div style={{ fontSize: "13px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "12px" }}>
+              <div style={{ fontSize: "13px", background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "12px" }}>
                 <div style={{ marginBottom: "8px" }}>Logo du groupe (optionnel)</div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   {logoGroupeUrl && (
@@ -2057,7 +2189,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
   useEffect(() => { if (view === "banque" || view === "bilan") rechargerPrets(); }, [groupId, view]);
 
-  const tourStatus = { "clôturé": { bg: C.ok, fg: C.accent2 }, "en cours": { bg: "#FBF1DC", fg: C.vifOr }, "à venir": { bg: "#EFECE4", fg: C.sub } };
+  const tourStatus = { "clôturé": { bg: C.ok, fg: C.accent2 }, "en cours": { bg: C.orBg, fg: C.vifOr }, "à venir": { bg: C.neutreBg, fg: C.sub } };
 
   const [showAmende, setShowAmende] = useState(null);
   const [amendeMontant, setAmendeMontant] = useState("");
@@ -2646,7 +2778,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   ])} />
 
                 {tourEnCours && tourEnCours.mode === "Enchères" && (
-                  <div style={{ marginTop: "18px", background: "#EBE6F5", border: `1px solid ${C.purple}44`, borderRadius: "12px", padding: "14px 18px", fontSize: "14px", lineHeight: 1.5, color: C.purple }}>
+                  <div style={{ marginTop: "18px", background: C.purpleBg, border: `1px solid ${C.purple}44`, borderRadius: "12px", padding: "14px 18px", fontSize: "14px", lineHeight: 1.5, color: C.purple }}>
                     <Gavel size={16} style={{ verticalAlign: "-3px", marginRight: "6px" }} aria-hidden="true" />Commission d'enchères de ce tour : <b>{fmtFCFA(tourEnCours.commissionEncheres || 0)}</b> — redistribuée aux membres à la clôture.
                   </div>
                 )}
@@ -2749,7 +2881,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   <button style={btnSecondary} onClick={() => { setCreditEpargneId(""); setCreditMembreId(""); setCreditMontant(""); setCreditFraisDossier(""); setCreditCommission(""); setCreditPenalite(""); setCreditDebut(""); setCreditFin(""); setCreditDepasseCaution(false); setCreditAvalisteId(""); setCreditError(""); setCreditSuccess(false); setShowCreditForm(true); }}><Plus size={14} /> Mettre en place un crédit</button>
                 </div>
                 <Table cols={["Membre", "Montant", "Avaliste", "Statut", "Échéance"]} widths="1.4fr 1fr 1.2fr 1fr 1fr"
-                  rows={prets.map((p) => [p.membre, p.montant, p.avaliste, <Badge bg={p.statut === "remboursé" ? C.ok : "#FBF1DC"} fg={p.statut === "remboursé" ? C.accent2 : C.vifOr}>{p.statut}</Badge>, p.echeance])} />
+                  rows={prets.map((p) => [p.membre, p.montant, p.avaliste, <Badge bg={p.statut === "remboursé" ? C.ok : C.orBg} fg={p.statut === "remboursé" ? C.accent2 : C.vifOr}>{p.statut}</Badge>, p.echeance])} />
               </>
             )}
 
@@ -2806,7 +2938,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
 
             {typesFonds.length === 0 ? (
-              <div style={{ marginTop: "22px", fontSize: "14px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
+              <div style={{ marginTop: "22px", fontSize: "14px", color: C.sub, background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
                 Aucun type de fonds créé pour l'instant — clique "Types de fonds" pour en ajouter un (ex. Fonds de garantie).
               </div>
             ) : (
@@ -2822,13 +2954,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         <div>
                           <div style={{ fontSize: "12.5px", fontWeight: 600 }}>{fmtFCFA(f.solde)} / {fmtFCFA(f.cible)}</div>
                           {f.cible > 0 && (
-                            <div style={{ width: "100%", height: "5px", background: "#E3DED0", borderRadius: "3px", marginTop: "4px", overflow: "hidden" }}>
+                            <div style={{ width: "100%", height: "5px", background: C.trait, borderRadius: "3px", marginTop: "4px", overflow: "hidden" }}>
                               <div style={{ width: `${Math.min(100, (f.solde / f.cible) * 100)}%`, height: "100%", background: atteint ? C.accent2 : C.accent }} />
                             </div>
                           )}
                         </div>,
                         f.cible > 0 ? (
-                          <Badge bg={atteint ? C.ok : "#FBF1DC"} fg={atteint ? C.accent2 : C.vifOr}>{atteint ? "objectif atteint" : "en cours"}</Badge>
+                          <Badge bg={atteint ? C.ok : C.orBg} fg={atteint ? C.accent2 : C.vifOr}>{atteint ? "objectif atteint" : "en cours"}</Badge>
                         ) : (
                           <span style={{ color: C.sub, fontSize: 12.5 }}>pas d'objectif</span>
                         ),
@@ -2871,7 +3003,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
 
             {seancesList.length === 0 ? (
-              <div style={{ marginTop: "22px", fontSize: "14px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
+              <div style={{ marginTop: "22px", fontSize: "14px", color: C.sub, background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
                 Aucune séance créée pour l'instant.
               </div>
             ) : (
@@ -2882,7 +3014,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     s.date,
                     s.lieu || "—",
                     <span style={{ color: C.sub, fontSize: 13 }}>{s.ordreDuJour || "—"}</span>,
-                    <Badge bg={s.statut === "terminée" ? C.ok : "#FBF1DC"} fg={s.statut === "terminée" ? C.accent2 : C.vifOr}>{s.statut}</Badge>,
+                    <Badge bg={s.statut === "terminée" ? C.ok : C.orBg} fg={s.statut === "terminée" ? C.accent2 : C.vifOr}>{s.statut}</Badge>,
                     <button
                       onClick={async () => {
                         setShowDetailSeance(s);
@@ -2951,7 +3083,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
 
             {rafraichissementsList.length === 0 ? (
-              <div style={{ fontSize: "14px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
+              <div style={{ fontSize: "14px", color: C.sub, background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
                 Aucun rafraîchissement enregistré pour l'instant.
               </div>
             ) : (
@@ -2989,7 +3121,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
 
             {depensesList.length === 0 ? (
-              <div style={{ marginTop: "14px", fontSize: "14px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
+              <div style={{ marginTop: "14px", fontSize: "14px", color: C.sub, background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center" }}>
                 Aucune dépense enregistrée pour l'instant.
               </div>
             ) : (
@@ -3084,7 +3216,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
 
             {comptesBancaires.length === 0 ? (
-              <div style={{ marginTop: "22px", fontSize: "13.5px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px" }}>
+              <div style={{ marginTop: "22px", fontSize: "13.5px", color: C.sub, background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "16px" }}>
                 Aucun compte bancaire enregistré pour ce groupe. Clique "Créer un compte" pour ajouter ton premier compte (courant ou épargne).
               </div>
             ) : (
@@ -3124,7 +3256,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   value={filtreDateDebut}
                   onChange={(e) => setFiltreDateDebut(e.target.value)}
                   placeholder="jj/mm/aaaa"
-                  style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none" }}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }}
                 />
               </div>
               <div style={{ flex: 1 }}>
@@ -3133,7 +3265,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   value={filtreDateFin}
                   onChange={(e) => setFiltreDateFin(e.target.value)}
                   placeholder="jj/mm/aaaa"
-                  style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none" }}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }}
                 />
               </div>
               <button
@@ -3159,7 +3291,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               rows={depots.map((d) => {
                 const typeStyle = {
                   "Dépôt": { bg: C.ok, fg: C.accent2 },
-                  "Retrait": { bg: "#EBE6F5", fg: C.purple },
+                  "Retrait": { bg: C.purpleBg, fg: C.purple },
                   "Frais": { bg: C.warnBg, fg: C.warn },
                   "Intérêt": { bg: `${C.vifVert}1A`, fg: C.vifVert },
                 };
@@ -3268,7 +3400,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     return [
                       m.nom,
                       fmtFCFA(info.solde),
-                      <div style={{ width: "100%", height: "5px", background: "#E3DED0", borderRadius: "3px", overflow: "hidden" }}>
+                      <div style={{ width: "100%", height: "5px", background: C.trait, borderRadius: "3px", overflow: "hidden" }}>
                         <div style={{ width: `${Math.min(100, soldeMinimum > 0 ? (info.solde / soldeMinimum) * 100 : 100)}%`, height: "100%", background: aJour ? C.accent2 : C.warn }} />
                       </div>,
                       aJour
@@ -3457,7 +3589,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     {fmtFCFA(fg?.solde || 0)} / {fmtFCFA(fg?.cible || 0)}
                   </div>
                   {fg && fg.cible > 0 && (
-                    <div style={{ width: "100%", height: "5px", background: "#E3DED0", borderRadius: "3px", marginTop: "4px", overflow: "hidden" }}>
+                    <div style={{ width: "100%", height: "5px", background: C.trait, borderRadius: "3px", marginTop: "4px", overflow: "hidden" }}>
                       <div style={{ width: `${Math.min(100, (fg.solde / fg.cible) * 100)}%`, height: "100%", background: fg.solde >= fg.cible ? C.accent2 : C.accent }} />
                     </div>
                   )}
@@ -3799,13 +3931,13 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     value={d.label}
                     onChange={(e) => updateDeduction(i, "label", e.target.value)}
                     placeholder="Ex. Achat de couronne"
-                    style={{ flex: 1.4, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none" }}
+                    style={{ flex: 1.4, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }}
                   />
                   <input
                     value={d.montant}
                     onChange={(e) => updateDeduction(i, "montant", e.target.value)}
                     placeholder="Montant"
-                    style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none", textAlign: "right" }}
+                    style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none", textAlign: "right" }}
                   />
                   <X size={14} color={C.sub} style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => removeDeduction(i)} />
                 </div>
@@ -4003,7 +4135,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   {clotureApercu.membres.map((m) => (
-                    <div key={m.membreId} style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px", fontSize: "13px" }}>
+                    <div key={m.membreId} style={{ background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px", fontSize: "13px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
                         <b>{m.nom}</b>
                         <b style={{ color: C.accent2 }}>{fmtFCFA(m.total)}</b>
@@ -4039,7 +4171,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         <div
                           key={opt}
                           onClick={() => setClotureDecisions({ ...clotureDecisions, [m.membreId]: opt })}
-                          style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "7px", border: `1px solid ${clotureDecisions[m.membreId] === opt ? C.vifRose : C.border}`, background: clotureDecisions[m.membreId] === opt ? `${C.vifRose}14` : "#FFFFFF", fontSize: "12px", fontWeight: 600, color: clotureDecisions[m.membreId] === opt ? C.vifRose : C.sub, cursor: "pointer" }}
+                          style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "7px", border: `1px solid ${clotureDecisions[m.membreId] === opt ? C.vifRose : C.border}`, background: clotureDecisions[m.membreId] === opt ? `${C.vifRose}14` : C.surface, fontSize: "12px", fontWeight: 600, color: clotureDecisions[m.membreId] === opt ? C.vifRose : C.sub, cursor: "pointer" }}
                         >
                           {opt === "recuperer" ? "Récupérer" : "Reconduire"}
                         </div>
@@ -4109,7 +4241,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 <div
                   key={m}
                   onClick={() => setEpargneType(m)}
-                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${epargneType === m ? C.accent2 : C.border}`, background: epargneType === m ? C.ok : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: epargneType === m ? C.accent2 : C.sub, cursor: "pointer" }}
+                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${epargneType === m ? C.accent2 : C.border}`, background: epargneType === m ? C.ok : C.sunken, fontSize: "12px", fontWeight: 600, color: epargneType === m ? C.accent2 : C.sub, cursor: "pointer" }}
                 >
                   {m}
                 </div>
@@ -4306,7 +4438,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             Le taux ou montant de pénalité est fixé par l'admin du groupe et s'applique automatiquement dès l'échéance dépassée.
           </div>
 
-          <div style={{ fontSize: "12.5px", color: C.sub, background: "#EBE6F5", border: `1px solid ${C.purple}44`, borderRadius: "8px", padding: "9px 11px" }}>
+          <div style={{ fontSize: "12.5px", color: C.sub, background: C.purpleBg, border: `1px solid ${C.purple}44`, borderRadius: "8px", padding: "9px 11px" }}>
             <b style={{ color: C.purple }}>Renouvellement</b> — ce membre a droit à un renouvellement unique de ce crédit, sous réserve du paiement des frais de mise en place à chaque renouvellement.
           </div>
 
@@ -4618,7 +4750,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               ) : (
                 <RapportSection titre="Par module">
                   {Object.entries(rapportMois.parModule).map(([module, t]) => (
-                    <div key={module} style={{ background: "#FBFAF6", borderRadius: "7px", padding: "8px 10px", fontSize: "13px" }}>
+                    <div key={module} style={{ background: C.sunken, borderRadius: "7px", padding: "8px 10px", fontSize: "13px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
                         <b>{module}</b>
                         <span style={{ color: C.sub }}>{t.nb} mouvement(s)</span>
@@ -4730,7 +4862,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             <div
               style={{
                 width: "88px", height: "88px", borderRadius: "10px",
-                border: `2px dashed ${C.border}`, background: "#FBFAF6",
+                border: `2px dashed ${C.border}`, background: C.sunken,
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                 gap: "4px", cursor: "pointer",
               }}
@@ -4753,7 +4885,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 <div
                   key={t}
                   onClick={() => setLogementType(t)}
-                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${logementType === t ? C.accent2 : C.border}`, background: logementType === t ? C.ok : "#FBFAF6", fontSize: "13px", fontWeight: 600, color: logementType === t ? C.accent2 : C.sub, cursor: "pointer" }}
+                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${logementType === t ? C.accent2 : C.border}`, background: logementType === t ? C.ok : C.sunken, fontSize: "13px", fontWeight: 600, color: logementType === t ? C.accent2 : C.sub, cursor: "pointer" }}
                 >
                   {t}
                 </div>
@@ -4795,7 +4927,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             <div
               style={{
                 border: `1.5px dashed ${C.border}`, borderRadius: "10px", padding: "16px",
-                textAlign: "center", background: "#FBFAF6", cursor: "pointer",
+                textAlign: "center", background: C.sunken, cursor: "pointer",
               }}
             >
               <div style={{ fontSize: "13px", fontWeight: 600, color: C.accent2 }}>+ Joindre des fichiers</div>
@@ -4808,7 +4940,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 { nom: "CNI_recto_verso.pdf" },
                 { nom: "Plan_localisation.jpg" },
               ].map((f, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", fontSize: "13px" }}>
+                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.surface, fontSize: "13px" }}>
                   <span>{f.nom}</span>
                   <X size={13} color={C.sub} style={{ cursor: "pointer" }} />
                 </div>
@@ -4823,7 +4955,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 <div
                   key={t}
                   onClick={() => setRoleType(t)}
-                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${roleType === t ? C.accent2 : C.border}`, background: roleType === t ? C.ok : "#FBFAF6", fontSize: "13px", fontWeight: 600, color: roleType === t ? C.accent2 : C.sub, cursor: "pointer" }}
+                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${roleType === t ? C.accent2 : C.border}`, background: roleType === t ? C.ok : C.sunken, fontSize: "13px", fontWeight: 600, color: roleType === t ? C.accent2 : C.sub, cursor: "pointer" }}
                 >
                   {t}
                 </div>
@@ -4959,7 +5091,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {typesFonds.map((t) => (
-              <div key={t.id} style={{ padding: "10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
+              <div key={t.id} style={{ padding: "10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.sunken }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
                   <span style={{ fontSize: "14px", fontWeight: 600 }}>{t.nom}</span>
                   <X
@@ -4981,7 +5113,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     value={cibleTypeInputs[t.id] ?? String(t.cible || "")}
                     onChange={(e) => setCibleTypeInputs({ ...cibleTypeInputs, [t.id]: e.target.value })}
                     placeholder="Objectif commun (FCFA)"
-                    style={{ flex: 1, boxSizing: "border-box", padding: "8px 9px", borderRadius: "7px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13px", outline: "none" }}
+                    style={{ flex: 1, boxSizing: "border-box", padding: "8px 9px", borderRadius: "7px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13px", outline: "none" }}
                   />
                   <button
                     disabled={cibleTypeEnCours === t.id}
@@ -5131,7 +5263,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           ) : (
             <>
               {historiqueMembreData.tontine && (
-                <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", fontSize: "13px" }}>
+                <div style={{ background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", fontSize: "13px" }}>
                   <b>{historiqueMembreData.tontine.nom}</b> — {fmtFCFA(historiqueMembreData.tontine.montantParTour)}/tour
                   {historiqueMembreData.tontine.tourEnCoursNumero && (
                     <div style={{ color: C.sub, fontSize: "12px", marginTop: "3px" }}>
@@ -5141,7 +5273,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 </div>
               )}
               {historiqueMembreData.assurance && (
-                <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", fontSize: "13px" }}>
+                <div style={{ background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "10px 12px", fontSize: "13px" }}>
                   Solde assurance : <b>{fmtFCFA(historiqueMembreData.assurance.solde)}</b>
                   {historiqueMembreData.assurance.delaiExpireLe && (
                     <span style={{ color: C.warn }}> — à reconstituer avant le {historiqueMembreData.assurance.delaiExpireLe}</span>
@@ -5157,7 +5289,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "280px", overflowY: "auto" }}>
                   {historiqueMembreData.historique.map((h, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: "8px", padding: "8px 10px", background: "#FBFAF6", borderRadius: "8px", fontSize: "13px" }}>
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: "8px", padding: "8px 10px", background: C.sunken, borderRadius: "8px", fontSize: "13px" }}>
                       <div>
                         <div style={{ fontWeight: 600 }}>{h.label}</div>
                         <div style={{ color: C.sub, fontSize: "12px" }}>{h.date}</div>
@@ -5188,7 +5320,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 { type: "cni", label: "CNI (recto/verso)", accept: "image/*,.pdf" },
                 { type: "plan_localisation", label: "Plan de localisation", accept: "image/*,.pdf" },
               ].map((doc) => (
-                <div key={doc.type} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
+                <div key={doc.type} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px" }}>
                   <span style={{ fontSize: "13px" }}>{doc.label}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     {editDocuments[doc.type] && (
@@ -5450,7 +5582,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 <div
                   key={t}
                   onClick={() => setCompteType(t)}
-                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${compteType === t ? C.vifBleu : C.border}`, background: compteType === t ? `${C.vifBleu}14` : "#FBFAF6", fontSize: "13px", fontWeight: 600, color: compteType === t ? C.vifBleu : C.sub, cursor: "pointer" }}
+                  style={{ flex: 1, textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${compteType === t ? C.vifBleu : C.border}`, background: compteType === t ? `${C.vifBleu}14` : C.sunken, fontSize: "13px", fontWeight: 600, color: compteType === t ? C.vifBleu : C.sub, cursor: "pointer" }}
                 >
                   {t}
                 </div>
@@ -5516,7 +5648,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 <div
                   key={t}
                   onClick={() => setTypeMouvementBanque(t)}
-                  style={{ flex: "1 1 auto", textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${typeMouvementBanque === t ? C.accent2 : C.border}`, background: typeMouvementBanque === t ? C.ok : "#FBFAF6", fontSize: "13px", fontWeight: 600, color: typeMouvementBanque === t ? C.accent2 : C.sub, cursor: "pointer" }}
+                  style={{ flex: "1 1 auto", textAlign: "center", padding: "9px 4px", borderRadius: "8px", border: `1px solid ${typeMouvementBanque === t ? C.accent2 : C.border}`, background: typeMouvementBanque === t ? C.ok : C.sunken, fontSize: "13px", fontWeight: 600, color: typeMouvementBanque === t ? C.accent2 : C.sub, cursor: "pointer" }}
                 >
                   {t}
                 </div>
@@ -5585,7 +5717,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               {categoriesFrais.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
                   {categoriesFrais.map((c) => (
-                    <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "999px", padding: "3px 8px 3px 10px", fontSize: "12px", color: C.sub }}>
+                    <span key={c.id} style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "999px", padding: "3px 8px 3px 10px", fontSize: "12px", color: C.sub }}>
                       {c.nom}
                       <X
                         size={11}
@@ -5690,7 +5822,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             {!recuJoint ? (
               <div
                 onClick={() => setRecuJoint(true)}
-                style={{ border: `1.5px dashed ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center", background: "#FBFAF6", cursor: "pointer" }}
+                style={{ border: `1.5px dashed ${C.border}`, borderRadius: "10px", padding: "16px", textAlign: "center", background: C.sunken, cursor: "pointer" }}
               >
                 <div style={{ fontSize: "13px", fontWeight: 600, color: C.accent2 }}>
                   + Joindre le justificatif
@@ -5777,7 +5909,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showAmende && (
         <Modal onClose={() => setShowAmende(null)} title="Appliquer une amende de retard">
-          <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px", fontSize: "13.5px" }}>
+          <div style={{ background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px", fontSize: "13.5px" }}>
             <b>{showAmende.membre}</b> — Tour {showAmende.tour}<br />
             <span style={{ color: C.warn }}>Cotisation pas encore reçue</span>
           </div>
@@ -5892,7 +6024,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             <div style={{ fontSize: "17px", fontWeight: 700, margin: "2px 0 6px" }}>{showPayout.beneficiaire}</div>
             <div style={{ fontSize: "24px", fontWeight: 700, color: C.accent2 }}>{showPayout.montant}</div>
           </div>
-          <div style={{ fontSize: "13px", color: C.sub, background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px" }}>
+          <div style={{ fontSize: "13px", color: C.sub, background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px" }}>
             Mode de ce tour : <b>{showPayout.mode}</b>. Confirmez que la cagnotte a bien été remise au bénéficiaire (espèces ou Mobile Money) pour clôturer ce tour.
           </div>
           <button
@@ -6012,7 +6144,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {redistributionApercu.membres.map((m) => (
-                  <div key={m.membreId} style={{ display: "flex", justifyContent: "space-between", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px", fontSize: "13px" }}>
+                  <div key={m.membreId} style={{ display: "flex", justifyContent: "space-between", background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 10px", fontSize: "13px" }}>
                     <div>
                       <b>{m.nom}</b>
                       <div style={{ color: C.sub, fontSize: "12px" }}>{m.nbCotisations} cotisation(s) sur ce cycle</div>
@@ -6075,7 +6207,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {typesAmendesSeance.map((t) => (
-              <div key={t.id} style={{ padding: "10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
+              <div key={t.id} style={{ padding: "10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.sunken }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
                   <span style={{ fontSize: "14px", fontWeight: 600 }}>{t.nom}</span>
                   <X
@@ -6097,7 +6229,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     value={montantAmendeInputs[t.id] ?? String(t.montant || "")}
                     onChange={(e) => setMontantAmendeInputs({ ...montantAmendeInputs, [t.id]: e.target.value })}
                     placeholder="Montant (FCFA)"
-                    style={{ flex: 1, boxSizing: "border-box", padding: "8px 9px", borderRadius: "7px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13px", outline: "none" }}
+                    style={{ flex: 1, boxSizing: "border-box", padding: "8px 9px", borderRadius: "7px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13px", outline: "none" }}
                   />
                   <button
                     onClick={async () => {
@@ -6150,7 +6282,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
               onChange={(e) => setSeanceOrdreDuJour(e.target.value)}
               placeholder="Ex. Cotisations du mois, point sur les prêts en cours, questions diverses..."
               rows={3}
-              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "14px", outline: "none", resize: "vertical", fontFamily: "inherit" }}
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "14px", outline: "none", resize: "vertical", fontFamily: "inherit" }}
             />
           </div>
           {seanceCreationErreur && (
@@ -6199,7 +6331,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                     <div
                       key={opt}
                       onClick={() => setPresencesSeance({ ...presencesSeance, [m.id]: opt })}
-                      style={{ padding: "5px 9px", borderRadius: "6px", border: `1px solid ${presencesSeance[m.id] === opt ? C.vifBleu : C.border}`, background: presencesSeance[m.id] === opt ? `${C.vifBleu}14` : "#FBFAF6", fontSize: "12px", fontWeight: 600, color: presencesSeance[m.id] === opt ? C.vifBleu : C.sub, cursor: "pointer" }}
+                      style={{ padding: "5px 9px", borderRadius: "6px", border: `1px solid ${presencesSeance[m.id] === opt ? C.vifBleu : C.border}`, background: presencesSeance[m.id] === opt ? `${C.vifBleu}14` : C.sunken, fontSize: "12px", fontWeight: 600, color: presencesSeance[m.id] === opt ? C.vifBleu : C.sub, cursor: "pointer" }}
                     >
                       {opt}
                     </div>
@@ -6258,7 +6390,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                             <div
                               key={mode}
                               onClick={() => setPaiementMode(mode)}
-                              style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "6px", border: `1px solid ${paiementMode === mode ? C.accent2 : C.border}`, background: paiementMode === mode ? C.ok : "#FFFFFF", fontSize: "12px", fontWeight: 600, color: paiementMode === mode ? C.accent2 : C.sub, cursor: "pointer" }}
+                              style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "6px", border: `1px solid ${paiementMode === mode ? C.accent2 : C.border}`, background: paiementMode === mode ? C.ok : C.surface, fontSize: "12px", fontWeight: 600, color: paiementMode === mode ? C.accent2 : C.sub, cursor: "pointer" }}
                             >
                               {mode === "espèces" ? "Espèces" : "Déduit banque"}
                             </div>
@@ -6268,7 +6400,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                           <select
                             value={paiementEpargneId}
                             onChange={(e) => setPaiementEpargneId(e.target.value)}
-                            style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "12px", outline: "none" }}
+                            style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "12px", outline: "none" }}
                           >
                             <option value="">Sélectionner l'épargne à débiter</option>
                             {epargnes.map((ep) => <option key={ep.id} value={ep.id}>{ep.nom} ({fmtFCFA(ep.solde)})</option>)}
@@ -6380,7 +6512,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             onChange={(e) => setSeanceCompteRendu(e.target.value)}
             placeholder="Résumé des décisions prises, points discutés..."
             rows={4}
-            style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "14px", outline: "none", resize: "vertical", fontFamily: "inherit" }}
+            style={{ width: "100%", boxSizing: "border-box", padding: "11px 13px", borderRadius: "9px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "14px", outline: "none", resize: "vertical", fontFamily: "inherit" }}
           />
           <button
             onClick={async () => {
@@ -6460,7 +6592,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             const facture = parseInt(rafraFacture.replace(/[^\d]/g, ""), 10) || 0;
             const reliquat = collecte - facture;
             return (
-              <div style={{ fontSize: "13px", background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px" }}>
+              <div style={{ fontSize: "13px", background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 12px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}><span>Collecté</span><b>{fmtFCFA(collecte)}</b></div>
                 <div style={{ display: "flex", justifyContent: "space-between" }}><span>Facture</span><b>{fmtFCFA(facture)}</b></div>
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", paddingTop: "4px", borderTop: `1px solid ${C.border}` }}>
@@ -6521,7 +6653,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             {typesDepenses.map((t) => (
-              <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6" }}>
+              <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.sunken }}>
                 <span style={{ fontSize: "14px", fontWeight: 600 }}>{t.nom}</span>
                 <X
                   size={14}
@@ -6775,7 +6907,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                           <div
                             key={mode}
                             onClick={() => setPrelevementSmsMode(mode)}
-                            style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "6px", border: `1px solid ${prelevementSmsMode === mode ? C.vifBleu : C.border}`, background: prelevementSmsMode === mode ? `${C.vifBleu}14` : "#FFFFFF", fontSize: "12px", fontWeight: 600, color: prelevementSmsMode === mode ? C.vifBleu : C.sub, cursor: "pointer" }}
+                            style={{ flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "6px", border: `1px solid ${prelevementSmsMode === mode ? C.vifBleu : C.border}`, background: prelevementSmsMode === mode ? `${C.vifBleu}14` : C.surface, fontSize: "12px", fontWeight: 600, color: prelevementSmsMode === mode ? C.vifBleu : C.sub, cursor: "pointer" }}
                           >
                             {mode === "espèces" ? "Espèces" : "Déduit banque"}
                           </div>
@@ -6785,7 +6917,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                         <select
                           value={prelevementSmsEpargneId}
                           onChange={(e) => setPrelevementSmsEpargneId(e.target.value)}
-                          style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "12px", outline: "none" }}
+                          style={{ width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: "6px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "12px", outline: "none" }}
                         >
                           <option value="">Sélectionner l'épargne</option>
                           {epargnes.map((ep) => <option key={ep.id} value={ep.id}>{ep.nom} ({fmtFCFA(ep.solde)})</option>)}
@@ -6864,9 +6996,9 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                   <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0" }}>
                     <span style={{ fontSize: "13.5px", fontWeight: 600 }}>{m.nom}</span>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <button onClick={() => ajusterParts(m.id, -1)} style={{ width: "36px", height: "36px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", cursor: "pointer", fontSize: "14px", lineHeight: 1 }}>−</button>
+                      <button onClick={() => ajusterParts(m.id, -1)} style={{ width: "36px", height: "36px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.surface, cursor: "pointer", fontSize: "14px", lineHeight: 1 }}>−</button>
                       <span style={{ fontSize: "13.5px", fontWeight: 700, color: C.vifBleu, minWidth: "14px", textAlign: "center" }}>{partsParMembre[m.id] || 1}</span>
-                      <button onClick={() => ajusterParts(m.id, 1)} style={{ width: "36px", height: "36px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FFFFFF", cursor: "pointer", fontSize: "14px", lineHeight: 1 }}>+</button>
+                      <button onClick={() => ajusterParts(m.id, 1)} style={{ width: "36px", height: "36px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.surface, cursor: "pointer", fontSize: "14px", lineHeight: 1 }}>+</button>
                     </div>
                   </div>
                 ))}
@@ -6905,7 +7037,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                 <div
                   key={o.key}
                   onClick={() => setModeSaisie(o.key)}
-                  style={{ flex: 1, textAlign: "center", padding: "8px 4px", borderRadius: "8px", border: `1px solid ${modeSaisie === o.key ? C.accent2 : C.border}`, background: modeSaisie === o.key ? C.ok : "#FBFAF6", fontSize: "12.5px", fontWeight: 600, color: modeSaisie === o.key ? C.accent2 : C.sub, cursor: "pointer" }}
+                  style={{ flex: 1, textAlign: "center", padding: "8px 4px", borderRadius: "8px", border: `1px solid ${modeSaisie === o.key ? C.accent2 : C.border}`, background: modeSaisie === o.key ? C.ok : C.sunken, fontSize: "12.5px", fontWeight: 600, color: modeSaisie === o.key ? C.accent2 : C.sub, cursor: "pointer" }}
                 >
                   {o.label}
                 </div>
@@ -6913,17 +7045,17 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
 
             {modeSaisie === "auto" && (
-              <div style={{ background: "#FBFAF6", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", marginBottom: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", marginBottom: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                  <input value={autoDateDebut} onChange={(e) => setAutoDateDebut(e.target.value)} placeholder="Début jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none" }} />
-                  <input value={autoDateFin} onChange={(e) => setAutoDateFin(e.target.value)} placeholder="Fin jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none" }} />
+                  <input value={autoDateDebut} onChange={(e) => setAutoDateDebut(e.target.value)} placeholder="Début jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }} />
+                  <input value={autoDateFin} onChange={(e) => setAutoDateFin(e.target.value)} placeholder="Fin jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }} />
                 </div>
 
-                <select value={autoJourSemaine} onChange={(e) => setAutoJourSemaine(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none" }}>
+                <select value={autoJourSemaine} onChange={(e) => setAutoJourSemaine(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }}>
                   {JOURS_SEMAINE.map((j, idx) => <option key={idx} value={idx}>{j}</option>)}
                 </select>
 
-                <select value={autoFrequence} onChange={(e) => setAutoFrequence(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: "#FFFFFF", fontSize: "13.5px", outline: "none" }}>
+                <select value={autoFrequence} onChange={(e) => setAutoFrequence(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }}>
                   <option value="chaque_semaine">Chaque semaine</option>
                   <option value="toutes_2_semaines">Toutes les 2 semaines</option>
                   <option value="mensuel_occurrences">Occurrences précises du mois</option>
@@ -6935,7 +7067,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
                       <div
                         key={o.v}
                         onClick={() => toggleOccurrence(o.v)}
-                        style={{ padding: "6px 10px", borderRadius: "7px", border: `1px solid ${autoOccurrences.includes(o.v) ? C.accent2 : C.border}`, background: autoOccurrences.includes(o.v) ? C.ok : "#FFFFFF", fontSize: "12.5px", fontWeight: 600, color: autoOccurrences.includes(o.v) ? C.accent2 : C.sub, cursor: "pointer" }}
+                        style={{ padding: "6px 10px", borderRadius: "7px", border: `1px solid ${autoOccurrences.includes(o.v) ? C.accent2 : C.border}`, background: autoOccurrences.includes(o.v) ? C.ok : C.surface, fontSize: "12.5px", fontWeight: 600, color: autoOccurrences.includes(o.v) ? C.accent2 : C.sub, cursor: "pointer" }}
                       >
                         {o.l}
                       </div>
@@ -6959,7 +7091,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             )}
 
             {seances.map((s, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: "#FBFAF6", marginBottom: "6px" }}>
+              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.sunken, marginBottom: "6px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px" }}>
                   <span style={{ fontWeight: 600 }}>{s.date}</span>
                   <Badge bg={`${C.vifViolet}1A`} fg={C.vifViolet}>{s.mode}</Badge>
@@ -7145,7 +7277,7 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
 
   if (licenceExpiree) {
     return (
-      <div className="tdb tdb-centre" data-theme="light">
+      <div className="tdb tdb-centre">
         <div className="tdb-carte tdb-bloque" role="alert">
           <div className="tdb-bloque-icone" aria-hidden="true"><ShieldAlert size={26} /></div>
           <h1>Licence expirée</h1>
@@ -7161,7 +7293,7 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
   }
 
   return (
-    <div className={`tdb ${chevauche ? "tdb-chevauche" : ""}`} data-theme="light">
+    <div className={`tdb ${chevauche ? "tdb-chevauche" : ""}`}>
       {/* En-tête : identité du membre et du groupe */}
       <header className="tdb-entete">
         <div className="tdb-entete-inner">
@@ -7554,4 +7686,4 @@ function StatCard({ label, value, sub, icon }) {
 // car les écrans les étendent en ligne : { ...btnPrimary, marginTop: "18px" }.
 // Les couleurs passent par les tokens CSS, donc suivent le thème choisi.
 const btnPrimary = { background: "var(--action)", color: "var(--on-action)", border: "1px solid transparent", borderRadius: "var(--radius-control)", minHeight: "44px", padding: "0 18px", fontSize: "14px", fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", boxShadow: "0 1px 2px rgba(20,32,26,0.12)", fontFamily: "inherit" };
-const btnSecondary = { background: "var(--surface)", color: "var(--primary)", border: "1px solid var(--border-strong)", borderRadius: "var(--radius-control)", minHeight: "44px", padding: "0 16px", fontSize: "14px", fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" };
+const btnSecondary = { background: "var(--surface)", color: "var(--primary-texte)", border: "1px solid var(--border-strong)", borderRadius: "var(--radius-control)", minHeight: "44px", padding: "0 16px", fontSize: "14px", fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "8px", cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" };

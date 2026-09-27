@@ -1339,10 +1339,10 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
   font-family: var(--font-titre);
   letter-spacing: 0;
 }
-.adm-titre { font-size: 24px; font-weight: 500; color: var(--primary); line-height: 1.25; }
-.adm-h2 { color: var(--primary); }
-.modal-titre { font-size: 17px; font-weight: 500; color: var(--primary); }
-.carte-auth h1 { font-size: 22px; font-weight: 500; color: var(--primary); }
+.adm-titre { font-size: 24px; font-weight: 500; color: var(--primary-texte); line-height: 1.25; }
+.adm-h2 { color: var(--primary-texte); }
+.modal-titre { font-size: 17px; font-weight: 500; color: var(--primary-texte); }
+.carte-auth h1 { font-size: 22px; font-weight: 500; color: var(--primary-texte); }
 .tdb-nom { font-weight: 500; font-size: clamp(20px, 4.6vw, 26px); }
 .sidebar-role { font-size: 14px; font-weight: 500; }
 
@@ -1369,7 +1369,7 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 .adm-btn-action { background: var(--action); color: var(--on-action); }
 .adm-btn-primaire { background: var(--primary); color: var(--on-primary); }
 .adm-btn-danger { background: var(--danger); color: #FFFFFF; }
-.adm-btn-secondaire { background: var(--surface); color: var(--primary); border-color: var(--border-strong); }
+.adm-btn-secondaire { background: var(--surface); color: var(--primary-texte); border-color: var(--border-strong); }
 .adm-btn-valider { background: var(--action); color: var(--on-action); font-weight: 700; min-height: 48px; }
 .adm-btn-mini { background: var(--primary); }
 .adm-btn-ligne-plein { background: var(--primary); }
@@ -1436,8 +1436,8 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 .tableau { border-color: var(--border); }
 
 /* ---------- Cartes de statistiques ---------- */
-.stat-icone { background: var(--indigo-clair); color: var(--primary); }
-.stat-valeur { color: var(--primary); }
+.stat-icone { background: var(--indigo-clair); color: var(--primary-texte); }
+.stat-valeur { color: var(--primary-texte); }
 .stat-carte { position: relative; overflow: hidden; }
 .stat-carte::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--gold); }
 
@@ -1496,7 +1496,7 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 }
 .tdb-avatar-initiales { background: var(--gold); color: #16225A; }
 .tdb-pastille { background: rgba(255, 255, 255, 0.1); }
-.tdb-section-titre { color: var(--primary); }
+.tdb-section-titre { color: var(--primary-texte); }
 
 /* Carte tontine : la « carte de solde » indigo, araignée en filigrane */
 .tdb-tontine {
@@ -1521,7 +1521,7 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 .tdb-tontine .tdb-etat-ok strong { color: #C9F4DC; }
 .tdb-tontine .tdb-etat-alerte { background: rgba(179, 38, 30, 0.4); border-color: rgba(255, 180, 168, 0.45); color: #FFD1C9; }
 .tdb-tontine .tdb-etat-alerte strong { color: #FFE3DE; }
-.tdb-icone-ok { background: var(--indigo-clair); color: var(--primary); }
+.tdb-icone-ok { background: var(--indigo-clair); color: var(--primary-texte); }
 .tdb-barre-complete { background: var(--success); }
 
 /* Logo cauri : coquillage blanc sur pastille or */
@@ -1536,87 +1536,6 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
   .accueil-marque { padding-top: calc(var(--space-4) + 44px + var(--space-3)); }
   .accueil-barre { top: var(--space-4); }
 }
-
-/* ================================================================
-   ÉQUILIBRE DES COULEURS — « moins de bleu »
-   Les grandes surfaces passent en blanc et sable ; l'indigo ne sert
-   plus que d'accent (texte des boutons secondaires, sélection, carte
-   tontine du membre). Le motif Ndop passe en version claire.
-   ================================================================ */
-:root {
-  --bg: #F6F3EC;
-  --sable: #F1EBDD;
-  --sable-fonce: #E7DEC9;
-  --ndop-clair: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'><rect width='72' height='72' fill='%23F1EBDD'/><g fill='none' stroke='%2316225A' stroke-opacity='0.16' stroke-width='2.6'><rect x='3' y='3' width='66' height='66'/><circle cx='36' cy='36' r='12'/><path d='M3 3L25 25M69 3L47 25M3 69L25 47M69 69L47 47'/></g><circle cx='36' cy='36' r='4' fill='%2316225A' fill-opacity='0.16'/><g fill='%23B8860B' fill-opacity='0.45'><circle cx='36' cy='11' r='2.4'/><circle cx='36' cy='61' r='2.4'/><circle cx='11' cy='36' r='2.4'/><circle cx='61' cy='36' r='2.4'/></g></svg>");
-}
-
-/* Titres en encre, plus en couleur de marque */
-.adm-titre, .adm-h2, .modal-titre, .carte-auth h1, .tdb-section-titre, .b-titre { color: var(--ink); }
-
-/* ---------- Barre de session : blanche ---------- */
-.barre-session { background: #FFFFFF; color: var(--ink); border-bottom: 1px solid var(--border); }
-.barre-session::after { bottom: -4px; height: 4px; background-size: 24px 4px; }
-.barre-session-texte { color: var(--muted); }
-.barre-session-texte strong { color: var(--ink); }
-.barre-session-pastille { background: var(--sable); color: #6B5530; }
-.barre-session-alerte { color: var(--gold-text); }
-.barre-session-btn { background: #FFFFFF; border-color: var(--border-strong); color: var(--primary); }
-.barre-session-btn:hover { background: var(--sable); color: var(--primary); }
-.barre-session-btn.est-actif { background: var(--action); border-color: transparent; color: var(--on-action); }
-.barre-session :focus-visible { outline-color: var(--primary); }
-
-/* ---------- Menu latéral : blanc, bande Ndop claire ---------- */
-.app-sidebar { background: #FFFFFF; border-right: 1px solid var(--border); }
-.app-sidebar::before { background: var(--ndop-clair); background-size: 36px 36px; }
-.sidebar-role { color: var(--ink); }
-.sidebar-sub { color: var(--muted); }
-.sidebar-item { color: #3C4262; }
-.sidebar-item:hover { background: var(--sable); color: var(--ink); }
-.sidebar-item.est-actif { background: var(--sable); color: var(--ink); }
-.sidebar-item.est-actif .sidebar-icone { color: var(--gold-text); }
-.sidebar-item:focus-visible { outline-color: var(--primary); }
-.sidebar-footer { color: var(--muted); }
-@media (max-width: 900px) {
-  .app-sidebar { border-right: none; border-bottom: 1px solid var(--border); }
-}
-
-/* ---------- Tableaux : en-tête sable ---------- */
-.tableau-entete { background: var(--sable); color: #6B5530; border-bottom: 1px solid var(--sable-fonce); }
-.tableau-ligne:hover { background: #FBF8F1; }
-
-/* ---------- Connexion : Ndop clair, carte blanche ---------- */
-.accueil-marque { background: var(--ndop-clair); background-size: 64px 64px; }
-.accueil-marque-bloc {
-  background: #FFFFFF; color: var(--ink);
-  box-shadow: 0 0 0 1px var(--sable-fonce), 0 24px 48px rgba(107, 85, 48, 0.14);
-}
-.accueil-logo-nom { color: var(--ink); }
-.accueil-logo-sub, .accueil-preuve span, .accueil-intro { color: var(--muted); }
-.accueil-titre { color: var(--ink); }
-.accueil-titre em { color: var(--gold-text); }
-.accueil-preuve strong { color: var(--ink); }
-.accueil-preuve-icone { background: var(--sable); border-color: var(--sable-fonce); color: var(--gold-text); }
-@media (max-width: 900px) {
-  .accueil-marque-bloc { box-shadow: 0 0 0 1px var(--sable-fonce), 0 12px 28px rgba(107, 85, 48, 0.12); }
-}
-
-/* ---------- Pages centrées ---------- */
-.page-centree { background: var(--ndop-clair); background-size: 64px 64px; }
-.page-centree .carte-auth { box-shadow: 0 0 0 1px var(--sable-fonce), 0 24px 48px rgba(107, 85, 48, 0.16); }
-.page-centree-texte { background: #FFFFFF; color: var(--ink); border: 1px solid var(--sable-fonce); }
-
-/* ---------- Espace membre : en-tête sable, seule la carte tontine reste indigo ---------- */
-.tdb-entete { background: var(--ndop-clair); background-size: 56px 56px; color: var(--ink); }
-.tdb-bonjour, .tdb-groupe { color: var(--muted); }
-.tdb-nom { color: var(--ink); }
-.tdb-pastille { background: #FFFFFF; border-color: var(--sable-fonce); color: var(--ink); }
-.tdb-pastille-ok { color: var(--success); }
-.tdb-pastille-attente { color: var(--gold-text); }
-.tdb-avatar { border-color: #FFFFFF; }
-
-/* ---------- Cartes de statistiques ---------- */
-.stat-valeur { color: var(--ink); }
-.stat-icone { background: var(--sable); color: #6B5530; }
 
 /* ================================================================
    AFFICHAGE PAR TAILLE D'ÉCRAN
@@ -1634,7 +1553,9 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 
 /* Tableaux : une colonne ne descend jamais sous le mot le plus long ;
    si la place manque, le tableau défile dans son cadre. */
-.tableau-ligne > div, .tableau-entete > div { min-width: auto; overflow-wrap: break-word; }
+/* Colonnes alignées d'une ligne à l'autre ; la largeur minimale par colonne
+   (120px, composant Table) évite les mots coupés. */
+.tableau-ligne > div, .tableau-entete > div { min-width: 0; overflow-wrap: break-word; }
 .table-scroll { border-radius: var(--radius-card); }
 
 /* Petit PC et tablette horizontale : menu plus étroit */
@@ -1659,9 +1580,141 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
   .tdb-entete { padding-left: var(--space-4); padding-right: var(--space-4); }
 }
 
-/* En-tête membre : motif adouci derrière le nom */
-.tdb-entete { background: linear-gradient(rgba(246, 243, 236, 0.72), rgba(246, 243, 236, 0.72)), var(--ndop-clair); background-size: auto, 56px 56px; }
-
 /* Connexion : le bloc de présentation est centré dans son panneau */
 .accueil-marque { align-items: center; }
 .accueil-marque-bloc { width: 100%; }
+
+/* ================================================================
+   CONNEXION v3 — illustration « finance moderne », moins de bleu
+   Panneau clair, motif Ndop réduit à une bande sur le bord,
+   illustration SVG (IllustrationFinance, App.jsx).
+   ================================================================ */
+.accueil-v3 {
+  background:
+    radial-gradient(circle at 72% 38%, color-mix(in srgb, var(--gold) 16%, transparent) 0, transparent 58%),
+    var(--surface);
+  color: var(--ink);
+  justify-content: center;
+  align-items: stretch;
+  padding: clamp(24px, 4vh, 48px) clamp(24px, 4vw, 64px) calc(clamp(24px, 4vh, 48px) + 14px);
+  border-right: 1px solid var(--border);
+}
+/* Bande Ndop verticale sur le bord droit du panneau */
+.accueil-v3::after {
+  display: block !important;
+  content: ""; position: absolute; top: 0; right: 0; bottom: 14px; width: 26px;
+  background: var(--ndop); background-size: 26px 26px;
+  border-radius: 0; left: auto; height: auto; pointer-events: none;
+}
+.accueil-contenu {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 2.4vh, 28px);
+  padding-right: 26px;
+  position: relative;
+  z-index: 1;
+}
+.accueil-v3 .accueil-logo-mark { background: var(--gold) !important; }
+.accueil-v3 .accueil-logo-nom { color: var(--ink); }
+.accueil-v3 .accueil-logo-sub { color: var(--muted); }
+.accueil-v3 .accueil-titre { color: var(--ink); font-size: clamp(26px, 2.4vw, 38px); margin-bottom: var(--space-2); max-width: 18ch; }
+.accueil-v3 .accueil-titre em { color: var(--gold-text); }
+.accueil-v3 .accueil-intro { color: var(--muted); font-size: clamp(15px, 1.1vw, 17px); max-width: 46ch; }
+
+.accueil-illustration { margin: 0; display: flex; justify-content: center; }
+.accueil-illustration svg {
+  display: block;
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+  max-height: 44vh;
+}
+
+.accueil-puces { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.accueil-puces li {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: 999px;
+  background: var(--surface-sunken); border: 1px solid var(--border);
+  font-size: 13px; font-weight: 600; color: var(--ink);
+}
+.accueil-puces svg { color: var(--gold-text); flex-shrink: 0; }
+
+/* Écrans bas (PC portable 768px de haut) : on resserre */
+@media (min-width: 901px) and (max-height: 820px) {
+  .accueil-v3 .accueil-intro { display: none; }
+  .accueil-illustration svg { max-height: 50vh; }
+}
+
+/* Tablette et téléphone : panneau au-dessus du formulaire */
+@media (max-width: 900px) {
+  .accueil-v3 {
+    border-right: none; border-bottom: 1px solid var(--border);
+    padding: calc(20px + var(--space-4)) var(--space-4) calc(var(--space-4) + 14px);
+  }
+  .accueil-v3::after { top: 0; right: 0; left: 0; bottom: auto; width: auto; height: 20px; background-size: 20px 20px; }
+  .accueil-contenu { padding-right: 0; gap: var(--space-3); max-width: 640px; }
+  .accueil-puces { display: none; }            /* la liste reste sous le formulaire */
+  .accueil-illustration svg { max-height: 240px; }
+  .accueil-v3 .accueil-titre { max-width: none; }
+}
+@media (max-width: 600px) {
+  .accueil-v3 .accueil-titre { font-size: 22px; margin-bottom: 0; }
+  .accueil-v3 .accueil-intro { display: none; }   /* le formulaire remonte */
+  .accueil-illustration svg { max-height: 150px; }
+}
+[data-theme="dark"] .carte-auth h1 { color: var(--ink); }
+
+
+/* ================================================================
+   MODE SOMBRE POUR TOUTE L'APPLICATION
+   L'attribut data-theme est posé sur <html> (appliquerMode, App.jsx).
+   --primary reste l'indigo du thème (fonds de boutons, bandeaux) ;
+   --primary-texte sert aux textes et icônes, éclairci en sombre.
+   ================================================================ */
+:root { --primary-texte: var(--primary); }
+[data-theme="dark"] {
+  --primary-texte: #A8B4F2;
+  --indigo-clair: #222849;
+  --border-strong: #6A7092;
+  color-scheme: dark;
+}
+[data-theme="dark"] body { background: #0E1124; }
+
+/* Boutons rouges : le rouge Toghu reste plein, texte blanc lisible */
+[data-theme="dark"] .adm-btn-danger,
+[data-theme="dark"] .adm-btn-ligne-danger-plein { background: #B3261E; color: #FFFFFF; }
+[data-theme="dark"] .adm-btn-ligne-danger { color: #FFB4A8; border-color: rgba(255, 180, 168, 0.45); }
+
+/* Encarts « en attente » (ambre) */
+[data-theme="dark"] .message-attente { color: #F2CD6B; background: #33290D; border-color: #5C4A17; }
+[data-theme="dark"] .tdb-icone-attente,
+[data-theme="dark"] .tdb-mini-attente { background: #33290D; color: #F2CD6B; }
+
+/* Champs : texte et fond lisibles partout (pages et fenêtres) */
+[data-theme="dark"] .app-main input, [data-theme="dark"] .app-main select, [data-theme="dark"] .app-main textarea,
+[data-theme="dark"] .modal input, [data-theme="dark"] .modal select, [data-theme="dark"] .modal textarea {
+  color: var(--ink);
+  background-color: var(--surface-sunken);
+}
+[data-theme="dark"] input::placeholder, [data-theme="dark"] textarea::placeholder { color: #8C92B3; opacity: 1; }
+
+/* Fenêtre modale et fond assombri */
+[data-theme="dark"] .modal-fond { background: rgba(3, 5, 14, 0.7); }
+
+/* Barre de session : déjà sombre, légère séparation */
+[data-theme="dark"] .barre-session { border-bottom: 1px solid #1E2547; }
+
+/* Bouton de mode dans la barre : carré, icône seule */
+.barre-session-mode { width: 40px; padding: 0; justify-content: center; }
+@media (max-width: 640px) { .barre-session-mode { width: 44px; } }
+
+/* Boutons indigo pleins : plus clairs en sombre pour rester visibles */
+[data-theme="dark"] .adm-btn-primaire,
+[data-theme="dark"] .adm-btn-ligne-plein,
+[data-theme="dark"] .adm-btn-mini:not(.adm-btn-mini-doux) { background: #3A4DA8; color: #FFFFFF; }
+
+/* Boutons de tableau : passent sur deux lignes plutôt que de déborder */
+.tableau-ligne .adm-btn, .tableau-ligne button { white-space: normal; text-align: center; max-width: 100%; line-height: 1.2; }

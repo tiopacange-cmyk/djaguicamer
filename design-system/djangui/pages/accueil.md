@@ -1,22 +1,33 @@
-# Page — Accueil / Connexion
+# Page — Accueil / Connexion (v3)
 
-Surcharge du MASTER pour le premier écran de l'application (`ConnexionScreen`).
+Surcharge du MASTER pour `ConnexionScreen`. Le reste de l'application garde l'identité Ndop indigo ;
+seul cet écran est allégé en bleu, à la demande du client.
 
 ## Structure
 
-1. **Panneau de marque** (vert `--primary`), à gauche sur ordinateur, bandeau compact en haut sur mobile :
-   - logo + « DJANGUI », « par Three T Solutions » ;
-   - titre de mission : « Votre tontine, claire et sereine. » ;
-   - 3 preuves de confiance, chacune avec une icône Lucide :
-     cotisations suivies tour par tour · confirmation SMS à chaque opération · accès sécurisé selon le rôle.
-     Sur mobile, les preuves passent sous le formulaire, en liste compacte.
-2. **Formulaire** (carte `--surface`) : sur-titre doré, titre, identifiant, mot de passe, lien
-   « Mot de passe oublié ? », bouton principal pleine largeur.
-3. **Pied de page** : crédit Three T Solutions.
+1. **Panneau de présentation** (clair, légère lueur or) :
+   - logo cauri + « DJANGUI CMR » / « By 3Tsolution Sarl » ;
+   - slogan « Votre tontine, *claire et sereine.* » (Unbounded) et une phrase d'introduction ;
+   - **illustration « finance moderne »** (`IllustrationFinance`, SVG dessiné pour l'app) :
+     téléphone avec l'épargne, graphique en hausse, notification « Cotisation reçue »,
+     piles de pièces FCFA, cauris, cercle des 4 membres de la tontine ;
+   - trois pastilles : Chaque franc tracé · Confirmation par SMS · Accès selon le rôle.
+   - Le motif **Ndop** n'est plus qu'une bande de 26px sur le bord droit (20px en haut sur mobile),
+     la **frise Toghu** borde le bas du panneau.
+2. **Formulaire** inchangé : carte blanche, bouton or « Se connecter ».
 
-## Règles propres à la page
+## Tailles d'écran
 
-- Un seul appel à l'action : « Se connecter ».
-- Le motif en damier or/vert (clin d'œil au tissu) reste un filet de 4px en haut du panneau, pas plus.
-- Bascule clair/sombre : vrai `<button>` avec `aria-pressed`, cible 44px.
-- Mise en page : grille 2 colonnes (≥ 900px) → 1 colonne.
+| Écran | Disposition |
+|---|---|
+| PC ≥ 901px | Deux colonnes ; l'image est limitée à 44 % de la hauteur d'écran ; sous 820px de haut, la phrase d'introduction disparaît |
+| Tablette 601–900px | Panneau au-dessus du formulaire, image ≤ 240px, pastilles remplacées par la liste sous le formulaire |
+| Téléphone ≤ 600px | Titre 22px, sans phrase d'introduction, image ≤ 150px : le formulaire apparaît dès le premier écran |
+
+## Règles
+
+- Pas de photo : l'illustration est vectorielle (légère en 3G, nette partout, sans droits d'auteur).
+  Une vraie photo pourra la remplacer si le client fournit un fichier dont il a les droits.
+- **Mode sombre par défaut** (choix du client). Le bouton en haut à droite propose l'action inverse
+  (« Mode clair » en sombre, « Mode sombre » en clair). Le panneau suit les tokens (`--surface`),
+  le titre de la carte passe en `--ink`.
