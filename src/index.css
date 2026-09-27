@@ -1339,10 +1339,10 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
   font-family: var(--font-titre);
   letter-spacing: 0;
 }
-.adm-titre { font-size: 24px; font-weight: 500; color: var(--primary); line-height: 1.25; }
-.adm-h2 { color: var(--primary); }
-.modal-titre { font-size: 17px; font-weight: 500; color: var(--primary); }
-.carte-auth h1 { font-size: 22px; font-weight: 500; color: var(--primary); }
+.adm-titre { font-size: 24px; font-weight: 500; color: var(--primary-texte); line-height: 1.25; }
+.adm-h2 { color: var(--primary-texte); }
+.modal-titre { font-size: 17px; font-weight: 500; color: var(--primary-texte); }
+.carte-auth h1 { font-size: 22px; font-weight: 500; color: var(--primary-texte); }
 .tdb-nom { font-weight: 500; font-size: clamp(20px, 4.6vw, 26px); }
 .sidebar-role { font-size: 14px; font-weight: 500; }
 
@@ -1369,7 +1369,7 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 .adm-btn-action { background: var(--action); color: var(--on-action); }
 .adm-btn-primaire { background: var(--primary); color: var(--on-primary); }
 .adm-btn-danger { background: var(--danger); color: #FFFFFF; }
-.adm-btn-secondaire { background: var(--surface); color: var(--primary); border-color: var(--border-strong); }
+.adm-btn-secondaire { background: var(--surface); color: var(--primary-texte); border-color: var(--border-strong); }
 .adm-btn-valider { background: var(--action); color: var(--on-action); font-weight: 700; min-height: 48px; }
 .adm-btn-mini { background: var(--primary); }
 .adm-btn-ligne-plein { background: var(--primary); }
@@ -1436,8 +1436,8 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 .tableau { border-color: var(--border); }
 
 /* ---------- Cartes de statistiques ---------- */
-.stat-icone { background: var(--indigo-clair); color: var(--primary); }
-.stat-valeur { color: var(--primary); }
+.stat-icone { background: var(--indigo-clair); color: var(--primary-texte); }
+.stat-valeur { color: var(--primary-texte); }
 .stat-carte { position: relative; overflow: hidden; }
 .stat-carte::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--gold); }
 
@@ -1496,7 +1496,7 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 }
 .tdb-avatar-initiales { background: var(--gold); color: #16225A; }
 .tdb-pastille { background: rgba(255, 255, 255, 0.1); }
-.tdb-section-titre { color: var(--primary); }
+.tdb-section-titre { color: var(--primary-texte); }
 
 /* Carte tontine : la « carte de solde » indigo, araignée en filigrane */
 .tdb-tontine {
@@ -1521,7 +1521,7 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 .tdb-tontine .tdb-etat-ok strong { color: #C9F4DC; }
 .tdb-tontine .tdb-etat-alerte { background: rgba(179, 38, 30, 0.4); border-color: rgba(255, 180, 168, 0.45); color: #FFD1C9; }
 .tdb-tontine .tdb-etat-alerte strong { color: #FFE3DE; }
-.tdb-icone-ok { background: var(--indigo-clair); color: var(--primary); }
+.tdb-icone-ok { background: var(--indigo-clair); color: var(--primary-texte); }
 .tdb-barre-complete { background: var(--success); }
 
 /* Logo cauri : coquillage blanc sur pastille or */
@@ -1553,7 +1553,9 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 
 /* Tableaux : une colonne ne descend jamais sous le mot le plus long ;
    si la place manque, le tableau défile dans son cadre. */
-.tableau-ligne > div, .tableau-entete > div { min-width: auto; overflow-wrap: break-word; }
+/* Colonnes alignées d'une ligne à l'autre ; la largeur minimale par colonne
+   (120px, composant Table) évite les mots coupés. */
+.tableau-ligne > div, .tableau-entete > div { min-width: 0; overflow-wrap: break-word; }
 .table-scroll { border-radius: var(--radius-card); }
 
 /* Petit PC et tablette horizontale : menu plus étroit */
@@ -1664,3 +1666,55 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
   .accueil-illustration svg { max-height: 150px; }
 }
 [data-theme="dark"] .carte-auth h1 { color: var(--ink); }
+
+
+/* ================================================================
+   MODE SOMBRE POUR TOUTE L'APPLICATION
+   L'attribut data-theme est posé sur <html> (appliquerMode, App.jsx).
+   --primary reste l'indigo du thème (fonds de boutons, bandeaux) ;
+   --primary-texte sert aux textes et icônes, éclairci en sombre.
+   ================================================================ */
+:root { --primary-texte: var(--primary); }
+[data-theme="dark"] {
+  --primary-texte: #A8B4F2;
+  --indigo-clair: #222849;
+  --border-strong: #6A7092;
+  color-scheme: dark;
+}
+[data-theme="dark"] body { background: #0E1124; }
+
+/* Boutons rouges : le rouge Toghu reste plein, texte blanc lisible */
+[data-theme="dark"] .adm-btn-danger,
+[data-theme="dark"] .adm-btn-ligne-danger-plein { background: #B3261E; color: #FFFFFF; }
+[data-theme="dark"] .adm-btn-ligne-danger { color: #FFB4A8; border-color: rgba(255, 180, 168, 0.45); }
+
+/* Encarts « en attente » (ambre) */
+[data-theme="dark"] .message-attente { color: #F2CD6B; background: #33290D; border-color: #5C4A17; }
+[data-theme="dark"] .tdb-icone-attente,
+[data-theme="dark"] .tdb-mini-attente { background: #33290D; color: #F2CD6B; }
+
+/* Champs : texte et fond lisibles partout (pages et fenêtres) */
+[data-theme="dark"] .app-main input, [data-theme="dark"] .app-main select, [data-theme="dark"] .app-main textarea,
+[data-theme="dark"] .modal input, [data-theme="dark"] .modal select, [data-theme="dark"] .modal textarea {
+  color: var(--ink);
+  background-color: var(--surface-sunken);
+}
+[data-theme="dark"] input::placeholder, [data-theme="dark"] textarea::placeholder { color: #8C92B3; opacity: 1; }
+
+/* Fenêtre modale et fond assombri */
+[data-theme="dark"] .modal-fond { background: rgba(3, 5, 14, 0.7); }
+
+/* Barre de session : déjà sombre, légère séparation */
+[data-theme="dark"] .barre-session { border-bottom: 1px solid #1E2547; }
+
+/* Bouton de mode dans la barre : carré, icône seule */
+.barre-session-mode { width: 40px; padding: 0; justify-content: center; }
+@media (max-width: 640px) { .barre-session-mode { width: 44px; } }
+
+/* Boutons indigo pleins : plus clairs en sombre pour rester visibles */
+[data-theme="dark"] .adm-btn-primaire,
+[data-theme="dark"] .adm-btn-ligne-plein,
+[data-theme="dark"] .adm-btn-mini:not(.adm-btn-mini-doux) { background: #3A4DA8; color: #FFFFFF; }
+
+/* Boutons de tableau : passent sur deux lignes plutôt que de déborder */
+.tableau-ligne .adm-btn, .tableau-ligne button { white-space: normal; text-align: center; max-width: 100%; line-height: 1.2; }

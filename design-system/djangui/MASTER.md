@@ -61,6 +61,17 @@ les tableaux, 44px sur écran tactile).
   tablette verticale 601–900px (menu en bande), téléphone ≤ 600px. Colonnes de tableau d'au moins
   120px, jamais de mot coupé : le tableau défile dans son cadre.
 
+### Mode sombre par défaut (toute l'application)
+
+- L'application s'ouvre en **mode sombre** sur tous les écrans (connexion, espace membre, bureau,
+  Super Admin, fenêtres). Un bouton soleil / lune dans la barre du haut (et sur la connexion)
+  repasse en clair ; le choix est mémorisé sur l'appareil (`localStorage`, clé `djangui-mode`).
+- Mécanique : `appliquerMode()` (App.jsx) pose `data-theme` sur `<html>` et bascule la palette `C`
+  entre `MODE_CLAIR` et `MODE_SOMBRE`. Les couleurs autrefois écrites en dur dans les écrans
+  passent par `C.surface`, `C.sunken`, `C.orBg`, `C.purpleBg`, `C.neutreBg`, `C.trait`.
+- `--primary` reste l'indigo du thème (fonds de boutons, bandeaux) ; `--primary-texte` sert aux
+  textes et icônes et passe en `#A8B4F2` en sombre. Les boutons rouges restent `#B3261E` avec texte blanc.
+
 ## 1. Positionnement
 
 | | |
