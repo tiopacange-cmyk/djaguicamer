@@ -1,7 +1,9 @@
 import { supabase } from "./supabaseClient";
 
-// Envoie un SMS à un ou plusieurs numéros, via la fonction Netlify
-// sécurisée (la clé API ne transite jamais par le navigateur).
+// Envoie un SMS à un ou plusieurs numéros, via le script PHP
+// api/send-sms.php de l'hébergement (la clé API ne transite jamais
+// par le navigateur). Le jeton de session Supabase accompagne la
+// requête : seul un utilisateur connecté peut envoyer un SMS.
 // Ne bloque jamais l'action principale : en cas d'échec (y compris
 // crédits épuisés), l'erreur est journalisée en console mais aucune
 // exception n'est levée, pour ne jamais empêcher l'enregistrement
@@ -39,12 +41,14 @@ export async function envoyerSMS({ message, numeros, senderId, groupId }) {
   }
 
   try {
-    const res = await fetch("/.netlify/functions/send-sms", {
+    const { data: session } = await supabase.auth.getSession();
+    const jeton = session?.session?.access_token;
+    const res = await fetch(import.meta.env.VITE_SMS_ENDPOINT || "api/send-sms.php", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(jeton ? { Authorization: `Bearer ${jeton}` } : {}) },
       body: JSON.stringify({ message, msisdn: valides, senderId: senderIdEffectif }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({ error: `Réponse invalide du serveur SMS (${res.status}).` }));
     if (!res.ok) {
       console.error("Erreur d'envoi SMS", data);
       return { success: false, error: data.error };

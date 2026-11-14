@@ -1,0 +1,9 @@
+# Les fichiers de configuration ne sont jamais servis au navigateur.
+<FilesMatch "^config(\.exemple)?\.php$">
+  Require all denied
+</FilesMatch>
+
+# Transmet l'en-tête Authorization à PHP (souvent retiré par Apache).
+RewriteEngine On
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
