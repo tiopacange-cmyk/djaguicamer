@@ -10,10 +10,13 @@ RewriteCond %{HTTPS} off
 RewriteCond %{HTTP:X-Forwarded-Proto} !https
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-# Toute adresse inconnue renvoie vers l'application
+# Toute adresse inconnue (ex. /armens, lien d'un groupe) renvoie vers l'application.
+# index.html sort tout de suite et [END] arrête la réécriture : évite la boucle
+# (erreur 500) observée chez LWS. Chemin relatif : le site est dans un sous-dossier.
+RewriteRule ^index\.html$ - [L]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.html [L]
+RewriteRule ^ index.html [END]
 
 # Compression
 <IfModule mod_deflate.c>

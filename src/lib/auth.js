@@ -70,7 +70,7 @@ export async function getMesGroupes() {
     .from("group_members")
     .select(`
       id, is_admin, is_president, statut, type_membre,
-      group:groups ( id, nom )
+      group:groups ( id, nom, slug )
     `)
     .eq("profile_id", monProfil.id)
     .eq("statut", "actif");

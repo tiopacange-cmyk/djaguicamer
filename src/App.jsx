@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre, reinitialiserMotDePasseMembre, televerserDocumentMembre, fetchDocumentsMembre } from "./lib/membres";
 import { fetchTypesFonds, creerTypeFonds, supprimerTypeFonds, fetchFondsTousMembres, fixerCibleTypeFonds, enregistrerVersementFonds, fetchFondsMembre } from "./lib/fonds";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse } from "./lib/auth";
-import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement, televerserLogoGroupe, fetchLogoGroupe, modifierGroupe, suspendreGroupe, reactiverGroupe, fetchStatsPlateforme, fetchSoldeSms, vendreCreditsSms, definirBlocageSms, fetchHistoriqueSms, fetchSmsSenderId, definirSmsSenderId } from "./lib/groups";
+import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement, televerserLogoGroupe, fetchLogoGroupe, modifierGroupe, suspendreGroupe, reactiverGroupe, fetchStatsPlateforme, fetchSoldeSms, vendreCreditsSms, definirBlocageSms, fetchHistoriqueSms, fetchSmsSenderId, definirSmsSenderId, fetchVitrineGroupe, genererSlug, SLUGS_RESERVES } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere, fetchApercuRedistribution, redistribuerCommission, fetchTotalRedistributions } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit, fetchApercuCloture, cloturerEpargne } from "./lib/banque";
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
@@ -44,7 +44,7 @@ import {
   CreditCard, ScrollText, LayoutDashboard, Wallet, Shield, FileBarChart,
   Gavel, Bell, LogOut, Moon, Sun, Lock, ChevronLeft, CheckCircle2, Clock,
   Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat, Eye, EyeOff, AlertTriangle, ShoppingCart, Palette,
-  ShieldCheck, MessageSquareText, ListChecks, UserRound, Mail, ArrowDownLeft, ArrowUpRight,
+  ShieldCheck, MessageSquareText, ListChecks, UserRound, Mail, ArrowDownLeft, ArrowUpRight, Check,
 } from "lucide-react";
 
 // ---------- Palette partagée ----------
@@ -256,6 +256,9 @@ export default function AppPrototype() {
   const [modeRecuperation, setModeRecuperation] = useState(false);
   const [vueEspacePersonnel, setVueEspacePersonnel] = useState(false);
   const [statutAbonnement, setStatutAbonnement] = useState(null);
+  // Message affiché sur la page de connexion quand un compte est refusé
+  // sur le lien d'un groupe (Super Admin, ou membre d'un autre groupe).
+  const [refusLienGroupe, setRefusLienGroupe] = useState("");
 
   const chargerSessionEtRole = async () => {
     setChargementSession(true);
@@ -279,8 +282,37 @@ export default function AppPrototype() {
         setMesGroupes([]);
         return;
       }
+      const [profil, groupesTous] = await Promise.all([getMonProfil(), getMesGroupes()]);
+      let groupes = groupesTous;
+
+      // Lien d'un groupe (ex. /armens) : seuls les membres de ce groupe
+      // entrent, et uniquement dans ce groupe. Le Super Admin se connecte
+      // depuis l'adresse principale.
+      const slug = lireSlugAdresse();
+      if (slug) {
+        const duGroupe = groupesTous.filter((g) => g.group?.slug === slug);
+        let refus = "";
+        if (profil?.is_super_admin || duGroupe.length === 0) {
+          // Un lien inconnu affiche la page normale : aucune restriction
+          const vitrine = await fetchVitrineGroupe(slug).catch(() => null);
+          if (vitrine && profil?.is_super_admin) {
+            refus = `Le compte Super Admin se connecte uniquement depuis ${window.location.host}, pas depuis le lien d'un groupe.`;
+          } else if (vitrine) {
+            refus = `Ce compte n'est pas membre ${deNom(vitrine.nom)}. Utilise le lien de ton propre groupe.`;
+          }
+        }
+        if (refus) {
+          setRefusLienGroupe(refus);
+          await signOut();
+          setConnecte(false);
+          setMonProfil(null);
+          setMesGroupes([]);
+          return;
+        }
+        if (duGroupe.length > 0) groupes = duGroupe;
+      }
+
       setConnecte(true);
-      const [profil, groupes] = await Promise.all([getMonProfil(), getMesGroupes()]);
       setMonProfil(profil);
       setMesGroupes(groupes);
     } catch (e) {
@@ -340,7 +372,13 @@ export default function AppPrototype() {
   if (!connecte) {
     return (
       <div style={{ fontFamily: "var(--font-sans)" }}>
-        <ConnexionScreen onLoggedIn={chargerSessionEtRole} sombre={sombre} onBasculerMode={basculerMode} />
+        <ConnexionScreen
+          onLoggedIn={chargerSessionEtRole}
+          sombre={sombre}
+          onBasculerMode={basculerMode}
+          messageRefus={refusLienGroupe}
+          onEffacerRefus={() => setRefusLienGroupe("")}
+        />
       </div>
     );
   }
@@ -428,9 +466,44 @@ export default function AppPrototype() {
 // ============================================================
 // ÉCRAN 1 — CONNEXION
 // ============================================================
-function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
+// Lien de groupe dans l'adresse : djangui.3tsolutioncm.com/armens -> "armens"
+function lireSlugAdresse() {
+  if (typeof window === "undefined") return "";
+  let premier = window.location.pathname.split("/").filter(Boolean)[0] || "";
+  try { premier = decodeURIComponent(premier).toLowerCase(); } catch { return ""; }
+  return /^[a-z0-9-]{1,40}$/.test(premier) ? premier : "";
+}
+
+// « de ARMENS » -> « d'ARMENS »
+const deNom = (nom) => (/^[aeiouyhàâäéèêëîïôöùûü]/i.test(nom) ? `d'${nom}` : `de ${nom}`);
+
+// Slogan en titre : la partie après la première virgule passe en doré
+function TitreSlogan({ slogan }) {
+  const i = slogan.indexOf(",");
+  if (i === -1) return <em>{slogan}</em>;
+  return <>{slogan.slice(0, i + 1)} <em>{slogan.slice(i + 1).trim()}</em></>;
+}
+
+function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode, messageRefus = "", onEffacerRefus }) {
   // Le mode (sombre par défaut) est celui de toute l'application.
   const dark = sombre;
+  // Page personnalisée quand l'adresse contient le lien d'un groupe
+  const [groupe, setGroupe] = useState(null);
+  useEffect(() => {
+    const slug = lireSlugAdresse();
+    if (!slug) return;
+    let actif = true;
+    fetchVitrineGroupe(slug)
+      .then((g) => { if (actif && g) setGroupe(g); })
+      .catch((e) => console.error("Erreur de chargement de la page du groupe", e));
+    return () => { actif = false; };
+  }, []);
+  useEffect(() => {
+    if (!groupe) return;
+    const titreAvant = document.title;
+    document.title = `${groupe.nom} — Connexion · DJANGUI CMR`;
+    return () => { document.title = titreAvant; };
+  }, [groupe]);
   const [identifiant, setIdentifiant] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -449,6 +522,7 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
     }
     setChargement(true);
     setErreur("");
+    onEffacerRefus?.();
     try {
       await signIn({ identifiant: identifiant.trim(), password });
       onLoggedIn();
@@ -493,22 +567,40 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
       {/* Panneau de marque : mission + preuves de confiance */}
       <section className="accueil-marque accueil-v3" aria-labelledby="accueil-titre">
         <div className="accueil-contenu">
-          <div className="accueil-logo">
-            <div className="accueil-logo-mark" aria-hidden="true">
-              <MarqueCauri taille={30} couleur="#16225A" fond="#FFFFFF" />
+          {groupe ? (
+            <div className="accueil-logo accueil-logo-groupe">
+              {groupe.logo_url ? (
+                <img className="accueil-logo-image" src={groupe.logo_url} alt={`Logo ${groupe.nom}`} />
+              ) : (
+                <div className="accueil-logo-mark" aria-hidden="true">
+                  <MarqueCauri taille={30} couleur="#16225A" fond="#FFFFFF" />
+                </div>
+              )}
+              <div>
+                <div className="accueil-logo-nom">{groupe.nom}</div>
+                <div className="accueil-logo-sub">Espace des membres</div>
+              </div>
             </div>
-            <div>
-              <div className="accueil-logo-nom">DJANGUI CMR</div>
-              <div className="accueil-logo-sub">By 3Tsolution Sarl</div>
+          ) : (
+            <div className="accueil-logo">
+              <div className="accueil-logo-mark" aria-hidden="true">
+                <MarqueCauri taille={30} couleur="#16225A" fond="#FFFFFF" />
+              </div>
+              <div>
+                <div className="accueil-logo-nom">DJANGUI CMR</div>
+                <div className="accueil-logo-sub">By 3Tsolution Sarl</div>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="accueil-texte">
             <p id="accueil-titre" className="accueil-titre">
-              Votre tontine, <em>claire et sereine.</em>
+              {groupe?.slogan ? <TitreSlogan slogan={groupe.slogan} /> : <>Votre tontine, <em>claire et sereine.</em></>}
             </p>
             <p className="accueil-intro">
-              Cotisations, tours, épargne, prêts et assurance de votre groupe réunis au même endroit, visibles par chaque membre.
+              {groupe
+                ? `Bienvenue chez ${groupe.nom}. Connecte-toi pour suivre tes cotisations, ton épargne et les séances du groupe.`
+                : "Cotisations, tours, épargne, prêts et assurance de votre groupe réunis au même endroit, visibles par chaque membre."}
             </p>
           </div>
 
@@ -521,6 +613,13 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
             <li><MessageSquareText size={16} aria-hidden="true" /> Confirmation par SMS</li>
             <li><ShieldCheck size={16} aria-hidden="true" /> Accès selon le rôle</li>
           </ul>
+
+          {groupe && (
+            <p className="accueil-propulse">
+              <span className="accueil-propulse-mark" aria-hidden="true"><MarqueCauri taille={16} couleur="#16225A" fond="#FFFFFF" /></span>
+              <span>Propulsé par <strong>DJANGUI CMR</strong> · By 3Tsolution Sarl</span>
+            </p>
+          )}
         </div>
       </section>
 
@@ -542,9 +641,11 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
           <div className="carte-auth">
             {!modeOubli ? (
               <>
-                <div className="carte-auth-surtitre">Espace membres</div>
+                <div className="carte-auth-surtitre">{groupe ? `Espace membres · ${groupe.nom}` : "Espace membres"}</div>
                 <h1>Connexion</h1>
-                <p className="carte-auth-desc">Utilise l'identifiant fourni par le bureau de ton groupe.</p>
+                <p className="carte-auth-desc">
+                  {groupe ? `Utilise l'identifiant fourni par le bureau ${deNom(groupe.nom)}.` : "Utilise l'identifiant fourni par le bureau de ton groupe."}
+                </p>
 
                 <form onSubmit={handleSubmitLogin} noValidate>
                   <div className="champ">
@@ -602,9 +703,9 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
                     Mot de passe oublié ?
                   </button>
 
-                  {erreur && (
+                  {(erreur || messageRefus) && (
                     <div id="connexion-erreur" className="message message-erreur" role="alert">
-                      <AlertTriangle size={16} aria-hidden="true" /> {erreur}
+                      <AlertTriangle size={16} aria-hidden="true" /> {erreur || messageRefus}
                     </div>
                   )}
 
@@ -684,7 +785,7 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
         </div>
 
         <footer className="accueil-pied">
-          <strong>DJANGUI CMR</strong> · By 3Tsolution Sarl — 2026
+          {groupe ? <>{groupe.nom} · propulsé par <strong>DJANGUI CMR</strong> · By 3Tsolution Sarl</> : <><strong>DJANGUI CMR</strong> · By 3Tsolution Sarl — 2026</>}
         </footer>
       </main>
     </div>
@@ -835,6 +936,9 @@ function SuperAdminScreen() {
   const [showRenouveler, setShowRenouveler] = useState(null);
   const [showModifierGroupe, setShowModifierGroupe] = useState(null);
   const [modifierGroupeNom, setModifierGroupeNom] = useState("");
+  const [modifierGroupeSlug, setModifierGroupeSlug] = useState("");
+  const [modifierGroupeSlogan, setModifierGroupeSlogan] = useState("");
+  const [lienCopie, setLienCopie] = useState(false);
   const [modifierGroupeErreur, setModifierGroupeErreur] = useState("");
   const [modifierGroupeEnCours, setModifierGroupeEnCours] = useState(false);
   const [modifierGroupeLogo, setModifierGroupeLogo] = useState("");
@@ -1125,6 +1229,9 @@ function SuperAdminScreen() {
                       onClick={async () => {
                         setShowModifierGroupe(g);
                         setModifierGroupeNom(g.nom);
+                        setModifierGroupeSlug(g.slug || "");
+                        setModifierGroupeSlogan(g.slogan || "");
+                        setLienCopie(false);
                         setModifierGroupeErreur("");
                         setModifierGroupeLogo("");
                         try {
@@ -1567,6 +1674,58 @@ function SuperAdminScreen() {
           <FormField label="Nom du groupe" placeholder="Ex. Tontine Les Bâtisseurs" value={modifierGroupeNom} onChange={(e) => setModifierGroupeNom(e.target.value)} />
 
           <div>
+            <label className="adm-label" htmlFor="modif-groupe-lien">Lien de connexion du groupe</label>
+            <div className="lien-groupe">
+              <span className="lien-groupe-base">{window.location.host}/</span>
+              <input
+                id="modif-groupe-lien"
+                className="lien-groupe-saisie"
+                value={modifierGroupeSlug}
+                placeholder={genererSlug(modifierGroupeNom) || "nom-du-groupe"}
+                autoCapitalize="none"
+                spellCheck={false}
+                onChange={(e) => { setModifierGroupeSlug(genererSlug(e.target.value.replace(/\s/g, "-")) + (/[-\s]$/.test(e.target.value) ? "-" : "")); setLienCopie(false); }}
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, color: C.sub, flex: 1, minWidth: 0 }}>
+                Lettres minuscules, chiffres et tirets. À partager aux membres pour ouvrir la page de connexion du groupe.
+              </span>
+              <button
+                type="button"
+                className="adm-btn-ligne"
+                disabled={!modifierGroupeSlug || modifierGroupeSlug !== (showModifierGroupe.slug || "")}
+                title={modifierGroupeSlug !== (showModifierGroupe.slug || "") ? "Enregistre d'abord le nouveau lien" : undefined}
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(`${window.location.origin}/${modifierGroupeSlug}`);
+                    setLienCopie(true);
+                  } catch (e) {
+                    console.error("Copie du lien impossible", e);
+                  }
+                }}
+              >
+                {lienCopie ? <><Check size={14} /> Copié</> : "Copier le lien"}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="adm-label" htmlFor="modif-groupe-slogan">Slogan (page de connexion)</label>
+            <input
+              id="modif-groupe-slogan"
+              className="adm-input"
+              value={modifierGroupeSlogan}
+              maxLength={80}
+              placeholder="Ex. Ensemble, on bâtit l'avenir."
+              onChange={(e) => setModifierGroupeSlogan(e.target.value)}
+            />
+            <div style={{ fontSize: 13, color: C.sub, marginTop: "6px" }}>
+              La partie après la virgule s'affiche en doré. Laisse vide pour garder le titre DJANGUI CMR.
+            </div>
+          </div>
+
+          <div>
             <label className="adm-label">Logo du groupe</label>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               {modifierGroupeLogo ? (
@@ -1617,9 +1776,11 @@ function SuperAdminScreen() {
             className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: modifierGroupeEnCours ? "default" : "pointer" }}
             onClick={async () => {
               if (!modifierGroupeNom.trim()) { setModifierGroupeErreur("Le nom du groupe est obligatoire."); return; }
+              const slug = modifierGroupeSlug.replace(/^-+|-+$/g, "");
+              if (SLUGS_RESERVES.includes(slug)) { setModifierGroupeErreur(`« ${slug} » est réservé par le site, choisis un autre lien.`); return; }
               setModifierGroupeEnCours(true);
               try {
-                await modifierGroupe(showModifierGroupe.id, modifierGroupeNom.trim());
+                await modifierGroupe(showModifierGroupe.id, modifierGroupeNom.trim(), { slug, slogan: modifierGroupeSlogan.trim() });
                 await chargerGroupes();
                 setShowModifierGroupe(null);
               } catch (e) {
@@ -3251,22 +3412,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
             <div style={{ display: "flex", alignItems: "flex-end", gap: "10px", marginTop: "22px", background: C.panel, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "14px 16px" }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: "12px", color: C.sub, marginBottom: "5px", display: "block" }}>Du</label>
-                <input
-                  value={filtreDateDebut}
-                  onChange={(e) => setFiltreDateDebut(e.target.value)}
-                  placeholder="jj/mm/aaaa"
-                  style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }}
-                />
+                <label htmlFor="filtre-du" style={{ fontSize: "12px", color: C.sub, marginBottom: "5px", display: "block" }}>Du</label>
+                <ChampDate id="filtre-du" compact aujourdhuiParDefaut={false} value={filtreDateDebut} onChange={(e) => setFiltreDateDebut(e.target.value)} />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: "12px", color: C.sub, marginBottom: "5px", display: "block" }}>Au</label>
-                <input
-                  value={filtreDateFin}
-                  onChange={(e) => setFiltreDateFin(e.target.value)}
-                  placeholder="jj/mm/aaaa"
-                  style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }}
-                />
+                <label htmlFor="filtre-au" style={{ fontSize: "12px", color: C.sub, marginBottom: "5px", display: "block" }}>Au</label>
+                <ChampDate id="filtre-au" compact aujourdhuiParDefaut={false} value={filtreDateFin} onChange={(e) => setFiltreDateFin(e.target.value)} />
               </div>
               <button
                 className="adm-btn adm-btn-action" style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
@@ -3691,13 +3842,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showCotisationTontine && (
         <Modal onClose={() => setShowCotisationTontine(false)} title="Enregistrer une cotisation — Tontine">
           <div>
-            <label className="adm-label">Date de la séance</label>
-            <input
-              value={cotisationTontineDate}
-              onChange={(e) => setCotisationTontineDate(e.target.value)}
-              placeholder="jj/mm/aaaa"
-              className="adm-input"
-            />
+            <ChampDate label="Date de la séance" value={cotisationTontineDate} onChange={(e) => setCotisationTontineDate(e.target.value)} />
             <div className="adm-aide">
               Une seule date pour toute la séance — elle s'applique à chaque montant saisi ci-dessous.
             </div>
@@ -3880,7 +4025,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <div style={{ flex: 1 }}>
-              <FormField label="Date de déclaration" placeholder="jj/mm/aaaa" />
+              <ChampDate label="Date de déclaration" />
             </div>
             <div style={{ flex: 1 }}>
               <FormField label="Frais de déclaration" placeholder="Ex. 2 000 FCFA" />
@@ -3954,7 +4099,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
           </div>
 
-          <FormField label="Date de l'événement" placeholder="jj/mm/aaaa" />
+          <ChampDate label="Date de l'événement" />
 
           <div className="adm-msg adm-msg-info">
             Le montant brut sera prélevé au prorata sur le solde d'assurance de <b>tous les membres</b>, et non depuis une caisse déjà constituée.
@@ -4048,13 +4193,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showCotisationAssurance && (
         <Modal onClose={() => setShowCotisationAssurance(false)} title="Enregistrer une cotisation — Assurance">
           <div>
-            <label className="adm-label">Date de la séance</label>
-            <input
-              value={cotisationAssuranceDate}
-              onChange={(e) => setCotisationAssuranceDate(e.target.value)}
-              placeholder="jj/mm/aaaa"
-              className="adm-input"
-            />
+            <ChampDate label="Date de la séance" value={cotisationAssuranceDate} onChange={(e) => setCotisationAssuranceDate(e.target.value)} />
           </div>
 
           <div>
@@ -4251,7 +4390,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <FormField label="Nom de l'épargne" placeholder="Ex. Épargne Achat de terrain" value={epargneNom} onChange={(e) => setEpargneNom(e.target.value)} />
           <FormField label="Cotisation par séance" placeholder="Ex. 20 000 FCFA" value={epargneCotisation} onChange={(e) => setEpargneCotisation(e.target.value)} />
           <FormField label="Taux d'intérêt sur les prêts" placeholder="Ex. 5 %" value={epargneTaux} onChange={(e) => setEpargneTaux(e.target.value)} />
-          <FormField label="Date de clôture du cycle" placeholder="jj/mm/aaaa" value={epargneCloture} onChange={(e) => setEpargneCloture(e.target.value)} />
+          <ChampDate label="Date de clôture du cycle" aujourdhuiParDefaut={false} value={epargneCloture} onChange={(e) => setEpargneCloture(e.target.value)} />
 
           {epargneError && (
             <div className="adm-msg adm-msg-erreur" role="alert">
@@ -4318,13 +4457,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <div>
-            <label className="adm-label">Date du dépôt (séance)</label>
-            <input
-              value={cotisationDate}
-              onChange={(e) => setCotisationDate(e.target.value)}
-              placeholder="jj/mm/aaaa"
-              className="adm-input"
-            />
+            <ChampDate label="Date du dépôt (séance)" value={cotisationDate} onChange={(e) => setCotisationDate(e.target.value)} />
             <div className="adm-aide">
               Une seule date pour toute la séance — elle s'applique à chaque montant saisi ci-dessous.
             </div>
@@ -4425,10 +4558,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <div style={{ flex: 1 }}>
-              <FormField label="Date de début du crédit" placeholder="jj/mm/aaaa" value={creditDebut} onChange={(e) => setCreditDebut(e.target.value)} />
+              <ChampDate label="Date de début du crédit" value={creditDebut} onChange={(e) => setCreditDebut(e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
-              <FormField label="Date de fin du crédit" placeholder="jj/mm/aaaa" value={creditFin} onChange={(e) => setCreditFin(e.target.value)} />
+              <ChampDate label="Date de fin du crédit" aujourdhuiParDefaut={false} value={creditFin} onChange={(e) => setCreditFin(e.target.value)} />
             </div>
           </div>
 
@@ -4554,7 +4687,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         <Modal onClose={() => setShowRapportJournalier(false)} title="Rapport journalier" icon={<FileBarChart />} accentColor={C.vifBleu}>
           {!rapportJour ? (
             <>
-              <FormField label="Date de la séance" placeholder="jj/mm/aaaa" value={rapportJourDate} onChange={(e) => setRapportJourDate(e.target.value)} />
+              <ChampDate label="Date de la séance" value={rapportJourDate} onChange={(e) => setRapportJourDate(e.target.value)} />
               <div className="adm-msg adm-msg-info">
                 Le rapport reprend toutes les cotisations, versements, amendes, mouvements bancaires et événements d'assurance enregistrés à cette date, tous modules confondus.
               </div>
@@ -5176,13 +5309,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <div>
-            <label className="adm-label">Date du versement</label>
-            <input
-              value={cotisationFondsDate}
-              onChange={(e) => setCotisationFondsDate(e.target.value)}
-              placeholder="jj/mm/aaaa"
-              className="adm-input"
-            />
+            <ChampDate label="Date du versement" value={cotisationFondsDate} onChange={(e) => setCotisationFondsDate(e.target.value)} />
           </div>
 
           <div>
@@ -5661,7 +5788,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             )}
           </div>
 
-          <FormField label="Date de la séance" placeholder="jj/mm/aaaa" value={depotDate} onChange={(e) => setDepotDate(e.target.value)} />
+          <ChampDate label="Date de la séance" value={depotDate} onChange={(e) => setDepotDate(e.target.value)} />
           <FormField label="Montant" placeholder="Ex. 1 000 000 FCFA" value={depotMontant} onChange={(e) => setDepotMontant(e.target.value)} />
 
           {typeMouvementBanque === "Retrait" && (
@@ -6273,7 +6400,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showCreerSeance && (
         <Modal onClose={() => setShowCreerSeance(false)} title="Créer une séance" icon={<Calendar />} accentColor={C.vifBleu}>
-          <FormField label="Date de la séance" placeholder="jj/mm/aaaa" value={seanceDate} onChange={(e) => setSeanceDate(e.target.value)} />
+          <ChampDate label="Date de la séance" value={seanceDate} onChange={(e) => setSeanceDate(e.target.value)} />
           <FormField label="Lieu" placeholder="Ex. Domicile du président" value={seanceLieu} onChange={(e) => setSeanceLieu(e.target.value)} />
           <div>
             <label className="adm-label">Ordre du jour</label>
@@ -6533,7 +6660,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showCreerRafraichissement && (
         <Modal onClose={() => setShowCreerRafraichissement(false)} title="Enregistrer un rafraîchissement" icon={<ShoppingCart />} accentColor={C.vifOr}>
-          <FormField label="Date" placeholder="jj/mm/aaaa" value={rafraDate} onChange={(e) => setRafraDate(e.target.value)} />
+          <ChampDate label="Date" value={rafraDate} onChange={(e) => setRafraDate(e.target.value)} />
 
           <div>
             <label className="adm-label">Séance liée (optionnel)</label>
@@ -6712,7 +6839,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <FormField label="Montant (FCFA)" placeholder="Ex. 5 000" value={depenseMontant} onChange={(e) => setDepenseMontant(e.target.value)} />
-          <FormField label="Date" placeholder="jj/mm/aaaa" value={depenseDate} onChange={(e) => setDepenseDate(e.target.value)} />
+          <ChampDate label="Date" value={depenseDate} onChange={(e) => setDepenseDate(e.target.value)} />
           <FormField label="Motif" placeholder="Ex. Achat de cahiers de compte" value={depenseMotif} onChange={(e) => setDepenseMotif(e.target.value)} />
 
           <div>
@@ -7047,8 +7174,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             {modeSaisie === "auto" && (
               <div style={{ background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", marginBottom: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                  <input value={autoDateDebut} onChange={(e) => setAutoDateDebut(e.target.value)} placeholder="Début jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }} />
-                  <input value={autoDateFin} onChange={(e) => setAutoDateFin(e.target.value)} placeholder="Fin jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }} />
+                  <div style={{ flex: 1, minWidth: "150px" }}><ChampDate compact placeholder="Début jj/mm/aaaa" ariaLabel="Date de début" value={autoDateDebut} onChange={(e) => setAutoDateDebut(e.target.value)} /></div>
+                  <div style={{ flex: 1, minWidth: "150px" }}><ChampDate compact aujourdhuiParDefaut={false} placeholder="Fin jj/mm/aaaa" ariaLabel="Date de fin" value={autoDateFin} onChange={(e) => setAutoDateFin(e.target.value)} /></div>
                 </div>
 
                 <select value={autoJourSemaine} onChange={(e) => setAutoJourSemaine(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }}>
@@ -7102,12 +7229,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
             {modeSaisie === "manuel" && (
             <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
-              <input
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-                placeholder="jj/mm/aaaa"
-                className="adm-input adm-input-compact adm-flex"
-              />
+              <div className="adm-flex"><ChampDate compact aujourdhuiParDefaut={false} ariaLabel="Date de la séance à ajouter" value={newDate} onChange={(e) => setNewDate(e.target.value)} /></div>
               <button
                 onClick={addSeance}
                 className="adm-btn-mini"
@@ -7631,6 +7753,87 @@ function Modal({ children, onClose, title, icon, accentColor }) {
         </div>
         <div className="modal-corps">{children}</div>
       </div>
+    </div>
+  );
+}
+
+// Date du jour au format de l'interface (jj/mm/aaaa)
+function dateDuJour() {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+}
+
+// Champ de date : saisie jj/mm/aaaa (les « / » s'ajoutent seuls), date du
+// jour par défaut, et bouton qui ouvre le calendrier de l'appareil.
+// La valeur reste au format jj/mm/aaaa, comme dans le reste de l'interface.
+function ChampDate({ label, value, onChange, aujourdhuiParDefaut = true, placeholder = "jj/mm/aaaa", compact = false, id, ariaLabel }) {
+  const autoId = React.useId();
+  const champId = id || autoId;
+  const calendrierRef = useRef(null);
+  const [interne, setInterne] = useState("");
+  const controle = value !== undefined;
+  const valeur = controle ? value : interne;
+
+  const emettre = (v) => {
+    if (controle) onChange?.({ target: { value: v } });
+    else setInterne(v);
+  };
+
+  // Date du jour à l'ouverture du formulaire, si le champ est vide
+  useEffect(() => {
+    if (aujourdhuiParDefaut && !valeur) emettre(dateDuJour());
+  }, []);
+
+  const saisir = (texte) => {
+    if (/[^\d/]/.test(texte)) { emettre(texte); return; }
+    const c = texte.replace(/\D/g, "").slice(0, 8);
+    emettre(c.length <= 2 ? c : c.length <= 4 ? `${c.slice(0, 2)}/${c.slice(2)}` : `${c.slice(0, 2)}/${c.slice(2, 4)}/${c.slice(4)}`);
+  };
+
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(valeur || "");
+  const iso = m ? `${m[3]}-${m[2]}-${m[1]}` : "";
+
+  const ouvrirCalendrier = () => {
+    const el = calendrierRef.current;
+    if (!el) return;
+    try { el.showPicker(); } catch { el.focus(); el.click(); }
+  };
+
+  const champ = (
+    <div className={`champ-date${compact ? " champ-date-compact" : ""}`}>
+      <input
+        id={champId}
+        className={`adm-input${compact ? " adm-input-compact" : ""}`}
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder={placeholder}
+        aria-label={label ? undefined : ariaLabel || placeholder}
+        value={valeur}
+        onChange={(e) => saisir(e.target.value)}
+      />
+      <button type="button" className="champ-date-btn" onClick={ouvrirCalendrier} aria-label="Choisir une date dans le calendrier">
+        <Calendar size={compact ? 16 : 18} aria-hidden="true" />
+      </button>
+      <input
+        ref={calendrierRef}
+        type="date"
+        className="champ-date-natif"
+        tabIndex={-1}
+        aria-hidden="true"
+        value={iso}
+        onChange={(e) => {
+          const [a, mo, j] = (e.target.value || "").split("-");
+          emettre(a && mo && j ? `${j}/${mo}/${a}` : "");
+        }}
+      />
+    </div>
+  );
+
+  if (!label) return champ;
+  return (
+    <div>
+      <label htmlFor={champId} className="adm-label">{label}</label>
+      {champ}
     </div>
   );
 }

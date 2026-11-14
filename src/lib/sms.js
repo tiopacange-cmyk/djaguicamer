@@ -43,7 +43,7 @@ export async function envoyerSMS({ message, numeros, senderId, groupId }) {
   try {
     const { data: session } = await supabase.auth.getSession();
     const jeton = session?.session?.access_token;
-    const res = await fetch(import.meta.env.VITE_SMS_ENDPOINT || "api/send-sms.php", {
+    const res = await fetch(import.meta.env.VITE_SMS_ENDPOINT || "/api/send-sms.php", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(jeton ? { Authorization: `Bearer ${jeton}` } : {}) },
       body: JSON.stringify({ message, msisdn: valides, senderId: senderIdEffectif }),
