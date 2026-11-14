@@ -1,39 +1,58 @@
-# Tontine Les Bâtisseurs — Prototype à héberger
+# DJANGUI CMR — mise en ligne chez LWS
 
-Ce dossier contient le projet complet, prêt à déployer gratuitement.
+Application React (Vite) + Supabase. Le site est fait de fichiers statiques,
+plus un petit script PHP (`api/send-sms.php`) qui envoie les SMS via LMT Group
+sans jamais exposer la clé API au navigateur.
 
-## Configuration Supabase (obligatoire avant de lancer le projet)
+## 1. Préparer la version à envoyer (sur votre ordinateur)
 
-1. Copie `.env.example` en `.env` et remplis avec tes vraies valeurs Supabase (Project Settings > API dans ton tableau de bord Supabase).
-2. Ouvre `src/App.jsx` et remplace la ligne :
-   ```js
-   const GROUP_ID = "REMPLACE-MOI-PAR-LE-VRAI-GROUP-ID";
-   ```
-   par l'UUID réel d'un groupe existant dans ta table `groups` (crée d'abord une ligne manuellement dans Supabase si besoin, via Table Editor).
-3. Pour l'instant, seul le module **Membres** est branché sur Supabase (voir `src/lib/membres.js`). Les autres modules (Tontine, Banque, Assurance, Dépôts) utilisent encore la sauvegarde locale du navigateur (localStorage) — on les connectera un par un ensuite.
-
-## Option la plus simple — Netlify (glisser-déposer, aucune ligne de commande)
-
-1. Ouvre un terminal dans ce dossier et lance :
+1. Copiez `.env.example` en `.env` et remplissez vos valeurs Supabase
+   (tableau de bord Supabase > Project Settings > API).
+2. Dans ce dossier, lancez :
    ```
    npm install
    npm run build
    ```
-   Cela crée un dossier `dist/`.
-2. Va sur https://app.netlify.com/drop
-3. Glisse-dépose le dossier `dist/` dans la page.
-4. Netlify te donne immédiatement une adresse en ligne (ex. `https://ton-nom.netlify.app`), gratuite, que tu peux partager pour les tests.
+   Cela crée le dossier `dist/` : c'est **son contenu** qu'on met en ligne.
 
-## Option Vercel (aussi gratuite, un peu plus technique)
+## 2. Envoyer les fichiers sur l'hébergement LWS
 
-1. Crée un compte gratuit sur https://vercel.com
-2. Installe l'outil Vercel : `npm install -g vercel`
-3. Dans ce dossier, lance : `vercel`
-4. Réponds aux questions (garde les valeurs par défaut), Vercel déploie et te donne un lien.
+1. Panneau LWS > votre domaine > **Gestionnaire de fichiers** (ou un logiciel FTP
+   comme FileZilla, avec les accès FTP indiqués par LWS).
+2. Ouvrez le dossier racine du site (`htdocs` ou `www`) et supprimez la page
+   d'attente de LWS (`index.html` / `index.php` par défaut) si elle existe.
+3. Envoyez **tout le contenu** de `dist/` (pas le dossier lui-même) :
+   `index.html`, `assets/`, `api/` et les fichiers `.htaccess`.
+   Les fichiers commençant par un point sont cachés : activez « afficher les
+   fichiers cachés » dans le gestionnaire de fichiers ou FileZilla.
 
-## Important à savoir
+## 3. Configurer l'envoi des SMS (une seule fois)
 
-- Les modules pas encore branchés sur Supabase (Tontine, Banque, Assurance, Dépôts) sauvegardent encore **dans le navigateur** (localStorage) : chaque testeur a ses propres données, pas partagées.
-- Une fois **Membres** branché et testé avec succès, dis-le à Claude pour qu'on connecte les modules suivants un par un, exactement de la même façon.
-- Ce prototype reste un **frontend seul** : pas encore de vrai système de connexion (email/mot de passe), pas de connexion Mobile Money réelle. Ça viendra à l'étape suivante.
+1. Sur le serveur, dans le dossier `api/`, dupliquez `config.exemple.php`
+   et nommez la copie `config.php`.
+2. Modifiez `config.php` : clé API, secret et nom d'expéditeur LMT Group,
+   puis l'adresse et la clé anon Supabase (les mêmes que dans `.env`).
+3. Ne mettez jamais `config.php` sur GitHub (il est ignoré par git). Le
+   fichier `api/.htaccess` empêche aussi de le lire depuis un navigateur.
 
+Lors des mises à jour suivantes, renvoyez le contenu de `dist/` **sans écraser**
+`api/config.php` sur le serveur (il n'existe pas dans `dist/`, il ne sera donc
+pas remplacé si vous ne supprimez pas tout le dossier `api/`).
+
+## 4. Réglages à vérifier
+
+- **HTTPS** : activez le certificat SSL gratuit (Let's Encrypt) dans le panneau
+  LWS. Le `.htaccess` redirige automatiquement vers `https://`.
+- **PHP** : version 7.4 ou plus récente, avec l'extension cURL (activée par
+  défaut chez LWS).
+- **Supabase** : dans Authentication > URL Configuration, mettez l'adresse de
+  votre site (ex. `https://votre-domaine.com`) dans « Site URL ».
+
+## En cas de problème
+
+- Page blanche : le contenu de `dist/` n'est pas à la racine du site, ou le
+  fichier `.htaccess` n'a pas été envoyé.
+- SMS non envoyés : ouvrez la console du navigateur (F12). Le message
+  « Configuration SMS absente » signifie que `api/config.php` manque ;
+  « Session expirée » qu'il faut se reconnecter ; « Clé API SMS non
+  configurée » que les valeurs LMT de `config.php` sont vides.

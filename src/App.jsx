@@ -17,7 +17,7 @@ import { fetchTableauDeBordMembre } from "./lib/moncompte";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
 // On simule la même API avec localStorage, pour que l'app fonctionne
-// telle quelle une fois déployée (Vercel, Netlify, etc.)
+// telle quelle une fois déployée chez l'hébergeur.
 if (typeof window !== "undefined" && !window.storage) {
   window.storage = {
     async get(key) {
