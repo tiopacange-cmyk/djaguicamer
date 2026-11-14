@@ -256,6 +256,9 @@ export default function AppPrototype() {
   const [modeRecuperation, setModeRecuperation] = useState(false);
   const [vueEspacePersonnel, setVueEspacePersonnel] = useState(false);
   const [statutAbonnement, setStatutAbonnement] = useState(null);
+  // Message affiché sur la page de connexion quand un compte est refusé
+  // sur le lien d'un groupe (Super Admin, ou membre d'un autre groupe).
+  const [refusLienGroupe, setRefusLienGroupe] = useState("");
 
   const chargerSessionEtRole = async () => {
     setChargementSession(true);
@@ -279,8 +282,37 @@ export default function AppPrototype() {
         setMesGroupes([]);
         return;
       }
+      const [profil, groupesTous] = await Promise.all([getMonProfil(), getMesGroupes()]);
+      let groupes = groupesTous;
+
+      // Lien d'un groupe (ex. /armens) : seuls les membres de ce groupe
+      // entrent, et uniquement dans ce groupe. Le Super Admin se connecte
+      // depuis l'adresse principale.
+      const slug = lireSlugAdresse();
+      if (slug) {
+        const duGroupe = groupesTous.filter((g) => g.group?.slug === slug);
+        let refus = "";
+        if (profil?.is_super_admin || duGroupe.length === 0) {
+          // Un lien inconnu affiche la page normale : aucune restriction
+          const vitrine = await fetchVitrineGroupe(slug).catch(() => null);
+          if (vitrine && profil?.is_super_admin) {
+            refus = `Le compte Super Admin se connecte uniquement depuis ${window.location.host}, pas depuis le lien d'un groupe.`;
+          } else if (vitrine) {
+            refus = `Ce compte n'est pas membre ${deNom(vitrine.nom)}. Utilise le lien de ton propre groupe.`;
+          }
+        }
+        if (refus) {
+          setRefusLienGroupe(refus);
+          await signOut();
+          setConnecte(false);
+          setMonProfil(null);
+          setMesGroupes([]);
+          return;
+        }
+        if (duGroupe.length > 0) groupes = duGroupe;
+      }
+
       setConnecte(true);
-      const [profil, groupes] = await Promise.all([getMonProfil(), getMesGroupes()]);
       setMonProfil(profil);
       setMesGroupes(groupes);
     } catch (e) {
@@ -340,7 +372,13 @@ export default function AppPrototype() {
   if (!connecte) {
     return (
       <div style={{ fontFamily: "var(--font-sans)" }}>
-        <ConnexionScreen onLoggedIn={chargerSessionEtRole} sombre={sombre} onBasculerMode={basculerMode} />
+        <ConnexionScreen
+          onLoggedIn={chargerSessionEtRole}
+          sombre={sombre}
+          onBasculerMode={basculerMode}
+          messageRefus={refusLienGroupe}
+          onEffacerRefus={() => setRefusLienGroupe("")}
+        />
       </div>
     );
   }
@@ -446,7 +484,7 @@ function TitreSlogan({ slogan }) {
   return <>{slogan.slice(0, i + 1)} <em>{slogan.slice(i + 1).trim()}</em></>;
 }
 
-function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
+function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode, messageRefus = "", onEffacerRefus }) {
   // Le mode (sombre par défaut) est celui de toute l'application.
   const dark = sombre;
   // Page personnalisée quand l'adresse contient le lien d'un groupe
@@ -484,6 +522,7 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
     }
     setChargement(true);
     setErreur("");
+    onEffacerRefus?.();
     try {
       await signIn({ identifiant: identifiant.trim(), password });
       onLoggedIn();
@@ -664,9 +703,9 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
                     Mot de passe oublié ?
                   </button>
 
-                  {erreur && (
+                  {(erreur || messageRefus) && (
                     <div id="connexion-erreur" className="message message-erreur" role="alert">
-                      <AlertTriangle size={16} aria-hidden="true" /> {erreur}
+                      <AlertTriangle size={16} aria-hidden="true" /> {erreur || messageRefus}
                     </div>
                   )}
 
