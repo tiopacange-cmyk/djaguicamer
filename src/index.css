@@ -1718,3 +1718,83 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 
 /* Boutons de tableau : passent sur deux lignes plutôt que de déborder */
 .tableau-ligne .adm-btn, .tableau-ligne button { white-space: normal; text-align: center; max-width: 100%; line-height: 1.2; }
+
+/* ============================================================
+   PAGE DE CONNEXION D'UN GROUPE (lien /slug)
+   ============================================================ */
+.accueil-logo-groupe { gap: var(--space-4); }
+.accueil-logo-image {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #FFFFFF;
+  flex-shrink: 0;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.accueil-logo-groupe .accueil-logo-nom { font-size: 26px; letter-spacing: 0.02em; }
+.accueil-logo-groupe .accueil-logo-sub {
+  color: var(--gold);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.accueil-propulse {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: var(--space-4) 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.accueil-propulse strong { color: var(--ink); font-weight: 700; }
+.accueil-propulse-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--gold);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  .accueil-logo-image { width: 56px; height: 56px; }
+  .accueil-logo-groupe .accueil-logo-nom { font-size: 22px; }
+}
+
+/* Lien de connexion du groupe (Super Admin) */
+.lien-groupe {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  overflow: hidden;
+}
+.lien-groupe:focus-within { box-shadow: 0 0 0 3px var(--ring); }
+.lien-groupe-base {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background: var(--surface-sunken, var(--bg));
+  color: var(--muted);
+  font-size: 14px;
+  white-space: nowrap;
+  border-right: 1px solid var(--border);
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lien-groupe-saisie {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+}

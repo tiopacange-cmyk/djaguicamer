@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre, reinitialiserMotDePasseMembre, televerserDocumentMembre, fetchDocumentsMembre } from "./lib/membres";
 import { fetchTypesFonds, creerTypeFonds, supprimerTypeFonds, fetchFondsTousMembres, fixerCibleTypeFonds, enregistrerVersementFonds, fetchFondsMembre } from "./lib/fonds";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse } from "./lib/auth";
-import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement, televerserLogoGroupe, fetchLogoGroupe, modifierGroupe, suspendreGroupe, reactiverGroupe, fetchStatsPlateforme, fetchSoldeSms, vendreCreditsSms, definirBlocageSms, fetchHistoriqueSms, fetchSmsSenderId, definirSmsSenderId } from "./lib/groups";
+import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement, televerserLogoGroupe, fetchLogoGroupe, modifierGroupe, suspendreGroupe, reactiverGroupe, fetchStatsPlateforme, fetchSoldeSms, vendreCreditsSms, definirBlocageSms, fetchHistoriqueSms, fetchSmsSenderId, definirSmsSenderId, fetchVitrineGroupe, genererSlug, SLUGS_RESERVES } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere, fetchApercuRedistribution, redistribuerCommission, fetchTotalRedistributions } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit, fetchApercuCloture, cloturerEpargne } from "./lib/banque";
 import { fetchConfigAssurance, sauvegarderConfigAssurance, fetchSoldesAssurance, enregistrerCotisationsAssurance, fetchTypesEvenement, creerTypeEvenement, fetchEvenements, declarerEvenement, fetchHistoriqueAssurance } from "./lib/assurance";
@@ -44,7 +44,7 @@ import {
   CreditCard, ScrollText, LayoutDashboard, Wallet, Shield, FileBarChart,
   Gavel, Bell, LogOut, Moon, Sun, Lock, ChevronLeft, CheckCircle2, Clock,
   Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat, Eye, EyeOff, AlertTriangle, ShoppingCart, Palette,
-  ShieldCheck, MessageSquareText, ListChecks, UserRound, Mail, ArrowDownLeft, ArrowUpRight,
+  ShieldCheck, MessageSquareText, ListChecks, UserRound, Mail, ArrowDownLeft, ArrowUpRight, Check,
 } from "lucide-react";
 
 // ---------- Palette partagée ----------
@@ -428,9 +428,44 @@ export default function AppPrototype() {
 // ============================================================
 // ÉCRAN 1 — CONNEXION
 // ============================================================
+// Lien de groupe dans l'adresse : djangui.3tsolutioncm.com/armens -> "armens"
+function lireSlugAdresse() {
+  if (typeof window === "undefined") return "";
+  let premier = window.location.pathname.split("/").filter(Boolean)[0] || "";
+  try { premier = decodeURIComponent(premier).toLowerCase(); } catch { return ""; }
+  return /^[a-z0-9-]{1,40}$/.test(premier) ? premier : "";
+}
+
+// « de ARMENS » -> « d'ARMENS »
+const deNom = (nom) => (/^[aeiouyhàâäéèêëîïôöùûü]/i.test(nom) ? `d'${nom}` : `de ${nom}`);
+
+// Slogan en titre : la partie après la première virgule passe en doré
+function TitreSlogan({ slogan }) {
+  const i = slogan.indexOf(",");
+  if (i === -1) return <em>{slogan}</em>;
+  return <>{slogan.slice(0, i + 1)} <em>{slogan.slice(i + 1).trim()}</em></>;
+}
+
 function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
   // Le mode (sombre par défaut) est celui de toute l'application.
   const dark = sombre;
+  // Page personnalisée quand l'adresse contient le lien d'un groupe
+  const [groupe, setGroupe] = useState(null);
+  useEffect(() => {
+    const slug = lireSlugAdresse();
+    if (!slug) return;
+    let actif = true;
+    fetchVitrineGroupe(slug)
+      .then((g) => { if (actif && g) setGroupe(g); })
+      .catch((e) => console.error("Erreur de chargement de la page du groupe", e));
+    return () => { actif = false; };
+  }, []);
+  useEffect(() => {
+    if (!groupe) return;
+    const titreAvant = document.title;
+    document.title = `${groupe.nom} — Connexion · DJANGUI CMR`;
+    return () => { document.title = titreAvant; };
+  }, [groupe]);
   const [identifiant, setIdentifiant] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -493,22 +528,40 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
       {/* Panneau de marque : mission + preuves de confiance */}
       <section className="accueil-marque accueil-v3" aria-labelledby="accueil-titre">
         <div className="accueil-contenu">
-          <div className="accueil-logo">
-            <div className="accueil-logo-mark" aria-hidden="true">
-              <MarqueCauri taille={30} couleur="#16225A" fond="#FFFFFF" />
+          {groupe ? (
+            <div className="accueil-logo accueil-logo-groupe">
+              {groupe.logo_url ? (
+                <img className="accueil-logo-image" src={groupe.logo_url} alt={`Logo ${groupe.nom}`} />
+              ) : (
+                <div className="accueil-logo-mark" aria-hidden="true">
+                  <MarqueCauri taille={30} couleur="#16225A" fond="#FFFFFF" />
+                </div>
+              )}
+              <div>
+                <div className="accueil-logo-nom">{groupe.nom}</div>
+                <div className="accueil-logo-sub">Espace des membres</div>
+              </div>
             </div>
-            <div>
-              <div className="accueil-logo-nom">DJANGUI CMR</div>
-              <div className="accueil-logo-sub">By 3Tsolution Sarl</div>
+          ) : (
+            <div className="accueil-logo">
+              <div className="accueil-logo-mark" aria-hidden="true">
+                <MarqueCauri taille={30} couleur="#16225A" fond="#FFFFFF" />
+              </div>
+              <div>
+                <div className="accueil-logo-nom">DJANGUI CMR</div>
+                <div className="accueil-logo-sub">By 3Tsolution Sarl</div>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="accueil-texte">
             <p id="accueil-titre" className="accueil-titre">
-              Votre tontine, <em>claire et sereine.</em>
+              {groupe?.slogan ? <TitreSlogan slogan={groupe.slogan} /> : <>Votre tontine, <em>claire et sereine.</em></>}
             </p>
             <p className="accueil-intro">
-              Cotisations, tours, épargne, prêts et assurance de votre groupe réunis au même endroit, visibles par chaque membre.
+              {groupe
+                ? `Bienvenue chez ${groupe.nom}. Connecte-toi pour suivre tes cotisations, ton épargne et les séances du groupe.`
+                : "Cotisations, tours, épargne, prêts et assurance de votre groupe réunis au même endroit, visibles par chaque membre."}
             </p>
           </div>
 
@@ -521,6 +574,13 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
             <li><MessageSquareText size={16} aria-hidden="true" /> Confirmation par SMS</li>
             <li><ShieldCheck size={16} aria-hidden="true" /> Accès selon le rôle</li>
           </ul>
+
+          {groupe && (
+            <p className="accueil-propulse">
+              <span className="accueil-propulse-mark" aria-hidden="true"><MarqueCauri taille={16} couleur="#16225A" fond="#FFFFFF" /></span>
+              <span>Propulsé par <strong>DJANGUI CMR</strong> · By 3Tsolution Sarl</span>
+            </p>
+          )}
         </div>
       </section>
 
@@ -542,9 +602,11 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
           <div className="carte-auth">
             {!modeOubli ? (
               <>
-                <div className="carte-auth-surtitre">Espace membres</div>
+                <div className="carte-auth-surtitre">{groupe ? `Espace membres · ${groupe.nom}` : "Espace membres"}</div>
                 <h1>Connexion</h1>
-                <p className="carte-auth-desc">Utilise l'identifiant fourni par le bureau de ton groupe.</p>
+                <p className="carte-auth-desc">
+                  {groupe ? `Utilise l'identifiant fourni par le bureau ${deNom(groupe.nom)}.` : "Utilise l'identifiant fourni par le bureau de ton groupe."}
+                </p>
 
                 <form onSubmit={handleSubmitLogin} noValidate>
                   <div className="champ">
@@ -684,7 +746,7 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode }) {
         </div>
 
         <footer className="accueil-pied">
-          <strong>DJANGUI CMR</strong> · By 3Tsolution Sarl — 2026
+          {groupe ? <>{groupe.nom} · propulsé par <strong>DJANGUI CMR</strong> · By 3Tsolution Sarl</> : <><strong>DJANGUI CMR</strong> · By 3Tsolution Sarl — 2026</>}
         </footer>
       </main>
     </div>
@@ -835,6 +897,9 @@ function SuperAdminScreen() {
   const [showRenouveler, setShowRenouveler] = useState(null);
   const [showModifierGroupe, setShowModifierGroupe] = useState(null);
   const [modifierGroupeNom, setModifierGroupeNom] = useState("");
+  const [modifierGroupeSlug, setModifierGroupeSlug] = useState("");
+  const [modifierGroupeSlogan, setModifierGroupeSlogan] = useState("");
+  const [lienCopie, setLienCopie] = useState(false);
   const [modifierGroupeErreur, setModifierGroupeErreur] = useState("");
   const [modifierGroupeEnCours, setModifierGroupeEnCours] = useState(false);
   const [modifierGroupeLogo, setModifierGroupeLogo] = useState("");
@@ -1125,6 +1190,9 @@ function SuperAdminScreen() {
                       onClick={async () => {
                         setShowModifierGroupe(g);
                         setModifierGroupeNom(g.nom);
+                        setModifierGroupeSlug(g.slug || "");
+                        setModifierGroupeSlogan(g.slogan || "");
+                        setLienCopie(false);
                         setModifierGroupeErreur("");
                         setModifierGroupeLogo("");
                         try {
@@ -1567,6 +1635,58 @@ function SuperAdminScreen() {
           <FormField label="Nom du groupe" placeholder="Ex. Tontine Les Bâtisseurs" value={modifierGroupeNom} onChange={(e) => setModifierGroupeNom(e.target.value)} />
 
           <div>
+            <label className="adm-label" htmlFor="modif-groupe-lien">Lien de connexion du groupe</label>
+            <div className="lien-groupe">
+              <span className="lien-groupe-base">{window.location.host}/</span>
+              <input
+                id="modif-groupe-lien"
+                className="lien-groupe-saisie"
+                value={modifierGroupeSlug}
+                placeholder={genererSlug(modifierGroupeNom) || "nom-du-groupe"}
+                autoCapitalize="none"
+                spellCheck={false}
+                onChange={(e) => { setModifierGroupeSlug(genererSlug(e.target.value.replace(/\s/g, "-")) + (/[-\s]$/.test(e.target.value) ? "-" : "")); setLienCopie(false); }}
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, color: C.sub, flex: 1, minWidth: 0 }}>
+                Lettres minuscules, chiffres et tirets. À partager aux membres pour ouvrir la page de connexion du groupe.
+              </span>
+              <button
+                type="button"
+                className="adm-btn-ligne"
+                disabled={!modifierGroupeSlug || modifierGroupeSlug !== (showModifierGroupe.slug || "")}
+                title={modifierGroupeSlug !== (showModifierGroupe.slug || "") ? "Enregistre d'abord le nouveau lien" : undefined}
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(`${window.location.origin}/${modifierGroupeSlug}`);
+                    setLienCopie(true);
+                  } catch (e) {
+                    console.error("Copie du lien impossible", e);
+                  }
+                }}
+              >
+                {lienCopie ? <><Check size={14} /> Copié</> : "Copier le lien"}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="adm-label" htmlFor="modif-groupe-slogan">Slogan (page de connexion)</label>
+            <input
+              id="modif-groupe-slogan"
+              className="adm-input"
+              value={modifierGroupeSlogan}
+              maxLength={80}
+              placeholder="Ex. Ensemble, on bâtit l'avenir."
+              onChange={(e) => setModifierGroupeSlogan(e.target.value)}
+            />
+            <div style={{ fontSize: 13, color: C.sub, marginTop: "6px" }}>
+              La partie après la virgule s'affiche en doré. Laisse vide pour garder le titre DJANGUI CMR.
+            </div>
+          </div>
+
+          <div>
             <label className="adm-label">Logo du groupe</label>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               {modifierGroupeLogo ? (
@@ -1617,9 +1737,11 @@ function SuperAdminScreen() {
             className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: modifierGroupeEnCours ? "default" : "pointer" }}
             onClick={async () => {
               if (!modifierGroupeNom.trim()) { setModifierGroupeErreur("Le nom du groupe est obligatoire."); return; }
+              const slug = modifierGroupeSlug.replace(/^-+|-+$/g, "");
+              if (SLUGS_RESERVES.includes(slug)) { setModifierGroupeErreur(`« ${slug} » est réservé par le site, choisis un autre lien.`); return; }
               setModifierGroupeEnCours(true);
               try {
-                await modifierGroupe(showModifierGroupe.id, modifierGroupeNom.trim());
+                await modifierGroupe(showModifierGroupe.id, modifierGroupeNom.trim(), { slug, slogan: modifierGroupeSlogan.trim() });
                 await chargerGroupes();
                 setShowModifierGroupe(null);
               } catch (e) {

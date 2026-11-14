@@ -31,3 +31,17 @@ seul cet écran est allégé en bleu, à la demande du client.
 - **Mode sombre par défaut** (choix du client). Le bouton en haut à droite propose l'action inverse
   (« Mode clair » en sombre, « Mode sombre » en clair). Le panneau suit les tokens (`--surface`),
   le titre de la carte passe en `--ink`.
+
+## Page de connexion d'un groupe (lien `/slug`)
+
+- Adresse : `djangui.3tsolutioncm.com/<slug>` (ex. `/armens`). Le `.htaccess` renvoie toute adresse
+  inconnue vers `index.html` ; `lireSlugAdresse()` lit le premier segment.
+- Données lues sans connexion par la fonction Supabase `get_vitrine_groupe(p_slug)` :
+  nom, logo et slogan uniquement.
+- Changements : logo du groupe (72px, rond) à la place du cauri, nom du groupe et « Espace des
+  membres », slogan en titre (après la première virgule en doré), accueil et formulaire au nom du
+  groupe, « Propulsé par DJANGUI CMR · By 3Tsolution Sarl » sous les pastilles, nom dans l'onglet.
+- Inchangés : illustration et ses textes, les 3 pastilles, formulaire, mode sombre.
+- Sans slogan, le titre DJANGUI CMR reste ; sans logo, le cauri reste ; lien inconnu = page normale.
+- Réglage : Super Admin → Groupes → Modifier (lien, bouton « Copier le lien », slogan, logo).
+  Liens réservés : `api`, `assets`, `index`, `admin`, `connexion`.

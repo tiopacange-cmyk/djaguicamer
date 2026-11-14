@@ -11,12 +11,20 @@ function genererIdentifiant(nom) {
   return nom.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
 }
 
+// Lien de connexion d'un groupe (ex. "Tontine Les Bâtisseurs" -> "tontine-les-batisseurs")
+export function genererSlug(nom) {
+  return (nom || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+}
+
+// Chemins déjà utilisés par le site : jamais attribués à un groupe
+export const SLUGS_RESERVES = ["api", "assets", "index", "admin", "connexion"];
+
 // Liste tous les groupes (réservé au Super Admin)
 export async function fetchGroupes() {
   const { data, error } = await supabase
     .from("groups")
     .select(`
-      id, nom, created_at, sms_credits, sms_sender_id, sms_bloquer_si_epuise,
+      id, nom, slug, slogan, created_at, sms_credits, sms_sender_id, sms_bloquer_si_epuise,
       subscriptions ( formule, periodicite, statut, date_expiration )
     `)
     .order("created_at", { ascending: false });
@@ -70,6 +78,14 @@ export async function creerGroupeAvecAdmin({ nomGroupe, adminNom, adminEmail, fo
     .select()
     .single();
   if (groupeError) throw groupeError;
+
+  // Lien de connexion personnalisé (ex. /armens). Facultatif : s'il est
+  // déjà pris, le Super Admin pourra en choisir un autre plus tard.
+  const slug = genererSlug(nomGroupe);
+  if (slug && !SLUGS_RESERVES.includes(slug)) {
+    const { error: slugError } = await supabase.from("groups").update({ slug }).eq("id", groupe.id);
+    if (!slugError) groupe.slug = slug;
+  }
 
   // La durée d'accès dépend du plan choisi : essai = 14 jours fixes,
   // sinon 30 jours (mensuel) ou 365 jours (annuel).
@@ -325,9 +341,24 @@ export async function fetchLogoGroupe(groupId) {
 // MODIFIER / SUSPENDRE UN GROUPE
 // ============================================================
 
-export async function modifierGroupe(groupId, nom) {
-  const { error } = await supabase.from("groups").update({ nom }).eq("id", groupId);
+export async function modifierGroupe(groupId, nom, { slug, slogan } = {}) {
+  const changements = { nom };
+  if (slug !== undefined) changements.slug = slug || null;
+  if (slogan !== undefined) changements.slogan = slogan || null;
+  const { error } = await supabase.from("groups").update(changements).eq("id", groupId);
+  if (error) {
+    if (error.code === "23505") throw new Error("Ce lien est déjà utilisé par un autre groupe.");
+    throw error;
+  }
+}
+
+// ============================================================
+// PAGE DE CONNEXION D'UN GROUPE (lien /slug, lisible sans connexion)
+// ============================================================
+export async function fetchVitrineGroupe(slug) {
+  const { data, error } = await supabase.rpc("get_vitrine_groupe", { p_slug: slug });
   if (error) throw error;
+  return Array.isArray(data) ? data[0] || null : data;
 }
 
 // Suspend l'accès au groupe sans rien supprimer (bloque la
