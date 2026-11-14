@@ -3373,22 +3373,12 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
             <div style={{ display: "flex", alignItems: "flex-end", gap: "10px", marginTop: "22px", background: C.panel, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "14px 16px" }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: "12px", color: C.sub, marginBottom: "5px", display: "block" }}>Du</label>
-                <input
-                  value={filtreDateDebut}
-                  onChange={(e) => setFiltreDateDebut(e.target.value)}
-                  placeholder="jj/mm/aaaa"
-                  style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }}
-                />
+                <label htmlFor="filtre-du" style={{ fontSize: "12px", color: C.sub, marginBottom: "5px", display: "block" }}>Du</label>
+                <ChampDate id="filtre-du" compact aujourdhuiParDefaut={false} value={filtreDateDebut} onChange={(e) => setFiltreDateDebut(e.target.value)} />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: "12px", color: C.sub, marginBottom: "5px", display: "block" }}>Au</label>
-                <input
-                  value={filtreDateFin}
-                  onChange={(e) => setFiltreDateFin(e.target.value)}
-                  placeholder="jj/mm/aaaa"
-                  style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }}
-                />
+                <label htmlFor="filtre-au" style={{ fontSize: "12px", color: C.sub, marginBottom: "5px", display: "block" }}>Au</label>
+                <ChampDate id="filtre-au" compact aujourdhuiParDefaut={false} value={filtreDateFin} onChange={(e) => setFiltreDateFin(e.target.value)} />
               </div>
               <button
                 className="adm-btn adm-btn-action" style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
@@ -3813,13 +3803,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showCotisationTontine && (
         <Modal onClose={() => setShowCotisationTontine(false)} title="Enregistrer une cotisation — Tontine">
           <div>
-            <label className="adm-label">Date de la séance</label>
-            <input
-              value={cotisationTontineDate}
-              onChange={(e) => setCotisationTontineDate(e.target.value)}
-              placeholder="jj/mm/aaaa"
-              className="adm-input"
-            />
+            <ChampDate label="Date de la séance" value={cotisationTontineDate} onChange={(e) => setCotisationTontineDate(e.target.value)} />
             <div className="adm-aide">
               Une seule date pour toute la séance — elle s'applique à chaque montant saisi ci-dessous.
             </div>
@@ -4002,7 +3986,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <div style={{ flex: 1 }}>
-              <FormField label="Date de déclaration" placeholder="jj/mm/aaaa" />
+              <ChampDate label="Date de déclaration" />
             </div>
             <div style={{ flex: 1 }}>
               <FormField label="Frais de déclaration" placeholder="Ex. 2 000 FCFA" />
@@ -4076,7 +4060,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             </div>
           </div>
 
-          <FormField label="Date de l'événement" placeholder="jj/mm/aaaa" />
+          <ChampDate label="Date de l'événement" />
 
           <div className="adm-msg adm-msg-info">
             Le montant brut sera prélevé au prorata sur le solde d'assurance de <b>tous les membres</b>, et non depuis une caisse déjà constituée.
@@ -4170,13 +4154,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
       {showCotisationAssurance && (
         <Modal onClose={() => setShowCotisationAssurance(false)} title="Enregistrer une cotisation — Assurance">
           <div>
-            <label className="adm-label">Date de la séance</label>
-            <input
-              value={cotisationAssuranceDate}
-              onChange={(e) => setCotisationAssuranceDate(e.target.value)}
-              placeholder="jj/mm/aaaa"
-              className="adm-input"
-            />
+            <ChampDate label="Date de la séance" value={cotisationAssuranceDate} onChange={(e) => setCotisationAssuranceDate(e.target.value)} />
           </div>
 
           <div>
@@ -4373,7 +4351,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           <FormField label="Nom de l'épargne" placeholder="Ex. Épargne Achat de terrain" value={epargneNom} onChange={(e) => setEpargneNom(e.target.value)} />
           <FormField label="Cotisation par séance" placeholder="Ex. 20 000 FCFA" value={epargneCotisation} onChange={(e) => setEpargneCotisation(e.target.value)} />
           <FormField label="Taux d'intérêt sur les prêts" placeholder="Ex. 5 %" value={epargneTaux} onChange={(e) => setEpargneTaux(e.target.value)} />
-          <FormField label="Date de clôture du cycle" placeholder="jj/mm/aaaa" value={epargneCloture} onChange={(e) => setEpargneCloture(e.target.value)} />
+          <ChampDate label="Date de clôture du cycle" aujourdhuiParDefaut={false} value={epargneCloture} onChange={(e) => setEpargneCloture(e.target.value)} />
 
           {epargneError && (
             <div className="adm-msg adm-msg-erreur" role="alert">
@@ -4440,13 +4418,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <div>
-            <label className="adm-label">Date du dépôt (séance)</label>
-            <input
-              value={cotisationDate}
-              onChange={(e) => setCotisationDate(e.target.value)}
-              placeholder="jj/mm/aaaa"
-              className="adm-input"
-            />
+            <ChampDate label="Date du dépôt (séance)" value={cotisationDate} onChange={(e) => setCotisationDate(e.target.value)} />
             <div className="adm-aide">
               Une seule date pour toute la séance — elle s'applique à chaque montant saisi ci-dessous.
             </div>
@@ -4547,10 +4519,10 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <div style={{ flex: 1 }}>
-              <FormField label="Date de début du crédit" placeholder="jj/mm/aaaa" value={creditDebut} onChange={(e) => setCreditDebut(e.target.value)} />
+              <ChampDate label="Date de début du crédit" value={creditDebut} onChange={(e) => setCreditDebut(e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
-              <FormField label="Date de fin du crédit" placeholder="jj/mm/aaaa" value={creditFin} onChange={(e) => setCreditFin(e.target.value)} />
+              <ChampDate label="Date de fin du crédit" aujourdhuiParDefaut={false} value={creditFin} onChange={(e) => setCreditFin(e.target.value)} />
             </div>
           </div>
 
@@ -4676,7 +4648,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         <Modal onClose={() => setShowRapportJournalier(false)} title="Rapport journalier" icon={<FileBarChart />} accentColor={C.vifBleu}>
           {!rapportJour ? (
             <>
-              <FormField label="Date de la séance" placeholder="jj/mm/aaaa" value={rapportJourDate} onChange={(e) => setRapportJourDate(e.target.value)} />
+              <ChampDate label="Date de la séance" value={rapportJourDate} onChange={(e) => setRapportJourDate(e.target.value)} />
               <div className="adm-msg adm-msg-info">
                 Le rapport reprend toutes les cotisations, versements, amendes, mouvements bancaires et événements d'assurance enregistrés à cette date, tous modules confondus.
               </div>
@@ -5298,13 +5270,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <div>
-            <label className="adm-label">Date du versement</label>
-            <input
-              value={cotisationFondsDate}
-              onChange={(e) => setCotisationFondsDate(e.target.value)}
-              placeholder="jj/mm/aaaa"
-              className="adm-input"
-            />
+            <ChampDate label="Date du versement" value={cotisationFondsDate} onChange={(e) => setCotisationFondsDate(e.target.value)} />
           </div>
 
           <div>
@@ -5783,7 +5749,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             )}
           </div>
 
-          <FormField label="Date de la séance" placeholder="jj/mm/aaaa" value={depotDate} onChange={(e) => setDepotDate(e.target.value)} />
+          <ChampDate label="Date de la séance" value={depotDate} onChange={(e) => setDepotDate(e.target.value)} />
           <FormField label="Montant" placeholder="Ex. 1 000 000 FCFA" value={depotMontant} onChange={(e) => setDepotMontant(e.target.value)} />
 
           {typeMouvementBanque === "Retrait" && (
@@ -6395,7 +6361,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showCreerSeance && (
         <Modal onClose={() => setShowCreerSeance(false)} title="Créer une séance" icon={<Calendar />} accentColor={C.vifBleu}>
-          <FormField label="Date de la séance" placeholder="jj/mm/aaaa" value={seanceDate} onChange={(e) => setSeanceDate(e.target.value)} />
+          <ChampDate label="Date de la séance" value={seanceDate} onChange={(e) => setSeanceDate(e.target.value)} />
           <FormField label="Lieu" placeholder="Ex. Domicile du président" value={seanceLieu} onChange={(e) => setSeanceLieu(e.target.value)} />
           <div>
             <label className="adm-label">Ordre du jour</label>
@@ -6655,7 +6621,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
       {showCreerRafraichissement && (
         <Modal onClose={() => setShowCreerRafraichissement(false)} title="Enregistrer un rafraîchissement" icon={<ShoppingCart />} accentColor={C.vifOr}>
-          <FormField label="Date" placeholder="jj/mm/aaaa" value={rafraDate} onChange={(e) => setRafraDate(e.target.value)} />
+          <ChampDate label="Date" value={rafraDate} onChange={(e) => setRafraDate(e.target.value)} />
 
           <div>
             <label className="adm-label">Séance liée (optionnel)</label>
@@ -6834,7 +6800,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
           </div>
 
           <FormField label="Montant (FCFA)" placeholder="Ex. 5 000" value={depenseMontant} onChange={(e) => setDepenseMontant(e.target.value)} />
-          <FormField label="Date" placeholder="jj/mm/aaaa" value={depenseDate} onChange={(e) => setDepenseDate(e.target.value)} />
+          <ChampDate label="Date" value={depenseDate} onChange={(e) => setDepenseDate(e.target.value)} />
           <FormField label="Motif" placeholder="Ex. Achat de cahiers de compte" value={depenseMotif} onChange={(e) => setDepenseMotif(e.target.value)} />
 
           <div>
@@ -7169,8 +7135,8 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
             {modeSaisie === "auto" && (
               <div style={{ background: C.sunken, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px", marginBottom: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                  <input value={autoDateDebut} onChange={(e) => setAutoDateDebut(e.target.value)} placeholder="Début jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }} />
-                  <input value={autoDateFin} onChange={(e) => setAutoDateFin(e.target.value)} placeholder="Fin jj/mm/aaaa" style={{ flex: 1, boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }} />
+                  <div style={{ flex: 1, minWidth: "150px" }}><ChampDate compact placeholder="Début jj/mm/aaaa" ariaLabel="Date de début" value={autoDateDebut} onChange={(e) => setAutoDateDebut(e.target.value)} /></div>
+                  <div style={{ flex: 1, minWidth: "150px" }}><ChampDate compact aujourdhuiParDefaut={false} placeholder="Fin jj/mm/aaaa" ariaLabel="Date de fin" value={autoDateFin} onChange={(e) => setAutoDateFin(e.target.value)} /></div>
                 </div>
 
                 <select value={autoJourSemaine} onChange={(e) => setAutoJourSemaine(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${C.borderFort}`, background: C.surface, fontSize: "13.5px", outline: "none" }}>
@@ -7224,12 +7190,7 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
 
             {modeSaisie === "manuel" && (
             <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
-              <input
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-                placeholder="jj/mm/aaaa"
-                className="adm-input adm-input-compact adm-flex"
-              />
+              <div className="adm-flex"><ChampDate compact aujourdhuiParDefaut={false} ariaLabel="Date de la séance à ajouter" value={newDate} onChange={(e) => setNewDate(e.target.value)} /></div>
               <button
                 onClick={addSeance}
                 className="adm-btn-mini"
@@ -7753,6 +7714,87 @@ function Modal({ children, onClose, title, icon, accentColor }) {
         </div>
         <div className="modal-corps">{children}</div>
       </div>
+    </div>
+  );
+}
+
+// Date du jour au format de l'interface (jj/mm/aaaa)
+function dateDuJour() {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+}
+
+// Champ de date : saisie jj/mm/aaaa (les « / » s'ajoutent seuls), date du
+// jour par défaut, et bouton qui ouvre le calendrier de l'appareil.
+// La valeur reste au format jj/mm/aaaa, comme dans le reste de l'interface.
+function ChampDate({ label, value, onChange, aujourdhuiParDefaut = true, placeholder = "jj/mm/aaaa", compact = false, id, ariaLabel }) {
+  const autoId = React.useId();
+  const champId = id || autoId;
+  const calendrierRef = useRef(null);
+  const [interne, setInterne] = useState("");
+  const controle = value !== undefined;
+  const valeur = controle ? value : interne;
+
+  const emettre = (v) => {
+    if (controle) onChange?.({ target: { value: v } });
+    else setInterne(v);
+  };
+
+  // Date du jour à l'ouverture du formulaire, si le champ est vide
+  useEffect(() => {
+    if (aujourdhuiParDefaut && !valeur) emettre(dateDuJour());
+  }, []);
+
+  const saisir = (texte) => {
+    if (/[^\d/]/.test(texte)) { emettre(texte); return; }
+    const c = texte.replace(/\D/g, "").slice(0, 8);
+    emettre(c.length <= 2 ? c : c.length <= 4 ? `${c.slice(0, 2)}/${c.slice(2)}` : `${c.slice(0, 2)}/${c.slice(2, 4)}/${c.slice(4)}`);
+  };
+
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(valeur || "");
+  const iso = m ? `${m[3]}-${m[2]}-${m[1]}` : "";
+
+  const ouvrirCalendrier = () => {
+    const el = calendrierRef.current;
+    if (!el) return;
+    try { el.showPicker(); } catch { el.focus(); el.click(); }
+  };
+
+  const champ = (
+    <div className={`champ-date${compact ? " champ-date-compact" : ""}`}>
+      <input
+        id={champId}
+        className={`adm-input${compact ? " adm-input-compact" : ""}`}
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder={placeholder}
+        aria-label={label ? undefined : ariaLabel || placeholder}
+        value={valeur}
+        onChange={(e) => saisir(e.target.value)}
+      />
+      <button type="button" className="champ-date-btn" onClick={ouvrirCalendrier} aria-label="Choisir une date dans le calendrier">
+        <Calendar size={compact ? 16 : 18} aria-hidden="true" />
+      </button>
+      <input
+        ref={calendrierRef}
+        type="date"
+        className="champ-date-natif"
+        tabIndex={-1}
+        aria-hidden="true"
+        value={iso}
+        onChange={(e) => {
+          const [a, mo, j] = (e.target.value || "").split("-");
+          emettre(a && mo && j ? `${j}/${mo}/${a}` : "");
+        }}
+      />
+    </div>
+  );
+
+  if (!label) return champ;
+  return (
+    <div>
+      <label htmlFor={champId} className="adm-label">{label}</label>
+      {champ}
     </div>
   );
 }

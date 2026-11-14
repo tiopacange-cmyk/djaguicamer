@@ -72,6 +72,16 @@ les tableaux, 44px sur écran tactile).
 - `--primary` reste l'indigo du thème (fonds de boutons, bandeaux) ; `--primary-texte` sert aux
   textes et icônes et passe en `#A8B4F2` en sombre. Les boutons rouges restent `#B3261E` avec texte blanc.
 
+### Champ de date (toute l'application)
+
+- Composant `ChampDate` (App.jsx) pour toutes les dates : saisie `jj/mm/aaaa` (les « / » s'ajoutent
+  seuls), bouton calendrier doré à droite qui ouvre **le calendrier de l'appareil** (choix du client),
+  valeur toujours au format `jj/mm/aaaa` (aucun changement d'enregistrement).
+- **Date du jour par défaut** pour les opérations (séance, cotisation, dépôt, versement, dépense,
+  rafraîchissement, début de crédit, rapport journalier, assurance, début de génération des séances).
+- **Vide** pour les dates futures ou les filtres : fin de crédit, clôture d'épargne, fin de
+  génération, ajout manuel d'une séance, filtre Du / Au de l'historique.
+
 ## 1. Positionnement
 
 | | |
