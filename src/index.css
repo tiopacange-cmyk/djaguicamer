@@ -1837,3 +1837,6 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
   padding: 0;
 }
 [data-theme="dark"] .champ-date-btn { color: #E7BC4F; }
+
+/* Surtitre du formulaire sur le lien d'un groupe : « Gestion de tontine » (texte) + « claire & sereine » (or) */
+.carte-auth-surtitre-texte { color: var(--ink); }

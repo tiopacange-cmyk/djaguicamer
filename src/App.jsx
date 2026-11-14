@@ -641,7 +641,9 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode, messageRefus = ""
           <div className="carte-auth">
             {!modeOubli ? (
               <>
-                <div className="carte-auth-surtitre">{groupe ? `Espace membres · ${groupe.nom}` : "Espace membres"}</div>
+                <div className="carte-auth-surtitre">
+                  {groupe ? <><span className="carte-auth-surtitre-texte">Gestion de tontine</span> claire &amp; sereine</> : "Gestion de tontine"}
+                </div>
                 <h1>Connexion</h1>
                 <p className="carte-auth-desc">
                   {groupe ? `Utilise l'identifiant fourni par le bureau ${deNom(groupe.nom)}.` : "Utilise l'identifiant fourni par le bureau de ton groupe."}
