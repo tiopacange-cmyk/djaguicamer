@@ -11,6 +11,11 @@ import { totalBilletage, penaliteGarde } from "./calculsBancaires";
 
 const especes = (mode) => !mode || ["especes", "espèces", "Espèces"].includes(mode);
 const num = (v) => Number(v || 0);
+// Date du jour à l'heure locale (un horodatage UTC peut changer de jour).
+const dateLocale = (horodatage) => {
+  const d = new Date(horodatage);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 export const REGLE_GARDE_DEFAUT = { valeur: 10, type: "pourcent", base: "manque" };
 
@@ -57,6 +62,21 @@ export async function ouvrirSeanceCaisse(groupId, date, { fondOuverture } = {}) 
   return versSeance(data);
 }
 
+// Réouverture : les sommes confiées à la clôture sont retirées (elles
+// seront ressaisies à la nouvelle clôture). Impossible si l'une a déjà
+// été rapportée.
+export async function reouvrirSeanceCaisse(seance, { motif, par }) {
+  const { data: g, error: e1 } = await supabase.from("sommes_gardees").select("id, statut").eq("caisse_seance_id", seance.id);
+  if (e1) throw e1;
+  if ((g || []).some((x) => x.statut !== "gardee")) throw new Error("Une somme confiée à cette séance a déjà été rapportée : la caisse ne peut plus être rouverte.");
+  if ((g || []).length) {
+    const { error: e2 } = await supabase.from("sommes_gardees").delete().eq("caisse_seance_id", seance.id).eq("statut", "gardee");
+    if (e2) throw e2;
+  }
+  await majSeanceCaisse(seance.id, { statut: "ouverte", reouverture_motif: `${motif} (${par || "—"}, ${new Date().toLocaleDateString("fr-FR")})` });
+  return { gardesRetirees: (g || []).length };
+}
+
 export async function majSeanceCaisse(id, champs) {
   const { error } = await supabase.from("caisse_seances").update(champs).eq("id", id);
   if (error) throw error;
@@ -84,7 +104,7 @@ export async function fetchMouvementsEspecesDuJour(groupId, date) {
       push("tontine", `Cotisations tontine (${(cot || []).filter((c) => especes(c.mode_paiement)).length})`, tot);
     }
     for (const t of tours || []) {
-      if (t.verse_le && String(t.verse_le).slice(0, 10) === date) push("tontine", `Tontine versée à ${nom[t.beneficiaire_id] || "—"} (tour ${t.numero})`, -(num(t.montant) - num(t.montant_enchere)));
+      if (t.verse_le && dateLocale(t.verse_le) === date) push("tontine", `Tontine versée à ${nom[t.beneficiaire_id] || "—"} (tour ${t.numero})`, -(num(t.montant) - num(t.montant_enchere)));
     }
   }
 
@@ -247,6 +267,7 @@ export async function fetchDettes(groupId) {
 
 export async function payerDette(groupId, dette, { montant, date, mode = "especes", saisiPar }) {
   const m = Math.round(num(montant));
+  if (!date) throw new Error("Date invalide (jj/mm/aaaa).");
   if (m <= 0 || m > dette.reste) throw new Error(`Montant invalide (reste dû : ${dette.reste.toLocaleString("fr-FR")} F).`);
   const rembourse = dette.rembourse + m;
   const solde = rembourse >= dette.montant;

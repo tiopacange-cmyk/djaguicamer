@@ -201,6 +201,7 @@ export async function payerAmendeSeance(groupId, amendeId, membreId, montant, mo
       montant,
       date_mouvement: new Date().toISOString().slice(0, 10),
       solde_apres: nouveauSolde,
+      mode_paiement: "prelevement", // pas une sortie d'espèces de la caisse
     });
     if (errMouvement) throw errMouvement;
 

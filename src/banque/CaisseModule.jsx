@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Lock, Unlock, Printer, AlertTriangle, HandCoins, Wallet } from "lucide-react";
 import {
   fetchSeancesCaisse, ouvrirSeanceCaisse, majSeanceCaisse, fetchMouvementsEspecesDuJour, fetchSommesGardees, recupererSommeGardee,
-  confierSommes, fetchDettes, payerDette, fetchMembresEnRetard, fetchReglesGroupe, sauverReglesGroupe,
+  confierSommes, fetchDettes, payerDette, reouvrirSeanceCaisse, fetchMembresEnRetard, fetchReglesGroupe, sauverReglesGroupe,
 } from "../lib/caisse";
 import { fetchAvoirsMembre } from "../lib/banque2";
 import { RUBRIQUES, LECTURES_DEFAUT } from "../lib/lectures";
@@ -257,8 +257,9 @@ function SeanceCaisse({ seance, groupId, nomGroupe, membres, utilisateur, gardee
   const rouvrir = async () => {
     setErreur("");
     if (!motifReouverture.trim()) { setErreur("Le motif de réouverture est obligatoire."); return; }
-    const res = await executer({ titre: "Rouvrir cette caisse ?", lignes: [["Séance", versDateFr(seance.date)], ["Motif", motifReouverture]], danger: true, libelleConfirmer: "Rouvrir", alertes: ["Les sommes déjà confiées aux gardiens restent enregistrées."] },
-      () => majSeanceCaisse(seance.id, { statut: "ouverte", reouverture_motif: `${motifReouverture.trim()} (${utilisateur || "—"}, ${new Date().toLocaleDateString("fr-FR")})` }));
+    const res = await executer({ titre: "Rouvrir cette caisse ?", lignes: [["Séance", versDateFr(seance.date)], ["Motif", motifReouverture]], danger: true, libelleConfirmer: "Rouvrir",
+      alertes: ["Les sommes confiées aux gardiens à cette séance seront retirées : il faudra les ressaisir à la nouvelle clôture."] },
+      () => reouvrirSeanceCaisse(seance, { motif: motifReouverture.trim(), par: utilisateur }));
     if (res) onMaj();
   };
 
@@ -434,8 +435,12 @@ function PaiementDette({ dette, groupId, utilisateur, onFermer, onFait }) {
   const [montant, setMontant] = useState(String(dette.reste));
   const [date, setDate] = useState(dateDuJour());
   const [mode, setMode] = useState("especes");
+  const [erreur, setErreur] = useState("");
   const valider = async () => {
     const d = versDateISO(date);
+    setErreur("");
+    if (!d) { setErreur("Date invalide (jj/mm/aaaa)."); return; }
+    if (!nombre(montant) || nombre(montant) > dette.reste) { setErreur(`Montant invalide (reste dû : ${fmtF(dette.reste)}).`); return; }
     const res = await executer({ titre: "Encaisser ce remboursement ?", lignes: [["Membre", dette.nom], ["Montant", fmtF(nombre(montant))], ["Reste après", fmtF(dette.reste - nombre(montant))]] },
       () => payerDette(groupId, dette, { montant: nombre(montant), date: d, mode, saisiPar: utilisateur }));
     if (res) onFait();
@@ -448,6 +453,7 @@ function PaiementDette({ dette, groupId, utilisateur, onFermer, onFait }) {
         <Champ label="Date"><ChampDate ariaLabel="Date" value={date} onChange={(e) => setDate(e.target.value)} /></Champ>
       </div>
       <Choix nom="Mode" valeur={mode} onChange={setMode} options={[{ valeur: "especes", libelle: "Espèces" }, { valeur: "momo", libelle: "Mobile Money" }]} />
+      <Message>{erreur}</Message>
       <button type="button" className="adm-btn adm-btn-action bq-plein" onClick={valider}>Encaisser</button>
     </Fenetre>
   );

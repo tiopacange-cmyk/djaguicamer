@@ -1,7 +1,7 @@
 import { supabase } from "./supabaseClient";
 import {
   normaliserRegles, fraisDeDossier, situationPret, repartirPaiement,
-  nombresParMembre, partagerCagnotte, versISO, versDate,
+  nombresParMembre, partagerCagnotte, versISO, versDate, joursEntre,
 } from "./calculsBancaires";
 
 // ============================================================
@@ -184,9 +184,21 @@ async function decaisserPret(groupId, pretId, { epargneId, membreId, montant, da
 }
 
 export async function validerPretSpecial(groupId, pret, { validePar }) {
-  const { error } = await supabase.from("prets").update({ statut: "en cours", valide_par: validePar, valide_le: new Date().toISOString() }).eq("id", pret.id);
+  const { data: ep, error: e0 } = await supabase.from("epargnes").select("solde, nom").eq("id", pret.epargneId).single();
+  if (e0) throw e0;
+  if (Number(ep.solde || 0) < pret.montant) {
+    throw new Error(`Pas assez d'argent dans ${ep.nom} : ${Number(ep.solde || 0).toLocaleString("fr-FR")} F en caisse pour ${pret.montant.toLocaleString("fr-FR")} F.`);
+  }
+  // Les intérêts courent à partir du décaissement (la validation), pas de
+  // la demande : on décale le début et l'échéance d'autant.
+  const auj = aujourdhui();
+  const decalage = Math.max(0, joursEntre(pret.dateDebut, auj));
+  const dateDebut = decalage > 0 ? auj : pret.dateDebut;
+  const dateFin = pret.dateFin && decalage > 0 ? versISO(new Date(versDate(pret.dateFin).getTime() + decalage * 86400000)) : pret.dateFin;
+  const { error } = await supabase.from("prets").update({ statut: "en cours", valide_par: validePar, valide_le: new Date().toISOString(), date_debut: dateDebut, date_fin: dateFin }).eq("id", pret.id);
   if (error) throw error;
-  await decaisserPret(groupId, pret.id, { epargneId: pret.epargneId, membreId: pret.membreId, montant: pret.montant, dateDebut: pret.dateDebut, frais: pret.fraisDossier, saisiPar: validePar });
+  await decaisserPret(groupId, pret.id, { epargneId: pret.epargneId, membreId: pret.membreId, montant: pret.montant, dateDebut, frais: pret.fraisDossier, saisiPar: validePar });
+  return { dateDebut, dateFin };
 }
 
 export async function refuserPretSpecial(pretId, { motif, par }) {
@@ -245,12 +257,12 @@ export async function reglerPret(groupId, pret, { date, sources, saisiPar }) {
       source: lignes[i].source, source_ref: lignes[i].refId || null, saisi_par: saisiPar || null,
     });
     if (error) throw error;
+    // Capital et intérêts de CETTE ligne reviennent dans l'épargne qui a
+    // prêté (un mouvement par ligne : l'annulation d'une ligne reste juste).
+    if (cap + int > 0) await mouvementEpargne({ epargneId: pret.epargneId, membreId: pret.membreId, type: "Remboursement", montant: cap + int, date, pretId: pret.id, saisiPar, modePaiement: ["especes", "momo"].includes(lignes[i].source) ? lignes[i].source : "prelevement" });
   }
 
-  // 3. Capital et intérêts reviennent dans l'épargne qui a prêté ;
-  //    les pénalités vont au compte de la réunion.
-  const versEpargne = rep.capital + rep.interets;
-  if (versEpargne > 0) await mouvementEpargne({ epargneId: pret.epargneId, membreId: pret.membreId, type: "Remboursement", montant: versEpargne, date, pretId: pret.id, saisiPar });
+  // 3. Les pénalités vont au compte de la réunion.
   if (rep.penalites > 0) await ecrireCompteReunion(groupId, { date, montant: rep.penalites, origine: "penalite_pret", libelle: `Pénalité de retard — ${pret.membre}`, refId: pret.id, saisiPar });
 
   const apres = situationPret(pret, [...pret.remboursements.filter((r) => !r.annule), { date, capital: rep.capital, interets: rep.interets, penalites: rep.penalites }], date);
@@ -305,17 +317,39 @@ export async function annulerRemboursement(groupId, pret, remboursement, { motif
   if (!["especes", "momo"].includes(remboursement.source)) {
     throw new Error("Ce remboursement venait des avoirs du membre : corrige-le avec le trésorier (il faut aussi rendre l'argent prélevé).");
   }
+  const annulation = { annule: true, annule_motif: motif.trim(), annule_par: par || null, annule_le: new Date().toISOString() };
+  // Lignes à annuler : celle-ci, ou tout le remboursement si son
+  // mouvement d'épargne regroupe plusieurs lignes (anciennes saisies).
+  let lignes = [remboursement];
+  let mouvementId = null;
   const vers = remboursement.capital + remboursement.interets;
   if (vers > 0) {
-    await ajusterSoldeEpargne(pret.epargneId, -vers);
-    const { error: eM } = await supabase.from("epargne_mouvements").update({ annule: true, annule_motif: motif.trim(), annule_par: par || null, annule_le: new Date().toISOString() })
-      .eq("pret_id", pret.id).eq("type", "Remboursement").eq("date_mouvement", remboursement.date).eq("montant", vers).eq("annule", false);
+    const { data: mv, error: e1 } = await supabase.from("epargne_mouvements").select("id, montant")
+      .eq("pret_id", pret.id).eq("type", "Remboursement").eq("date_mouvement", remboursement.date).eq("annule", false);
+    if (e1) throw e1;
+    const exact = (mv || []).find((m) => Number(m.montant) === vers);
+    if (exact) mouvementId = exact.id;
+    else {
+      const soeurs = pret.remboursements.filter((r) => !r.annule && r.date === remboursement.date);
+      const totalSoeurs = soeurs.reduce((s, r) => s + r.capital + r.interets, 0);
+      const groupe = (mv || []).find((m) => Number(m.montant) === totalSoeurs);
+      if (!groupe) throw new Error("Impossible de retrouver le mouvement de ce remboursement dans l'épargne. Corrige-le avec le trésorier.");
+      if (soeurs.some((r) => !["especes", "momo"].includes(r.source))) throw new Error("Ce remboursement mélange espèces et prélèvements sur les avoirs : corrige-le avec le trésorier.");
+      lignes = soeurs;
+      mouvementId = groupe.id;
+    }
+  }
+  const totalVers = lignes.reduce((s, r) => s + r.capital + r.interets, 0);
+  const totalPen = lignes.reduce((s, r) => s + r.penalites, 0);
+  if (mouvementId) {
+    const { error: eM } = await supabase.from("epargne_mouvements").update(annulation).eq("id", mouvementId);
     if (eM) throw eM;
+    await ajusterSoldeEpargne(pret.epargneId, -totalVers);
   }
-  if (remboursement.penalites > 0) {
-    await ecrireCompteReunion(groupId, { date: aujourdhui(), montant: -remboursement.penalites, origine: "penalite_pret", libelle: `Annulation : ${motif.trim()}`, refId: pret.id, saisiPar: par });
+  if (totalPen > 0) {
+    await ecrireCompteReunion(groupId, { date: aujourdhui(), montant: -totalPen, origine: "penalite_pret", libelle: `Annulation : ${motif.trim()}`, refId: pret.id, saisiPar: par });
   }
-  const { error } = await supabase.from("pret_remboursements").update({ annule: true, annule_motif: motif.trim(), annule_par: par || null, annule_le: new Date().toISOString() }).eq("id", remboursement.id);
+  const { error } = await supabase.from("pret_remboursements").update(annulation).in("id", lignes.map((r) => r.id));
   if (error) throw error;
   const { error: eS } = await supabase.from("prets").update({ statut: "en cours" }).eq("id", pret.id);
   if (eS) throw eS;
@@ -344,8 +378,12 @@ export async function preparerCloture(groupId, epargne, dateCloture) {
   const situation = nombresParMembre(pourNombres, dateCloture);
 
   const prets = (await fetchPretsBanque(groupId)).filter((p) => p.epargneId === epargne.id && !["en attente", "refusé"].includes(p.statutBase));
+  // Un prêt reporté d'un cycle précédent a déjà vu ses anciens
+  // intérêts partagés : on ne compte que ceux encaissés dans ce cycle.
+  const debutCycle = epargne.dateDebut ? versDate(epargne.dateDebut) : null;
+  const dansCeCycle = (p, r) => !debutCycle || versDate(p.dateDebut) >= debutCycle || versDate(r.date) > debutCycle;
   const cagnotte = prets.reduce((s, p) => s + p.remboursements
-    .filter((r) => !r.annule && versDate(r.date) <= versDate(dateCloture))
+    .filter((r) => !r.annule && versDate(r.date) <= versDate(dateCloture) && dansCeCycle(p, r))
     .reduce((a, r) => a + r.interets, 0), 0);
   const pretsOuverts = prets.map((p) => ({ ...p, etat: situationPret(p, p.remboursements.filter((r) => !r.annule), dateCloture) }))
     .filter((p) => p.etat.totalDu > 0);

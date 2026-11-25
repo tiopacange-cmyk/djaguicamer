@@ -330,7 +330,9 @@ function NouveauPret({ type, groupId, epargnes, membres, utilisateur, nomGroupe,
   const dFin = echeanceManuelle ? versDateISO(echeanceManuelle) : echeanceAuto;
   const fraisCalc = frais !== "" ? nombre(frais) : fraisDeDossier(m, regles);
   const epargneMembre = avoirs?.epargnes.find((e) => e.id === epargneId)?.solde || 0;
-  const plafond = regles.plafondMultiple ? regles.plafondMultiple * epargneMembre : null;
+  // Pas de plafond affiché tant que les avoirs du membre ne sont pas chargés.
+  const plafond = regles.plafondMultiple && avoirs ? regles.plafondMultiple * epargneMembre : null;
+  const avoirsEnAttente = !!(membreId && regles.plafondMultiple && !avoirs);
   const depasse = plafond !== null && m > plafond;
   const dejaEnCours = prets.filter((p) => p.membreId === membreId && p.etat.totalDu > 0);
   // Alerte : plus de 30 % de l'épargne prêtée en prêts spéciaux.
@@ -346,6 +348,7 @@ function NouveauPret({ type, groupId, epargnes, membres, utilisateur, nomGroupe,
     setErreur("");
     if (!epargneId || !membreId || !m) { setErreur("Choisis l'épargne, le membre et le montant."); return; }
     if (!dDebut || !dFin) { setErreur("Dates invalides (jj/mm/aaaa)."); return; }
+    if (avoirsEnAttente) { setErreur("Chargement de l'épargne du membre… réessaie dans un instant."); return; }
     if (m > (ep?.solde || 0) && !special) { setErreur(`Pas assez d'argent dans ${ep?.nom} (${fmtF(ep?.solde)} en caisse).`); return; }
     if (!special && depasse) { setErreur(`Ce montant dépasse le plafond (${fmtF(plafond)}). Utilise un prêt spécial.`); return; }
     if (special && !motif.trim()) { setErreur("Le motif ou procès-verbal de la décision est obligatoire."); return; }
@@ -361,6 +364,7 @@ function NouveauPret({ type, groupId, epargnes, membres, utilisateur, nomGroupe,
         dejaEnCours.length ? `${membre?.nom} a déjà ${dejaEnCours.length} prêt(s) en cours.` : null,
         special && depasse ? `Hors règles : dépasse son plafond normal (${fmtF(plafond)}).` : null,
         special && partSpeciale > 30 ? `Attention : ${partSpeciale} % de ${ep?.nom} serait prêté en prêts spéciaux (seuil d'alerte 30 %).` : null,
+        special && m > (ep?.solde || 0) ? `${ep?.nom} n'a que ${fmtF(ep?.solde)} en caisse : le Président ne pourra pas valider tant qu'il manque de l'argent.` : null,
         special ? "Le prêt restera en attente : rien ne sort de la caisse avant la validation du Président." : null,
       ],
       libelleConfirmer: special ? "Soumettre au Président" : "Accorder le prêt",
@@ -490,7 +494,7 @@ function FichePret({ pret, groupId, membres, utilisateur, nomGroupe, onFermer, o
     const res = await executer({
       titre: "Valider ce prêt spécial ?",
       lignes: [["Membre", pret.membre], ["Montant", fmtF(pret.montant)], ["Conditions", libelleRegle(pret.regles)], ["Validé par", president]],
-      alertes: [`${fmtF(pret.montant)} vont sortir de ${pret.epargneNom}.`],
+      alertes: [`${fmtF(pret.montant)} vont sortir de ${pret.epargneNom}.`, "Les intérêts courent à partir d'aujourd'hui (date du décaissement) ; l'échéance est décalée d'autant."],
       libelleConfirmer: "Valider et décaisser",
       detailSucces: `Prêt spécial décaissé pour ${pret.membre}`,
     }, async () => {

@@ -5,8 +5,8 @@ import { versDateFr } from "../ui/ChampDate";
 import { useConfirmation, fmtF } from "../ui/Confirmation";
 import { Fenetre, Champ, Pastille, Message, ChampMontant, nombre } from "./communs";
 
-const ETAPE = { saisie: "1re lecture à faire", lecture1: "2e lecture à faire", lecture2: "Prête à valider", validee: "Validée", abandonnee: "Abandonnée" };
-const TON = { saisie: "or", lecture1: "or", lecture2: "violet", validee: "vert", abandonnee: "neutre" };
+const ETAPE = { saisie: "1re lecture à faire", lecture1: "2e lecture à faire", lecture2: "Prête à valider", validation: "Validation en cours", validee: "Validée", abandonnee: "Abandonnée" };
+const TON = { saisie: "or", lecture1: "or", lecture2: "violet", validation: "violet", validee: "vert", abandonnee: "neutre" };
 
 export default function LecturesModule({ groupId, nomGroupe, membres, utilisateur, onChange }) {
   const [ops, setOps] = useState([]);

@@ -80,6 +80,7 @@ export async function effectuerPrelevementSms(groupId, membreId, mois, montant, 
     const nouveauSolde = ep.solde - montant;
     const { error: errMvt } = await supabase.from("epargne_mouvements").insert({
       epargne_id: epargneId, membre_id: membreId, type: "Retrait", montant, date_mouvement: new Date().toISOString().slice(0, 10), solde_apres: nouveauSolde,
+      mode_paiement: "prelevement", // pas une sortie d'espèces de la caisse
     });
     if (errMvt) throw errMvt;
     const { error: errMaj } = await supabase.from("epargnes").update({ solde: nouveauSolde }).eq("id", epargneId);

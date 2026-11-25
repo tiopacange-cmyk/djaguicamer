@@ -72,15 +72,28 @@ export async function validerOperation(groupId, op, { nomGroupe } = {}) {
   const total = op.lignes.reduce((s, l) => s + num(l.montant), 0);
   if (op.lecture1.total !== op.lecture2.total || op.lecture2.total !== total) throw new Error("Les totaux des deux lectures ne sont pas identiques.");
 
+  // Verrou : une seule validation possible, même si deux personnes
+  // cliquent en même temps.
+  const { data: verrou, error: eV } = await supabase.from("operations_en_attente").update({ statut: "validation" })
+    .eq("id", op.id).eq("statut", "lecture2").select("id");
+  if (eV) throw eV;
+  if (!verrou || verrou.length === 0) throw new Error("Cette saisie est déjà validée ou en cours de validation par quelqu'un d'autre.");
+
   const lignes = op.lignes.filter((l) => num(l.montant) > 0).map((l) => ({ membreId: l.membreId, montant: num(l.montant), date: op.date }));
   const p = op.parametres || {};
   let soldes = {};
-  if (op.rubrique === "tontine") await enregistrerCotisationsTontine(p.tourId, lignes);
-  else if (op.rubrique === "epargne") await enregistrerCotisationsEpargne(p.epargneId, lignes);
-  else if (op.rubrique === "assurance") soldes = (await enregistrerCotisationsAssurance(groupId, lignes, p.soldeMinimum || 0)) || {};
-  else if (op.rubrique === "fonds") {
-    for (const l of lignes) soldes[l.membreId] = await enregistrerVersementFonds(l.membreId, p.typeFondsId, l.montant, op.date);
-  } else throw new Error("Rubrique inconnue.");
+  try {
+    if (op.rubrique === "tontine") await enregistrerCotisationsTontine(p.tourId, lignes);
+    else if (op.rubrique === "epargne") await enregistrerCotisationsEpargne(p.epargneId, lignes);
+    else if (op.rubrique === "assurance") soldes = (await enregistrerCotisationsAssurance(groupId, lignes, p.soldeMinimum || 0)) || {};
+    else if (op.rubrique === "fonds") {
+      for (const l of lignes) soldes[l.membreId] = await enregistrerVersementFonds(l.membreId, p.typeFondsId, l.montant, op.date);
+    } else throw new Error("Rubrique inconnue.");
+  } catch (e) {
+    // Rien (ou pas tout) n'a été enregistré : on rend la main.
+    await supabase.from("operations_en_attente").update({ statut: "lecture2" }).eq("id", op.id);
+    throw e;
+  }
 
   const { error } = await supabase.from("operations_en_attente").update({ statut: "validee", valide_le: new Date().toISOString() }).eq("id", op.id);
   if (error) throw error;
