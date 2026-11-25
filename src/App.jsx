@@ -13,6 +13,8 @@ import { fetchRapportJournalier, fetchRapportMensuel, fetchBilanAnnuel } from ".
 import { fetchSeances, creerSeance, enregistrerCompteRendu, supprimerSeance, fetchPresences, enregistrerPresences, fetchTauxPresence, fetchTypesAmendesSeance, creerTypeAmendeSeance, modifierTypeAmendeSeance, supprimerTypeAmendeSeance, fetchAmendesSeance, appliquerAmendeSeance, fetchCaisseAmendes, payerAmendeSeance } from "./lib/seances";
 import { fetchCaisseRafraichissement, fetchRafraichissements, creerRafraichissement, fetchTypesDepenses, creerTypeDepense, supprimerTypeDepense, fetchDepenses, creerDepense, libelleSourceDepense } from "./lib/depenses";
 import { envoyerSMS } from "./lib/sms";
+import { ChampDate } from "./ui/ChampDate";
+import BanqueModule from "./banque/BanqueModule";
 import { fetchTableauDeBordMembre } from "./lib/moncompte";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
@@ -443,7 +445,7 @@ export default function AppPrototype() {
         ) : groupeAdmin && vueEspacePersonnel ? (
           <MembreScreen groupId={groupeAdmin.group?.id} nomGroupe={groupeAdmin.group?.nom} profileId={monProfil?.id} nomComplet={monProfil?.nom_complet} />
         ) : groupeAdmin ? (
-          <AdminGroupeScreen groupId={groupeAdmin.group?.id} nomGroupe={groupeAdmin.group?.nom} />
+          <AdminGroupeScreen groupId={groupeAdmin.group?.id} nomGroupe={groupeAdmin.group?.nom} utilisateur={monProfil?.nom_complet || ""} />
         ) : groupeMembreSimple ? (
           <MembreScreen groupId={groupeMembreSimple.group?.id} nomGroupe={groupeMembreSimple.group?.nom} profileId={monProfil?.id} nomComplet={monProfil?.nom_complet} />
         ) : (
@@ -2020,7 +2022,7 @@ function SuperAdminScreen() {
 // ============================================================
 // ÉCRAN 3 — ADMIN DE GROUPE (modules Tontine / Banque / Assurance / Bilan / Membres)
 // ============================================================
-function AdminGroupeScreen({ groupId, nomGroupe }) {
+function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
   const fmtFCFA = (n) => `${Math.round(n).toLocaleString("fr-FR")} FCFA`;
 
   // Vérifie le statut de la licence du groupe (bloque l'accès si
@@ -2971,101 +2973,15 @@ function AdminGroupeScreen({ groupId, nomGroupe }) {
         )}
 
         {view === "banque" && (
-          <>
-            <div className="adm-entete">
-              <div>
-                <h1 className="adm-titre">Banques du groupe</h1>
-                <p className="adm-sous-titre">Banque scolaire, banque annuelle, et épargnes personnalisées.</p>
-              </div>
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                <button style={btnSecondary} onClick={() => { setCotisationEpargneId(""); setCotisationDate(""); setCotisationMontants({}); setCotisationBanqueErreur(""); setShowCotisationBanque(true); }}><Plus size={15} /> Enregistrer une cotisation</button>
-                <button style={btnPrimary} onClick={() => { setEpargneNom(""); setEpargneCotisation(""); setEpargneTaux(""); setEpargneCloture(""); setEpargneType("Personnalisée"); setEpargneError(""); setEpargneSuccess(false); setShowCreateEpargne(true); }}><Plus size={15} /> Créer une épargne</button>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: "6px", margin: "18px 0 4px", flexWrap: "wrap" }}>
-              {[
-                { key: "apercu", label: "Vue d'ensemble" },
-                { key: "historique", label: "Historique des mouvements" },
-              ].map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => setBankTab(t.key)}
-                  style={{
-                    padding: "8px 14px", borderRadius: "8px", border: `1px solid ${bankTab === t.key ? C.accent2 : C.border}`,
-                    background: bankTab === t.key ? C.ok : "transparent", color: bankTab === t.key ? C.accent2 : C.sub,
-                    fontSize: "13.5px", fontWeight: 600, cursor: "pointer",
-                  }}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {bankTab === "apercu" && (
-              <>
-                <div style={{ display: "flex", gap: "14px", margin: "18px 0", flexWrap: "wrap" }}>
-                  {epargnes.map((ep) => (
-                    <div key={ep.nom} style={{ flex: 1, minWidth: "220px" }}>
-                      <StatCard label={ep.nom} value={fmtFCFA(ep.solde)} sub={`Clôture ${ep.cloture}`} icon={<PiggyBank size={16} />} />
-                      {ep.statut !== "clôturée" && (
-                        <button
-                          onClick={async () => {
-                            setShowCloture(ep);
-                            setClotureEtape(1);
-                            setClotureApercu(null);
-                            setClotureDecisions({});
-                            setClotureNouveauNom(`${ep.nom} — cycle suivant`);
-                            setClotureErreur("");
-                            setClotureChargement(true);
-                            try {
-                              const apercu = await fetchApercuCloture(ep.id);
-                              setClotureApercu(apercu);
-                              const decisionsInit = {};
-                              apercu.membres.forEach((m) => { decisionsInit[m.membreId] = "recuperer"; });
-                              setClotureDecisions(decisionsInit);
-                            } catch (e) {
-                              console.error("Erreur de chargement de l'aperçu de clôture", e);
-                              setClotureErreur("Erreur lors du chargement.");
-                            } finally {
-                              setClotureChargement(false);
-                            }
-                          }}
-                          style={{ width: "100%", marginTop: "6px", background: "transparent", color: C.vifRose, border: `1px solid ${C.vifRose}66`, borderRadius: "8px", padding: "7px", fontSize: "12.5px", fontWeight: 600, cursor: "pointer" }}
-                        >
-                          Clôturer le cycle
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "10px 0" }}>
-                  <h2 style={{ fontSize: "15px", fontWeight: 700, margin: 0 }}>Prêts en cours — Banque scolaire</h2>
-                  <button style={btnSecondary} onClick={() => { setCreditEpargneId(""); setCreditMembreId(""); setCreditMontant(""); setCreditFraisDossier(""); setCreditCommission(""); setCreditPenalite(""); setCreditDebut(""); setCreditFin(""); setCreditDepasseCaution(false); setCreditAvalisteId(""); setCreditError(""); setCreditSuccess(false); setShowCreditForm(true); }}><Plus size={14} /> Mettre en place un crédit</button>
-                </div>
-                <Table cols={["Membre", "Montant", "Avaliste", "Statut", "Échéance"]} widths="1.4fr 1fr 1.2fr 1fr 1fr"
-                  rows={prets.map((p) => [p.membre, p.montant, p.avaliste, <Badge bg={p.statut === "remboursé" ? C.ok : C.orBg} fg={p.statut === "remboursé" ? C.accent2 : C.vifOr}>{p.statut}</Badge>, p.echeance])} />
-              </>
-            )}
-
-            {bankTab === "historique" && (
-              <div style={{ marginTop: "18px" }}>
-                <Table cols={["Date", "Membre", "Épargne", "Type", "Montant", "Solde après"]} widths="1fr 1.3fr 1.4fr 1fr 1.1fr 1.2fr"
-                  rows={historiqueBanque.map((h) => [
-                    <span style={{ color: C.sub, fontSize: 13 }}>{h.date}</span>,
-                    h.membre,
-                    <span style={{ color: C.sub, fontSize: 13 }}>{h.epargne}</span>,
-                    <Badge bg={h.type === "Versement" ? C.ok : C.warnBg} fg={h.type === "Versement" ? C.accent2 : C.warn}>{h.type}</Badge>,
-                    <span style={{ fontWeight: 700, color: h.type === "Versement" ? C.accent2 : C.warn }}>{h.montant}</span>,
-                    <span style={{ color: C.sub, fontSize: 13 }}>{h.solde}</span>,
-                  ])}
-                />
-                <div className="adm-aide adm-aide-espace">
-                  Chaque cotisation apparaît comme un <b>versement</b>, chaque prêt octroyé comme un <b>retrait</b> — ce sont les deux seuls types de mouvement de la banque.
-                </div>
-              </div>
-            )}
-          </>
+          <BanqueModule
+            groupId={groupId}
+            nomGroupe={nomGroupe}
+            membres={membres}
+            utilisateur={utilisateur}
+            rafraichir={epargnes}
+            onCotisation={() => { setCotisationEpargneId(""); setCotisationDate(""); setCotisationMontants({}); setCotisationBanqueErreur(""); setShowCotisationBanque(true); }}
+            onCreerEpargne={() => { setEpargneNom(""); setEpargneCotisation(""); setEpargneTaux(""); setEpargneCloture(""); setEpargneType("Personnalisée"); setEpargneError(""); setEpargneSuccess(false); setShowCreateEpargne(true); }}
+          />
         )}
 
         {view === "fonds" && (
@@ -7755,87 +7671,6 @@ function Modal({ children, onClose, title, icon, accentColor }) {
         </div>
         <div className="modal-corps">{children}</div>
       </div>
-    </div>
-  );
-}
-
-// Date du jour au format de l'interface (jj/mm/aaaa)
-function dateDuJour() {
-  const d = new Date();
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-}
-
-// Champ de date : saisie jj/mm/aaaa (les « / » s'ajoutent seuls), date du
-// jour par défaut, et bouton qui ouvre le calendrier de l'appareil.
-// La valeur reste au format jj/mm/aaaa, comme dans le reste de l'interface.
-function ChampDate({ label, value, onChange, aujourdhuiParDefaut = true, placeholder = "jj/mm/aaaa", compact = false, id, ariaLabel }) {
-  const autoId = React.useId();
-  const champId = id || autoId;
-  const calendrierRef = useRef(null);
-  const [interne, setInterne] = useState("");
-  const controle = value !== undefined;
-  const valeur = controle ? value : interne;
-
-  const emettre = (v) => {
-    if (controle) onChange?.({ target: { value: v } });
-    else setInterne(v);
-  };
-
-  // Date du jour à l'ouverture du formulaire, si le champ est vide
-  useEffect(() => {
-    if (aujourdhuiParDefaut && !valeur) emettre(dateDuJour());
-  }, []);
-
-  const saisir = (texte) => {
-    if (/[^\d/]/.test(texte)) { emettre(texte); return; }
-    const c = texte.replace(/\D/g, "").slice(0, 8);
-    emettre(c.length <= 2 ? c : c.length <= 4 ? `${c.slice(0, 2)}/${c.slice(2)}` : `${c.slice(0, 2)}/${c.slice(2, 4)}/${c.slice(4)}`);
-  };
-
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(valeur || "");
-  const iso = m ? `${m[3]}-${m[2]}-${m[1]}` : "";
-
-  const ouvrirCalendrier = () => {
-    const el = calendrierRef.current;
-    if (!el) return;
-    try { el.showPicker(); } catch { el.focus(); el.click(); }
-  };
-
-  const champ = (
-    <div className={`champ-date${compact ? " champ-date-compact" : ""}`}>
-      <input
-        id={champId}
-        className={`adm-input${compact ? " adm-input-compact" : ""}`}
-        inputMode="numeric"
-        autoComplete="off"
-        placeholder={placeholder}
-        aria-label={label ? undefined : ariaLabel || placeholder}
-        value={valeur}
-        onChange={(e) => saisir(e.target.value)}
-      />
-      <button type="button" className="champ-date-btn" onClick={ouvrirCalendrier} aria-label="Choisir une date dans le calendrier">
-        <Calendar size={compact ? 16 : 18} aria-hidden="true" />
-      </button>
-      <input
-        ref={calendrierRef}
-        type="date"
-        className="champ-date-natif"
-        tabIndex={-1}
-        aria-hidden="true"
-        value={iso}
-        onChange={(e) => {
-          const [a, mo, j] = (e.target.value || "").split("-");
-          emettre(a && mo && j ? `${j}/${mo}/${a}` : "");
-        }}
-      />
-    </div>
-  );
-
-  if (!label) return champ;
-  return (
-    <div>
-      <label htmlFor={champId} className="adm-label">{label}</label>
-      {champ}
     </div>
   );
 }
