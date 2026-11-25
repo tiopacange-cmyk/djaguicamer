@@ -212,6 +212,25 @@ begin
   end loop;
 end $$;
 
+-- Réglages du groupe (pénalité des sommes gardées, lectures) :
+-- lecture pour les membres, écriture pour les administrateurs.
+create or replace function public.djangui_regles_groupe(gid uuid) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select case when public.djangui_est_membre(gid) then (select regles_groupe from groups where id = gid) else null end;
+$$;
+
+create or replace function public.djangui_sauver_regles_groupe(gid uuid, regles jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.djangui_est_admin(gid) then
+    raise exception 'Seul un administrateur du groupe peut modifier ces réglages.';
+  end if;
+  update groups set regles_groupe = regles where id = gid;
+end $$;
+
+grant execute on function public.djangui_regles_groupe(uuid) to authenticated;
+grant execute on function public.djangui_sauver_regles_groupe(uuid, jsonb) to authenticated;
+
 -- ---------- Vérification ----------
 select 'pret_remboursements' as table_, count(*) from pret_remboursements
 union all select 'compte_reunion_mouvements', count(*) from compte_reunion_mouvements

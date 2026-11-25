@@ -15,14 +15,14 @@ const num = (v) => Number(v || 0);
 export const REGLE_GARDE_DEFAUT = { valeur: 10, type: "pourcent", base: "manque" };
 
 export async function fetchReglesGroupe(groupId) {
-  const { data, error } = await supabase.from("groups").select("regles_groupe").eq("id", groupId).maybeSingle();
+  const { data, error } = await supabase.rpc("djangui_regles_groupe", { gid: groupId });
   if (error) throw error;
-  const r = data?.regles_groupe || {};
+  const r = data || {};
   return { ...r, garde: { ...REGLE_GARDE_DEFAUT, ...(r.garde || {}) } };
 }
 
 export async function sauverReglesGroupe(groupId, regles) {
-  const { error } = await supabase.from("groups").update({ regles_groupe: regles }).eq("id", groupId);
+  const { error } = await supabase.rpc("djangui_sauver_regles_groupe", { gid: groupId, regles });
   if (error) throw error;
 }
 

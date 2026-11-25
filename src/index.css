@@ -1927,6 +1927,7 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
   .bq-deux, .bq-trois { grid-template-columns: 1fr; }
   .bq-kpi { grid-template-columns: 1fr 1fr; }
   .bq-garantie { grid-template-columns: 1fr; }
+  .bq-fiche { grid-template-columns: 1fr 1fr; }
 }
 
 /* ---------- Confirmation et message de succès ---------- */
