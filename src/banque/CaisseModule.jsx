@@ -5,6 +5,7 @@ import {
   confierSommes, fetchDettes, payerDette, fetchMembresEnRetard, fetchReglesGroupe, sauverReglesGroupe,
 } from "../lib/caisse";
 import { fetchAvoirsMembre } from "../lib/banque2";
+import { RUBRIQUES, LECTURES_DEFAUT } from "../lib/lectures";
 import { COUPURES, totalBilletage, penaliteGarde } from "../lib/calculsBancaires";
 import { envoyerSMS } from "../lib/sms";
 import { ChampDate, versDateISO, versDateFr, dateDuJour } from "../ui/ChampDate";
@@ -144,7 +145,13 @@ export default function CaisseModule({ groupId, nomGroupe, membres, utilisateur 
 function Reglages({ groupId, regles, onFait }) {
   const { executer } = useConfirmation();
   const [g, setG] = useState(regles.garde);
+  const [lectures, setLectures] = useState({ ...LECTURES_DEFAUT, ...(regles.lectures || {}) });
   const exemple = penaliteGarde(200000, 150000, g);
+  const enregistrerLectures = async () => {
+    const res = await executer({ titre: "Enregistrer le réglage des lectures ?", lignes: Object.entries(RUBRIQUES).map(([k, l]) => [l, lectures[k] ? "deux lectures" : "validation directe"]) },
+      () => sauverReglesGroupe(groupId, { ...regles, lectures }));
+    if (res) onFait();
+  };
   const enregistrer = async () => {
     const res = await executer({ titre: "Enregistrer la règle ?", lignes: [["Pénalité", g.type === "fixe" ? fmtF(g.valeur) : `${g.valeur} % ${g.base === "garde" ? "de la somme confiée" : "du montant manquant"}`], ["Exemple", `200 000 confiés, 150 000 rapportés → ${fmtF(exemple)}`]] },
       () => sauverReglesGroupe(groupId, { ...regles, garde: { ...g, valeur: Number(g.valeur) || 0 } }));
@@ -160,6 +167,13 @@ function Reglages({ groupId, regles, onFait }) {
       </div>
       <div className="adm-msg adm-msg-info">Exemple : 200 000 F confiés, 150 000 F rapportés → manque 50 000 F, pénalité <b>{fmtF(exemple)}</b> (compte de la réunion).</div>
       <button type="button" className="adm-btn adm-btn-action bq-plein" onClick={enregistrer}>Enregistrer</button>
+
+      <h3 className="bq-section">Deux lectures avant validation</h3>
+      <div className="adm-aide">Les cotisations cochées restent en attente jusqu'à ce que deux personnes différentes (Commissaire aux comptes, Secrétaire…) les aient relues.</div>
+      {Object.entries(RUBRIQUES).map(([k, l]) => (
+        <label key={k} className="bq-case"><input type="checkbox" checked={!!lectures[k]} onChange={(e) => setLectures((x) => ({ ...x, [k]: e.target.checked }))} /> {l}</label>
+      ))}
+      <button type="button" className="adm-btn adm-btn-secondaire bq-plein" onClick={enregistrerLectures}>Enregistrer le réglage des lectures</button>
     </div>
   );
 }

@@ -1986,3 +1986,9 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 .bq-garde-nom { flex: 2 1 220px !important; color: var(--ink); font-size: 14px; }
 .bq-carte-reglage { max-width: 640px; }
 .bq-rappel-garde { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px 14px; border-radius: var(--radius-control); background: color-mix(in srgb, var(--gold) 14%, var(--surface)); color: var(--ink); border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); font-size: 14px; }
+
+/* ---------- Deux lectures ---------- */
+.bq-coche { width: 22px; height: 22px; accent-color: var(--success); cursor: pointer; }
+.bq-table tr.est-en-lecture td { background: color-mix(in srgb, var(--gold) 20%, var(--surface)); }
+.bq-controles { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.bq-abandon { margin-top: 18px; }

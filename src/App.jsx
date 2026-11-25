@@ -18,7 +18,9 @@ import BanqueModule from "./banque/BanqueModule";
 import CaisseModule from "./banque/CaisseModule";
 import { useConfirmation } from "./ui/Confirmation";
 import { fetchCompteReunion } from "./lib/banque2";
-import { fetchSommesGardees, fetchDettes } from "./lib/caisse";
+import { fetchSommesGardees, fetchDettes, fetchReglesGroupe } from "./lib/caisse";
+import LecturesModule from "./banque/LecturesModule";
+import { soumettreOperation, fetchOperationsEnAttente, LECTURES_DEFAUT } from "./lib/lectures";
 import { fetchTableauDeBordMembre } from "./lib/moncompte";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
@@ -905,7 +907,7 @@ function ChangerMotDePasseScreen({ onDone }) {
 // ÉCRAN 2 — SUPER ADMIN
 // ============================================================
 function SuperAdminScreen() {
-  const { confirmer: confirmerFenetre, succes: succesOp } = useConfirmation();
+  const { confirmer: confirmerFenetre, succes: succesOp, executer: executerOp } = useConfirmation();
   const confirmerOp = (titre, options = {}) => confirmerFenetre({ titre, ...options });
   const fmtFCFA = (n) => `${Math.round(n || 0).toLocaleString("fr-FR")} FCFA`;
   const [view, setView] = useState("dashboard");
@@ -2039,7 +2041,7 @@ function SuperAdminScreen() {
 // ÉCRAN 3 — ADMIN DE GROUPE (modules Tontine / Banque / Assurance / Bilan / Membres)
 // ============================================================
 function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
-  const { confirmer: confirmerFenetre, succes: succesOp } = useConfirmation();
+  const { confirmer: confirmerFenetre, succes: succesOp, executer: executerOp } = useConfirmation();
   const confirmerOp = (titre, options = {}) => confirmerFenetre({ titre, ...options });
   const fmtFCFA = (n) => `${Math.round(n).toLocaleString("fr-FR")} FCFA`;
 
@@ -2780,6 +2782,28 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
   };
   useEffect(() => { if (view === "depenses" || view === "bilan") rechargerDepenses(); }, [groupId, view]);
 
+  // Deux lectures avant validation (réglable par groupe)
+  const [reglesGroupe, setReglesGroupe] = useState(null);
+  const [nbLectures, setNbLectures] = useState(0);
+  useEffect(() => {
+    if (!groupId) return;
+    fetchReglesGroupe(groupId).then(setReglesGroupe).catch(() => setReglesGroupe(null));
+    fetchOperationsEnAttente(groupId).then((o) => setNbLectures(o.filter((x) => !["validee", "abandonnee"].includes(x.statut)).length)).catch(() => setNbLectures(0));
+  }, [groupId, view]);
+  const lecturesActives = (rubrique) => ({ ...LECTURES_DEFAUT, ...(reglesGroupe?.lectures || {}) })[rubrique] !== false;
+  const envoyerEnLecture = async (rubrique, { date, titre, parametres, lignes }) => {
+    const propres = lignes.filter((l) => (parseInt(String(l.montant).replace(/[^\d]/g, ""), 10) || 0) > 0);
+    const total = propres.reduce((t, l) => t + (parseInt(String(l.montant).replace(/[^\d]/g, ""), 10) || 0), 0);
+    const res = await executerOp({
+      titre: "Envoyer cette saisie en lecture ?",
+      lignes: [["Saisie", titre], ["Date", date ? date.split("-").reverse().join("/") : "—"], ["Membres", String(propres.length)], ["Total", fmtFCFA(total)]],
+      alertes: ["Rien ne change dans les soldes et aucun SMS ne part avant les deux lectures (menu « Lectures »)."],
+      libelleConfirmer: "Envoyer en lecture", detailSucces: "Saisie en attente des deux lectures",
+    }, () => soumettreOperation(groupId, { rubrique, date, titre, parametres, lignes: propres, saisiPar: utilisateur }));
+    if (res) setNbLectures((n) => n + 1);
+    return !!res;
+  };
+
   // Sommes gardées pas encore récupérées : rappel sur les écrans d'encaisse
   const [gardeesARecuperer, setGardeesARecuperer] = useState({ total: 0, nb: 0 });
   useEffect(() => {
@@ -2855,6 +2879,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
           { icon: <Banknote size={16} />, label: "Tontine", key: "tontine" },
           { icon: <PiggyBank size={16} />, label: "Banque", key: "banque" },
           { icon: <Coins size={16} />, label: "Caisse", key: "caisse" },
+          { icon: <ListChecks size={16} />, label: nbLectures ? `Lectures (${nbLectures})` : "Lectures", key: "lectures" },
           { icon: <HeartHandshake size={16} />, label: "Assurance", key: "assurance" },
           { icon: <Wallet size={16} />, label: "Fonds", key: "fonds" },
           { icon: <ShoppingCart size={16} />, label: "Dépenses", key: "depenses" },
@@ -3015,6 +3040,10 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
               </>
             )}
           </>
+        )}
+
+        {view === "lectures" && (
+          <LecturesModule groupId={groupId} nomGroupe={nomGroupe} membres={membres} utilisateur={utilisateur} onChange={setNbLectures} />
         )}
 
         {view === "caisse" && (
@@ -3851,6 +3880,16 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
             onClick={async () => {
               if (!cotisationTontineDate.trim()) { setCotisationTontineError("La date de séance est obligatoire."); return; }
               if (!tourEnCours) { setCotisationTontineError("Aucun tour en cours."); return; }
+              if (lecturesActives("tontine")) {
+                const dateISO = versDateISO(cotisationTontineDate);
+                if (!dateISO) { setCotisationTontineError("Date invalide (jj/mm/aaaa)."); return; }
+                const ok = await envoyerEnLecture("tontine", {
+                  date: dateISO, titre: `Cotisations tontine — tour ${tourEnCours.numero}`, parametres: { tourId: tourEnCours.id, libelle: "cotisation tontine" },
+                  lignes: membres.filter((m) => cotisationTontineMontants[m.nom]).map((m) => ({ membreId: m.id, nom: m.nom, telephone: m.telephone, montant: cotisationTontineMontants[m.nom] })),
+                });
+                if (ok) setShowCotisationTontine(false);
+                return;
+              }
               if (!(await confirmerOp("Enregistrer ces cotisations tontine ?"))) return;
               try {
                 const cotisations = membres
@@ -4200,11 +4239,21 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
           <button
             className="adm-btn-valider"
             onClick={async () => {
+              if (lecturesActives("assurance")) {
+                const dateISO = versDateISO(cotisationAssuranceDate);
+                if (!dateISO) { setCotisationAssuranceErreur("La date de la séance est obligatoire (jj/mm/aaaa)."); return; }
+                const ok = await envoyerEnLecture("assurance", {
+                  date: dateISO, titre: "Cotisations assurance", parametres: { soldeMinimum, libelle: "cotisation assurance" },
+                  lignes: membres.filter((m) => cotisationAssuranceMontants[m.nom]).map((m) => ({ membreId: m.id, nom: m.nom, telephone: m.telephone, montant: cotisationAssuranceMontants[m.nom] })),
+                });
+                if (ok) setShowCotisationAssurance(false);
+                return;
+              }
               if (!(await confirmerOp("Enregistrer ces cotisations assurance ?"))) return;
               try {
                 const cotisations = membres
                   .filter((m) => cotisationAssuranceMontants[m.nom])
-                  .map((m) => ({ membreId: m.id, montant: cotisationAssuranceMontants[m.nom] }));
+                  .map((m) => ({ membreId: m.id, montant: cotisationAssuranceMontants[m.nom], date: versDateISO(cotisationAssuranceDate) || undefined }));
                 const soldesApres = await enregistrerCotisationsAssurance(groupId, cotisations, soldeMinimum); succesOp();
                 await rechargerAssurance();
 
@@ -4472,6 +4521,17 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
             onClick={async () => {
               if (!cotisationEpargneId) { setCotisationBanqueErreur("Sélectionne une épargne."); return; }
               if (!cotisationDate.trim()) { setCotisationBanqueErreur("La date du dépôt est obligatoire."); return; }
+              if (lecturesActives("epargne")) {
+                const dateISO = versDateISO(cotisationDate);
+                if (!dateISO) { setCotisationBanqueErreur("Date invalide (jj/mm/aaaa)."); return; }
+                const ep = epargnes.find((x) => x.id === cotisationEpargneId);
+                const ok = await envoyerEnLecture("epargne", {
+                  date: dateISO, titre: `Cotisations — ${ep?.nom || "épargne"}`, parametres: { epargneId: cotisationEpargneId, libelle: `cotisation ${ep?.nom || "épargne"}` },
+                  lignes: membres.filter((m) => cotisationMontants[m.nom]).map((m) => ({ membreId: m.id, nom: m.nom, telephone: m.telephone, montant: cotisationMontants[m.nom] })),
+                });
+                if (ok) setShowCotisationBanque(false);
+                return;
+              }
               if (!(await confirmerOp("Enregistrer ces cotisations ?"))) return;
               try {
                 const cotisations = membres
@@ -5336,6 +5396,15 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
               const aVerser = membres.filter((m) => cotisationFondsMontants[m.id] && parseInt(cotisationFondsMontants[m.id].replace(/[^\d]/g, ""), 10) > 0);
               if (aVerser.length === 0) { setCotisationFondsErreur("Saisis au moins un montant."); return; }
 
+              if (lecturesActives("fonds")) {
+                const typeChoisi = typesFonds.find((t) => t.id === cotisationFondsTypeId);
+                const ok = await envoyerEnLecture("fonds", {
+                  date: dateISO, titre: `Versements — ${typeChoisi?.nom || "fonds"}`, parametres: { typeFondsId: cotisationFondsTypeId, libelle: `versement "${typeChoisi?.nom || "fonds"}"` },
+                  lignes: aVerser.map((m) => ({ membreId: m.id, nom: m.nom, telephone: m.telephone, montant: cotisationFondsMontants[m.id] })),
+                });
+                if (ok) setShowCotisationFonds(false);
+                return;
+              }
               if (!(await confirmerOp("Enregistrer ces versements ?"))) return;
               setCotisationFondsEnCours(true);
               setCotisationFondsErreur("");
