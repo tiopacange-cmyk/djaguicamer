@@ -1968,3 +1968,21 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
   .bq-releve-sign { margin-top: 40px; }
 }
 .bq-carte-nom svg { flex: none; margin-top: 3px; }
+
+/* ---------- Caisse de séance ---------- */
+.bq-sans-marge { margin-bottom: 0; }
+.bq-rouge-texte { color: var(--danger); }
+.bq-fieldset { border: none; padding: 0; margin: 0; min-width: 0; }
+.bq-fieldset:disabled { opacity: 0.55; }
+.bq-billetage { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.bq-coupure { display: grid; grid-template-columns: 56px 1fr; grid-template-rows: auto auto; gap: 2px 8px; align-items: center; padding: 8px; border-radius: 12px; background: var(--surface-sunken); border: 1px solid var(--border); }
+.bq-coupure > span:first-child { font-weight: 800; color: var(--ink); }
+.bq-coupure .adm-input { min-height: 38px; text-align: right; }
+.bq-coupure > span:last-child { grid-column: 1 / -1; text-align: right; font-size: 12px; color: var(--muted); }
+.bq-kpi-3 { grid-template-columns: repeat(3, 1fr); }
+.bq-kpi .bq-kpi-alerte { background: var(--danger-bg); }
+.bq-kpi .bq-kpi-alerte b { color: var(--danger); }
+.bq-garde { padding: 10px 12px; margin-bottom: 8px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--border)); background: color-mix(in srgb, var(--gold) 7%, var(--surface)); }
+.bq-garde-nom { flex: 2 1 220px !important; color: var(--ink); font-size: 14px; }
+.bq-carte-reglage { max-width: 640px; }
+.bq-rappel-garde { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px 14px; border-radius: var(--radius-control); background: color-mix(in srgb, var(--gold) 14%, var(--surface)); color: var(--ink); border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); font-size: 14px; }

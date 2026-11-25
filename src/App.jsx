@@ -15,6 +15,9 @@ import { fetchCaisseRafraichissement, fetchRafraichissements, creerRafraichissem
 import { envoyerSMS } from "./lib/sms";
 import { ChampDate } from "./ui/ChampDate";
 import BanqueModule from "./banque/BanqueModule";
+import CaisseModule from "./banque/CaisseModule";
+import { fetchCompteReunion } from "./lib/banque2";
+import { fetchSommesGardees, fetchDettes } from "./lib/caisse";
 import { fetchTableauDeBordMembre } from "./lib/moncompte";
 
 // Polyfill : en dehors de Claude.ai, window.storage n'existe pas.
@@ -47,6 +50,7 @@ import {
   Gavel, Bell, LogOut, Moon, Sun, Lock, ChevronLeft, CheckCircle2, Clock,
   Banknote, PiggyBank, HeartHandshake, UserCog, Calendar, Repeat, Eye, EyeOff, AlertTriangle, ShoppingCart, Palette,
   ShieldCheck, MessageSquareText, ListChecks, UserRound, Mail, ArrowDownLeft, ArrowUpRight, Check,
+  Coins,
 } from "lucide-react";
 
 // ---------- Palette partagée ----------
@@ -2762,6 +2766,24 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
   };
   useEffect(() => { if (view === "depenses" || view === "bilan") rechargerDepenses(); }, [groupId, view]);
 
+  // Sommes gardées pas encore récupérées : rappel sur les écrans d'encaisse
+  const [gardeesARecuperer, setGardeesARecuperer] = useState({ total: 0, nb: 0 });
+  useEffect(() => {
+    if (!groupId) return;
+    fetchSommesGardees(groupId, { ouvertesSeulement: true })
+      .then((g) => setGardeesARecuperer({ total: g.reduce((s, x) => s + x.montant, 0), nb: g.length }))
+      .catch(() => setGardeesARecuperer({ total: 0, nb: 0 }));
+  }, [groupId, view]);
+
+  // Bilan : compte de la réunion, sommes gardées par des membres, dettes à recevoir
+  const [bilanCaisse, setBilanCaisse] = useState({ compteReunion: 0, gardees: 0, nbGardiens: 0, dettes: 0 });
+  useEffect(() => {
+    if (view !== "bilan" || !groupId) return;
+    Promise.all([fetchCompteReunion(groupId), fetchSommesGardees(groupId, { ouvertesSeulement: true }), fetchDettes(groupId)])
+      .then(([c, g, d]) => setBilanCaisse({ compteReunion: c.solde, gardees: g.reduce((s, x) => s + x.montant, 0), nbGardiens: g.length, dettes: d.reduce((s, x) => s + x.reste, 0) }))
+      .catch((e) => console.error("Bilan caisse", e));
+  }, [groupId, view]);
+
   const addEventType = async () => {
     if (!newTypeName.trim()) return;
     try {
@@ -2817,6 +2839,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
           { icon: <Calendar size={16} />, label: "Séances", key: "seances" },
           { icon: <Banknote size={16} />, label: "Tontine", key: "tontine" },
           { icon: <PiggyBank size={16} />, label: "Banque", key: "banque" },
+          { icon: <Coins size={16} />, label: "Caisse", key: "caisse" },
           { icon: <HeartHandshake size={16} />, label: "Assurance", key: "assurance" },
           { icon: <Wallet size={16} />, label: "Fonds", key: "fonds" },
           { icon: <ShoppingCart size={16} />, label: "Dépenses", key: "depenses" },
@@ -2828,6 +2851,13 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
         active={view} onSelect={setView}
       />
       <div className="app-main" style={{ flex: 1, minWidth: 0 }}>
+        {gardeesARecuperer.total > 0 && ["tontine", "banque", "assurance", "fonds", "seances"].includes(view) && (
+          <div className="bq-rappel-garde" role="status">
+            <Coins size={16} aria-hidden="true" />
+            <span><b>{fmtFCFA(gardeesARecuperer.total)}</b> gardés par {gardeesARecuperer.nb} membre(s) : à récupérer dans la Caisse avant toute encaisse.</span>
+            <button type="button" className="adm-btn-ligne" onClick={() => setView("caisse")}>Aller à la caisse</button>
+          </div>
+        )}
         {view === "tontine" && (
           <>
             <div className="adm-entete">
@@ -2972,6 +3002,10 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
           </>
         )}
 
+        {view === "caisse" && (
+          <CaisseModule groupId={groupId} nomGroupe={nomGroupe} membres={membres} utilisateur={utilisateur} />
+        )}
+
         {view === "banque" && (
           <BanqueModule
             groupId={groupId}
@@ -3078,6 +3112,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
             </div>
 
             <div style={{ margin: "18px 0", maxWidth: "260px" }}>
+              <StatCard label="Compte de la réunion" value={fmtFCFA(bilanCaisse.compteReunion)} icon={<Building2 size={16} />} />
+              <StatCard label={`Sommes gardées (${bilanCaisse.nbGardiens} membre(s))`} value={fmtFCFA(bilanCaisse.gardees)} icon={<Coins size={16} />} />
+              <StatCard label="Dettes à recevoir" value={fmtFCFA(bilanCaisse.dettes)} icon={<Clock size={16} />} />
               <StatCard label="Caisse des amendes" value={fmtFCFA(soldeCaisseAmendes)} icon={<AlertTriangle size={16} />} />
             </div>
 

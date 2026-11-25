@@ -82,6 +82,8 @@ create table if not exists dettes (
   saisi_par text,
   created_at timestamptz not null default now()
 );
+alter table dettes add column if not exists penalite numeric not null default 0;
+alter table dettes add column if not exists paiements jsonb;   -- [{ date, montant, mode, par }]
 
 -- ---------- 6. Caisse de séance ----------
 create table if not exists caisse_seances (
@@ -103,9 +105,11 @@ create table if not exists caisse_seances (
   cloture_par text,
   cloture_le timestamptz,
   reouverture_motif text,
+  autres jsonb,                                -- autres entrées/sorties justifiées [{ libelle, montant }]
   created_at timestamptz not null default now(),
   unique (group_id, date)
 );
+alter table caisse_seances add column if not exists autres jsonb;
 
 create table if not exists sommes_gardees (
   id uuid primary key default gen_random_uuid(),
