@@ -54,8 +54,9 @@ export async function sauvegarderConfigAssurance(groupId, { soldeMinimum, delaiJ
 // ============================================================
 
 // Récupère les soldes de tous les membres du groupe. Si un membre
-// n'a pas encore de ligne (nouveau), on lui attribue le solde
-// minimum par défaut, initialisé en base au passage.
+// n'a pas encore de ligne (nouveau), sa ligne est créée à 0 F : le
+// solde ne vient que de ses vraies cotisations, jamais d'un montant
+// offert (il est « en reconstitution » jusqu'à atteindre le minimum).
 export async function fetchSoldesAssurance(groupId, membres, soldeMinimum) {
   const { data, error } = await supabase
     .from("assurance_soldes")
@@ -67,7 +68,7 @@ export async function fetchSoldesAssurance(groupId, membres, soldeMinimum) {
   const manquants = membres.filter((m) => m && m.id && !soldesParMembre[m.id]);
 
   if (manquants.length > 0) {
-    const lignes = manquants.map((m) => ({ group_id: groupId, membre_id: m.id, solde: soldeMinimum }));
+    const lignes = manquants.map((m) => ({ group_id: groupId, membre_id: m.id, solde: 0 }));
     const { data: crees, error: errInsert } = await supabase.from("assurance_soldes").insert(lignes).select();
     if (errInsert) throw errInsert;
     crees.forEach((s) => { soldesParMembre[s.membre_id] = s; });

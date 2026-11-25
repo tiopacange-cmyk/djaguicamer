@@ -163,32 +163,54 @@ export async function reinitialiserMotDePasseMembre(email) {
   return motDePasseTemp;
 }
 
+// Opérations qui gardent la trace d'un membre : tant qu'il en a une,
+// il ne peut pas être supprimé (on le rend inactif à la place).
+const HISTORIQUE_MEMBRE = [
+  ["tontine_cotisations", "membre_id", "des cotisations de tontine"],
+  ["tontine_tours", "beneficiaire_id", "un tour de tontine à son nom"],
+  ["tontine_amendes", "membre_id", "des amendes de tontine"],
+  ["tontine_redistributions", "membre_id", "des redistributions de commission"],
+  ["epargne_mouvements", "membre_id", "des mouvements en banque"],
+  ["prets", "membre_id", "des prêts"],
+  ["avalisations", "avaliste_id", "des prêts dont il est l'avaliste"],
+  ["assurance_mouvements", "membre_id", "des cotisations d'assurance"],
+  ["assurance_evenements", "membre_beneficiaire_id", "des aides d'assurance"],
+  ["assurance_prelevements", "membre_id", "des prélèvements d'assurance"],
+  ["assurance_delegues", "membre_id", "des délégations à un événement"],
+  ["caisse_amendes_mouvements", "membre_id", "des amendes de séance payées"],
+  ["mouvements_bancaires_externes", "membre_id", "des mouvements bancaires"],
+  ["mouvement_responsables_frais", "membre_id", "des frais bancaires à sa charge"],
+  ["signataires_compte", "membre_id", "un rôle de signataire de compte"],
+  ["rafraichissements", "responsable_id", "des achats de rafraîchissement"],
+];
+
 export async function supprimerMembre(groupMemberId) {
-  const { data: cotisationsTontine, error: errTontine } = await supabase
-    .from("tontine_cotisations")
-    .select("id")
-    .eq("membre_id", groupMemberId)
-    .limit(1);
-  if (errTontine) throw errTontine;
-
-  const { data: mouvementsBanque, error: errBanque } = await supabase
-    .from("epargne_mouvements")
-    .select("id")
-    .eq("membre_id", groupMemberId)
-    .eq("type", "Versement")
-    .limit(1);
-  if (errBanque) throw errBanque;
-
-  if ((cotisationsTontine && cotisationsTontine.length > 0) || (mouvementsBanque && mouvementsBanque.length > 0)) {
-    throw new Error("Ce membre a déjà effectué au moins une cotisation — suppression impossible.");
+  const raisons = [];
+  for (const [table, colonne, libelle] of HISTORIQUE_MEMBRE) {
+    const { data, error } = await supabase.from(table).select("id").eq(colonne, groupMemberId).limit(1);
+    if (error) throw error;
+    if (data && data.length > 0) raisons.push(libelle);
   }
+  if (raisons.length > 0) {
+    throw new Error(`Suppression impossible : ce membre a ${raisons.join(", ")}. Utilise « Rendre inactif » pour conserver l'historique financier.`);
+  }
+
+  // Lignes créées automatiquement, sans aucune opération réelle :
+  // elles disparaissent avec le membre.
+  const { error: errSolde } = await supabase.from("assurance_soldes").delete().eq("membre_id", groupMemberId);
+  if (errSolde) throw errSolde;
 
   const { error } = await supabase
     .from("group_members")
     .delete()
     .eq("id", groupMemberId);
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === "23503") {
+      throw new Error("Suppression impossible : ce membre est encore lié à des opérations du groupe. Utilise « Rendre inactif » à la place.");
+    }
+    throw error;
+  }
 }
 
 // ============================================================
