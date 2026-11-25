@@ -16,6 +16,7 @@ import { envoyerSMS } from "./lib/sms";
 import { ChampDate } from "./ui/ChampDate";
 import BanqueModule from "./banque/BanqueModule";
 import CaisseModule from "./banque/CaisseModule";
+import { useConfirmation } from "./ui/Confirmation";
 import { fetchCompteReunion } from "./lib/banque2";
 import { fetchSommesGardees, fetchDettes } from "./lib/caisse";
 import { fetchTableauDeBordMembre } from "./lib/moncompte";
@@ -904,6 +905,8 @@ function ChangerMotDePasseScreen({ onDone }) {
 // ÉCRAN 2 — SUPER ADMIN
 // ============================================================
 function SuperAdminScreen() {
+  const { confirmer: confirmerFenetre, succes: succesOp } = useConfirmation();
+  const confirmerOp = (titre, options = {}) => confirmerFenetre({ titre, ...options });
   const fmtFCFA = (n) => `${Math.round(n || 0).toLocaleString("fr-FR")} FCFA`;
   const [view, setView] = useState("dashboard");
   const [groupes, setGroupes] = useState([]);
@@ -1255,10 +1258,11 @@ function SuperAdminScreen() {
                     </button>
                     <button
                       onClick={async () => {
+                        if (!(await confirmerOp(abo?.statut === "suspendu" ? "Réactiver ce groupe ?" : "Suspendre ce groupe ?", { danger: abo?.statut !== "suspendu", lignes: [["Groupe", g.nom]] }))) return;
                         setSuspensionEnCours(g.id);
                         try {
                           if (abo?.statut === "suspendu") await reactiverGroupe(g.id);
-                          else await suspendreGroupe(g.id);
+                          else await suspendreGroupe(g.id); succesOp();
                           await chargerGroupes();
                         } catch (e) {
                           console.error("Erreur de suspension/réactivation", e);
@@ -1372,6 +1376,7 @@ function SuperAdminScreen() {
                         <button
                           disabled={savingPlan}
                           onClick={async () => {
+                            if (!(await confirmerOp("Modifier ce plan tarifaire ?"))) return;
                             setSavingPlan(true);
                             try {
                               await modifierPlanTarifaire(p.id, {
@@ -1379,7 +1384,7 @@ function SuperAdminScreen() {
                                 prixAnnuel: parseFloat(editPrixAnnuel) || 0,
                                 limiteMembres: editLimiteMembres.trim() === "" ? null : parseInt(editLimiteMembres, 10),
                                 description: editDescription,
-                              });
+                              }); succesOp();
                               await chargerPlans();
                               setEditPlanId(null);
                             } catch (e) {
@@ -1536,10 +1541,11 @@ function SuperAdminScreen() {
               disabled={renouvelerEnCours}
               className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: renouvelerEnCours ? "default" : "pointer" }}
               onClick={async () => {
+                if (!(await confirmerOp("Renouveler cet abonnement ?"))) return;
                 setRenouvelerEnCours(true);
                 setRenouvelerErreur("");
                 try {
-                  await renouvelerAbonnement(showRenouveler.id, renouvelerFormule, renouvelerPeriodicite);
+                  await renouvelerAbonnement(showRenouveler.id, renouvelerFormule, renouvelerPeriodicite); succesOp();
                   await chargerGroupes();
                   setRenouvelerSuccess(true);
                 } catch (e) {
@@ -1568,8 +1574,9 @@ function SuperAdminScreen() {
               type="checkbox"
               checked={smsSoldeActuel?.bloquerSiEpuise ?? true}
               onChange={async (e) => {
+                if (!(await confirmerOp("Changer le blocage des SMS ?"))) return;
                 try {
-                  await definirBlocageSms(showGererSms.id, e.target.checked);
+                  await definirBlocageSms(showGererSms.id, e.target.checked); succesOp();
                   setSmsSoldeActuel({ ...smsSoldeActuel, bloquerSiEpuise: e.target.checked });
                 } catch (err) {
                   console.error("Erreur de mise à jour du blocage SMS", err);
@@ -1594,9 +1601,10 @@ function SuperAdminScreen() {
             <button
               disabled={smsSenderIdEnCours}
               onClick={async () => {
+                if (!(await confirmerOp("Enregistrer cet expéditeur SMS ?"))) return;
                 setSmsSenderIdEnCours(true);
                 try {
-                  await definirSmsSenderId(showGererSms.id, smsSenderIdInput.trim());
+                  await definirSmsSenderId(showGererSms.id, smsSenderIdInput.trim()); succesOp();
                 } catch (e) {
                   console.error("Erreur de mise à jour du sender ID", e);
                 } finally {
@@ -1640,11 +1648,12 @@ function SuperAdminScreen() {
             onClick={async () => {
               const quantite = parseInt(smsVenteQuantite.replace(/[^\d]/g, ""), 10);
               if (!quantite || quantite <= 0) { setSmsVenteErreur("Saisis une quantité valide."); return; }
+              if (!(await confirmerOp("Enregistrer cette vente de crédits SMS ?", { lignes: [["Groupe", showGererSms.nom], ["Crédits", String(quantite)], ["Prix", smsVentePrix || "—"]] }))) return;
               setSmsVenteEnCours(true);
               setSmsVenteErreur("");
               try {
                 const prix = parseInt(smsVentePrix.replace(/[^\d]/g, ""), 10) || null;
-                const nouveauSolde = await vendreCreditsSms(showGererSms.id, quantite, prix, smsVenteMode, smsVenteNote.trim());
+                const nouveauSolde = await vendreCreditsSms(showGererSms.id, quantite, prix, smsVenteMode, smsVenteNote.trim()); succesOp();
                 setSmsSoldeActuel({ ...smsSoldeActuel, solde: nouveauSolde });
                 const histo = await fetchHistoriqueSms(showGererSms.id);
                 setSmsHistorique(histo);
@@ -1786,9 +1795,10 @@ function SuperAdminScreen() {
               if (!modifierGroupeNom.trim()) { setModifierGroupeErreur("Le nom du groupe est obligatoire."); return; }
               const slug = modifierGroupeSlug.replace(/^-+|-+$/g, "");
               if (SLUGS_RESERVES.includes(slug)) { setModifierGroupeErreur(`« ${slug} » est réservé par le site, choisis un autre lien.`); return; }
+              if (!(await confirmerOp("Enregistrer les modifications du groupe ?"))) return;
               setModifierGroupeEnCours(true);
               try {
-                await modifierGroupe(showModifierGroupe.id, modifierGroupeNom.trim(), { slug, slogan: modifierGroupeSlogan.trim() });
+                await modifierGroupe(showModifierGroupe.id, modifierGroupeNom.trim(), { slug, slogan: modifierGroupeSlogan.trim() }); succesOp();
                 await chargerGroupes();
                 setShowModifierGroupe(null);
               } catch (e) {
@@ -1863,6 +1873,7 @@ function SuperAdminScreen() {
                     setCreationErreur("Tous les champs sont obligatoires.");
                     return;
                   }
+                  if (!(await confirmerOp("Créer ce groupe ?"))) return;
                   setCreationEnCours(true);
                   setCreationErreur("");
                   try {
@@ -1873,7 +1884,7 @@ function SuperAdminScreen() {
                       formule: creationFormule,
                       periodicite: creationPeriodicite,
                       creditSms: parseInt(creationCreditSms.replace(/[^\d]/g, ""), 10) || 0,
-                    });
+                    }); succesOp();
                     setResultatCreation(resultat);
                     await chargerGroupes();
                     await chargerAudit();
@@ -1998,11 +2009,12 @@ function SuperAdminScreen() {
                 setResetMotDePasseTemp("");
                 return;
               }
+              if (!(await confirmerOp("Réinitialiser le mot de passe de cet administrateur ?", { danger: true }))) return;
               setResetEnCours(true);
               setResetErreur("");
               try {
                 const admin = adminsList[parseInt(resetSelection, 10)];
-                const nouveauMdp = await reinitialiserMotDePasseDirect(admin.email, admin.groupId, admin.groupNom);
+                const nouveauMdp = await reinitialiserMotDePasseDirect(admin.email, admin.groupId, admin.groupNom); succesOp();
                 setResetMotDePasseTemp(nouveauMdp);
                 await chargerAudit();
               } catch (e) {
@@ -2027,6 +2039,8 @@ function SuperAdminScreen() {
 // ÉCRAN 3 — ADMIN DE GROUPE (modules Tontine / Banque / Assurance / Bilan / Membres)
 // ============================================================
 function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
+  const { confirmer: confirmerFenetre, succes: succesOp } = useConfirmation();
+  const confirmerOp = (titre, options = {}) => confirmerFenetre({ titre, ...options });
   const fmtFCFA = (n) => `${Math.round(n).toLocaleString("fr-FR")} FCFA`;
 
   // Vérifie le statut de la licence du groupe (bloque l'accès si
@@ -2786,8 +2800,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
 
   const addEventType = async () => {
     if (!newTypeName.trim()) return;
+    if (!(await confirmerOp("Créer ce type d'événement ?"))) return;
     try {
-      const nouveau = await creerTypeEvenement(groupId, newTypeName.trim());
+      const nouveau = await creerTypeEvenement(groupId, newTypeName.trim()); succesOp();
       setEventTypes([...eventTypes, nouveau]);
       setTypeEvenementId(nouveau.id);
       setNewTypeName("");
@@ -3427,9 +3442,10 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                         onChange={async (e) => {
                           const fichier = e.target.files[0];
                           if (!fichier) return;
+                          if (!(await confirmerOp("Joindre ce reçu ?"))) return;
                           setJoindreRecuEnCours(d.id);
                           try {
-                            await joindreRecu(d.id, groupId, fichier);
+                            await joindreRecu(d.id, groupId, fichier); succesOp();
                             await rechargerDepots();
                           } catch (err) {
                             console.error("Erreur lors de la jointure du reçu", err);
@@ -3710,9 +3726,10 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   {m.statut === "en attente" && (
                     <button
                       onClick={async () => {
+                        if (!(await confirmerOp("Valider ce membre ?"))) return;
                         try {
                           // ⚠️ validateurId : à remplacer par l'id du membre connecté (Président)
-                          await validerMembre(m.id, m.id);
+                          await validerMembre(m.id, m.id); succesOp();
                           await rechargerMembres();
                         } catch (e) {
                           console.error("Erreur de validation du membre", e);
@@ -3726,9 +3743,10 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   {(m.statut === "actif" || m.statut === "inactif") && (
                     <button
                       onClick={async () => {
+                        if (!(await confirmerOp("Changer le statut de ce membre ?"))) return;
                         try {
                           const nouveauStatut = m.statut === "actif" ? "inactif" : "actif";
-                          await toggleActifMembre(m.id, nouveauStatut);
+                          await toggleActifMembre(m.id, nouveauStatut); succesOp();
                           await rechargerMembres();
                         } catch (e) {
                           console.error("Erreur de changement de statut du membre", e);
@@ -3833,11 +3851,12 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
             onClick={async () => {
               if (!cotisationTontineDate.trim()) { setCotisationTontineError("La date de séance est obligatoire."); return; }
               if (!tourEnCours) { setCotisationTontineError("Aucun tour en cours."); return; }
+              if (!(await confirmerOp("Enregistrer ces cotisations tontine ?"))) return;
               try {
                 const cotisations = membres
                   .filter((m) => cotisationTontineMontants[m.nom])
                   .map((m) => ({ membreId: m.id, montant: cotisationTontineMontants[m.nom], date: versDateISO(cotisationTontineDate) }));
-                await enregistrerCotisationsTontine(tourEnCours.id, cotisations);
+                await enregistrerCotisationsTontine(tourEnCours.id, cotisations); succesOp();
                 await rechargerTontine();
 
                 // Notifie chaque membre par SMS de sa cotisation enregistrée
@@ -3896,8 +3915,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
               if (!soldeNum || soldeNum <= 0) { setConfigAssuranceErreur("Saisis un solde minimum valide."); return; }
               if (!delaiNum || delaiNum <= 0) { setConfigAssuranceErreur("Saisis un délai valide (en jours)."); return; }
               if (!montantNum || montantNum <= 0) { setConfigAssuranceErreur("Saisis un montant de prélèvement valide."); return; }
+              if (!(await confirmerOp("Enregistrer la configuration de l'assurance ?"))) return;
               try {
-                await sauvegarderConfigAssurance(groupId, { soldeMinimum: soldeNum, delaiJours: delaiNum, montantPrelevementDefaut: montantNum });
+                await sauvegarderConfigAssurance(groupId, { soldeMinimum: soldeNum, delaiJours: delaiNum, montantPrelevementDefaut: montantNum }); succesOp();
                 await rechargerAssurance();
                 setConfigAssuranceErreur("");
                 setConfigAssuranceSuccess(true);
@@ -4087,6 +4107,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                 setEvenementSuccess(false);
                 return;
               }
+              if (!(await confirmerOp("Déclarer cet événement ?"))) return;
               try {
                 const { soldesApres, part } = await declarerEvenement(groupId, {
                   typeId: typeEvenementId,
@@ -4102,7 +4123,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   membresGroupe: membres.filter((m) => m.statut === "actif"),
                   soldeMinimum,
                   delaiJours: delaiJoursAssurance,
-                });
+                }); succesOp();
                 await rechargerAssurance();
 
                 const membresActifs = membres.filter((m) => m.statut === "actif");
@@ -4179,11 +4200,12 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
           <button
             className="adm-btn-valider"
             onClick={async () => {
+              if (!(await confirmerOp("Enregistrer ces cotisations assurance ?"))) return;
               try {
                 const cotisations = membres
                   .filter((m) => cotisationAssuranceMontants[m.nom])
                   .map((m) => ({ membreId: m.id, montant: cotisationAssuranceMontants[m.nom] }));
-                const soldesApres = await enregistrerCotisationsAssurance(groupId, cotisations, soldeMinimum);
+                const soldesApres = await enregistrerCotisationsAssurance(groupId, cotisations, soldeMinimum); succesOp();
                 await rechargerAssurance();
 
                 cotisations.forEach((c) => {
@@ -4293,10 +4315,11 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   disabled={clotureEnCours}
                   className="adm-btn adm-btn-action" style={{ flex: 2, cursor: clotureEnCours ? "default" : "pointer" }}
                   onClick={async () => {
+                    if (!(await confirmerOp("Clôturer cette épargne ?"))) return;
                     setClotureEnCours(true);
                     setClotureErreur("");
                     try {
-                      await cloturerEpargne(showCloture.id, groupId, clotureApercu.membres, clotureDecisions, clotureNouveauNom.trim());
+                      await cloturerEpargne(showCloture.id, groupId, clotureApercu.membres, clotureDecisions, clotureNouveauNom.trim()); succesOp();
                       clotureApercu.membres.forEach((m) => {
                         if (m.telephone) {
                           const decision = clotureDecisions[m.membreId];
@@ -4367,6 +4390,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                 setEpargneSuccess(false);
                 return;
               }
+              if (!(await confirmerOp("Créer cette épargne ?"))) return;
               try {
                 await creerEpargne(groupId, {
                   nom: epargneNom.trim(),
@@ -4374,7 +4398,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   cotisationParSeance: epargneCotisation.trim() || null,
                   tauxInteret: epargneTaux.trim() || null,
                   dateCloture: versDateISO(epargneCloture),
-                });
+                }); succesOp();
                 await rechargerEpargnes();
                 setEpargneError("");
                 setEpargneSuccess(true);
@@ -4448,11 +4472,12 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
             onClick={async () => {
               if (!cotisationEpargneId) { setCotisationBanqueErreur("Sélectionne une épargne."); return; }
               if (!cotisationDate.trim()) { setCotisationBanqueErreur("La date du dépôt est obligatoire."); return; }
+              if (!(await confirmerOp("Enregistrer ces cotisations ?"))) return;
               try {
                 const cotisations = membres
                   .filter((m) => cotisationMontants[m.nom])
                   .map((m) => ({ membreId: m.id, montant: cotisationMontants[m.nom], date: versDateISO(cotisationDate) }));
-                const resultatCotisation = await enregistrerCotisationsEpargne(cotisationEpargneId, cotisations);
+                const resultatCotisation = await enregistrerCotisationsEpargne(cotisationEpargneId, cotisations); succesOp();
                 await rechargerEpargnes();
                 await rechargerHistoriqueBanque();
 
@@ -4592,6 +4617,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                 setCreditSuccess(false);
                 return;
               }
+              if (!(await confirmerOp("Mettre en place ce crédit ?"))) return;
               try {
                 await mettreEnPlaceCredit(creditEpargneId, {
                   membreId: creditMembreId,
@@ -4603,7 +4629,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   penaliteRetard: creditPenalite.trim() || null,
                   avalisteId: creditDepasseCaution ? creditAvalisteId : null,
                   montantGaranti: montantNum,
-                });
+                }); succesOp();
                 await rechargerPrets();
                 await rechargerEpargnes();
                 await rechargerHistoriqueBanque();
@@ -5123,6 +5149,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                 setInviteSuccess(false);
                 return;
               }
+              if (!(await confirmerOp("Inviter ce membre ?"))) return;
               try {
                 const resultat = await inviterMembre(groupId, {
                   nom: inviteNom.trim(),
@@ -5130,7 +5157,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   telephone: inviteTelephone.trim(),
                   typeMembre: roleType,
                   posteId: null, // ⚠️ à relier au vrai id du poste choisi (table postes_bureau) une fois les postes créés en base
-                });
+                }); succesOp();
 
                 // Enregistre un éventuel versement immédiat vers le
                 // "Fonds de garantie" (l'objectif, lui, est commun à
@@ -5187,8 +5214,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                     color={C.sub}
                     style={{ cursor: "pointer" }}
                     onClick={async () => {
+                      if (!(await confirmerOp("Supprimer ce type de fonds ?", { danger: true }))) return;
                       try {
-                        await supprimerTypeFonds(t.id);
+                        await supprimerTypeFonds(t.id); succesOp();
                         await rechargerFonds();
                       } catch (e) {
                         console.error("Erreur de suppression du type de fonds", e);
@@ -5207,9 +5235,10 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                     disabled={cibleTypeEnCours === t.id}
                     onClick={async () => {
                       const val = parseInt((cibleTypeInputs[t.id] || "").replace(/[^\d]/g, ""), 10) || 0;
+                      if (!(await confirmerOp("Modifier l'objectif de ce fonds ?"))) return;
                       setCibleTypeEnCours(t.id);
                       try {
-                        await fixerCibleTypeFonds(t.id, val);
+                        await fixerCibleTypeFonds(t.id, val); succesOp();
                         await rechargerFonds();
                       } catch (e) {
                         console.error("Erreur de mise à jour de l'objectif", e);
@@ -5231,8 +5260,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
           <button
             onClick={async () => {
               if (!newTypeFondsNom.trim()) return;
+              if (!(await confirmerOp("Créer ce type de fonds ?"))) return;
               try {
-                await creerTypeFonds(groupId, newTypeFondsNom.trim(), parseInt(newTypeFondsCible.replace(/[^\d]/g, ""), 10) || 0);
+                await creerTypeFonds(groupId, newTypeFondsNom.trim(), parseInt(newTypeFondsCible.replace(/[^\d]/g, ""), 10) || 0); succesOp();
                 setNewTypeFondsNom("");
                 setNewTypeFondsCible("");
                 await rechargerFonds();
@@ -5306,13 +5336,14 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
               const aVerser = membres.filter((m) => cotisationFondsMontants[m.id] && parseInt(cotisationFondsMontants[m.id].replace(/[^\d]/g, ""), 10) > 0);
               if (aVerser.length === 0) { setCotisationFondsErreur("Saisis au moins un montant."); return; }
 
+              if (!(await confirmerOp("Enregistrer ces versements ?"))) return;
               setCotisationFondsEnCours(true);
               setCotisationFondsErreur("");
               try {
                 const typeChoisi = typesFonds.find((t) => t.id === cotisationFondsTypeId);
                 for (const m of aVerser) {
                   const montant = parseInt(cotisationFondsMontants[m.id].replace(/[^\d]/g, ""), 10);
-                  const nouveauSolde = await enregistrerVersementFonds(m.id, cotisationFondsTypeId, montant, dateISO);
+                  const nouveauSolde = await enregistrerVersementFonds(m.id, cotisationFondsTypeId, montant, dateISO); succesOp();
                   if (m.telephone) {
                     envoyerSMS({
                       message: msgOperation(m.nom, `versement "${typeChoisi?.nom}"`, montant, nouveauSolde),
@@ -5466,12 +5497,13 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                 setEditSuccess(false);
                 return;
               }
+              if (!(await confirmerOp("Enregistrer les modifications du membre ?"))) return;
               try {
                 await modifierMembre(editMembre.profileId, {
                   nom: editNom.trim(),
                   email: editEmail.trim(),
                   telephone: editTelephone.trim(),
-                });
+                }); succesOp();
                 await rechargerMembres();
                 setEditError("");
                 setEditSuccess(true);
@@ -5535,11 +5567,12 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
               className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: resetMembreEnCours ? "default" : "pointer" }}
               onClick={async () => {
                 if (!resetMembreId) { setResetMembreErreur("Sélectionne un membre."); return; }
+                if (!(await confirmerOp("Réinitialiser le mot de passe de ce membre ?", { danger: true }))) return;
                 setResetMembreEnCours(true);
                 setResetMembreErreur("");
                 try {
                   const membreChoisi = membres.find((m) => m.id === resetMembreId);
-                  const nouveauMdp = await reinitialiserMotDePasseMembre(membreChoisi.email);
+                  const nouveauMdp = await reinitialiserMotDePasseMembre(membreChoisi.email); succesOp();
                   setResetMembreMotDePasse(nouveauMdp);
                 } catch (e) {
                   console.error("Erreur de réinitialisation", e);
@@ -5577,10 +5610,11 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
             <button
               disabled={deleteEnCours}
               onClick={async () => {
+                if (!(await confirmerOp("Supprimer définitivement ce membre ?", { danger: true }))) return;
                 setDeleteEnCours(true);
                 setDeleteErreur("");
                 try {
-                  await supprimerMembre(showDeleteMembre.id);
+                  await supprimerMembre(showDeleteMembre.id); succesOp();
                   await rechargerMembres();
                   setShowDeleteMembre(null);
                 } catch (e) {
@@ -5631,8 +5665,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
             className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: "pointer" }}
             onClick={async () => {
               if (!sigMembreId) { setSigError("Sélectionnez un membre."); return; }
+              if (!(await confirmerOp("Ajouter ce signataire ?"))) return;
               try {
-                await ajouterSignataire(groupId, sigMembreId, sigFonction.trim());
+                await ajouterSignataire(groupId, sigMembreId, sigFonction.trim()); succesOp();
                 await rechargerComptes();
                 setSigError("");
                 setSigSuccess(true);
@@ -5691,6 +5726,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
             className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: "pointer" }}
             onClick={async () => {
               if (!compteNom.trim()) { setCompteError("Le nom du compte est obligatoire."); return; }
+              if (!(await confirmerOp("Créer ce compte bancaire ?"))) return;
               try {
                 await creerCompteBancaire(groupId, {
                   nom: compteNom.trim(),
@@ -5698,7 +5734,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   numeroCompte: compteNumero.trim(),
                   type: compteType,
                   tauxInteretAnnuel: compteType === "Épargne" ? parseFloat(compteTauxInteret) || null : null,
-                });
+                }); succesOp();
                 await rechargerComptes();
                 setCompteError("");
                 setCompteSuccess(true);
@@ -5780,8 +5816,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   <button
                     onClick={async () => {
                       if (!newCategorieFraisNom.trim()) return;
+                      if (!(await confirmerOp("Créer cette catégorie de frais ?"))) return;
                       try {
-                        const nouvelle = await creerCategorieFrais(groupId, newCategorieFraisNom.trim());
+                        const nouvelle = await creerCategorieFrais(groupId, newCategorieFraisNom.trim()); succesOp();
                         setCategoriesFrais([...categoriesFrais, nouvelle]);
                         setDepotCategorie(nouvelle.nom);
                         setNewCategorieFraisNom("");
@@ -5805,8 +5842,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                         size={11}
                         style={{ cursor: "pointer" }}
                         onClick={async () => {
+                          if (!(await confirmerOp("Supprimer cette catégorie de frais ?", { danger: true }))) return;
                           try {
-                            await supprimerCategorieFrais(c.id);
+                            await supprimerCategorieFrais(c.id); succesOp();
                             setCategoriesFrais(categoriesFrais.filter((cat) => cat.id !== c.id));
                             if (depotCategorie === c.nom) setDepotCategorie("");
                           } catch (e) {
@@ -5955,6 +5993,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                 setDepotSuccess(false);
                 return;
               }
+              if (!(await confirmerOp("Enregistrer ce mouvement bancaire ?", { lignes: [["Type", typeMouvementBanque], ["Montant", fmtFCFA(montantNum)], ["Date", depotDate]] }))) return;
               try {
                 await creerMouvementExterne(groupId, {
                   compteId: compteActifId,
@@ -5966,7 +6005,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   membreId: depotMembreSimple || null,
                   signatairesIds: typeMouvementBanque === "Frais" ? responsablesFrais : signatairesChoisis,
                   recuJoint,
-                });
+                }); succesOp();
                 await rechargerDepots();
                 await rechargerComptes();
                 setDepotError("");
@@ -6006,8 +6045,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
             onClick={async () => {
               const montantNum = parseInt(amendeMontant.replace(/[^\d]/g, ""), 10);
               if (!montantNum || montantNum <= 0) { setAmendeError("Montant invalide."); return; }
+              if (!(await confirmerOp("Appliquer cette amende ?", { lignes: [["Membre", membres.find((m) => m.id === showAmende.membreId)?.nom || "—"], ["Montant", fmtFCFA(montantNum)], ["Motif", amendeMotif.trim() || "—"]] }))) return;
               try {
-                await appliquerAmendeTontine(showAmende.tourId, showAmende.membreId, { montant: montantNum, motif: amendeMotif.trim() });
+                await appliquerAmendeTontine(showAmende.tourId, showAmende.membreId, { montant: montantNum, motif: amendeMotif.trim() }); succesOp();
 
                 const membre = membres.find((m) => m.id === showAmende.membreId);
                 if (membre?.telephone) {
@@ -6081,8 +6121,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
               if (!montantNum || montantNum <= 0) { setEnchereErreur("Saisis un montant d'enchère valide."); return; }
               const cagnotte = tontineActive.montantParTour * membres.filter((m) => m.statut === "actif").length;
               if (montantNum >= cagnotte) { setEnchereErreur("Le montant de l'enchère ne peut pas dépasser la cagnotte totale."); return; }
+              if (!(await confirmerOp("Enregistrer cette enchère ?", { lignes: [["Gagnant", membres.find((m) => m.id === enchereBeneficiaire)?.nom || "—"], ["Enchère", fmtFCFA(montantNum)], ["Cagnotte", fmtFCFA(cagnotte)]] }))) return;
               try {
-                await enregistrerEnchere(enchereTour.id, enchereBeneficiaire, montantNum, cagnotte);
+                await enregistrerEnchere(enchereTour.id, enchereBeneficiaire, montantNum, cagnotte); succesOp();
                 await rechargerTontine();
                 setShowEnchere(false);
               } catch (e) {
@@ -6111,8 +6152,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
           </div>
           <button
             onClick={async () => {
+              if (!(await confirmerOp("Confirmer le versement de la cagnotte ?", { lignes: [["Tour", String(showPayout.tour)], ["Bénéficiaire", showPayout.beneficiaire], ["Montant", showPayout.montant]] }))) return;
               try {
-                await verserTour(tontineActive.id, showPayout.id, showPayout.tour);
+                await verserTour(tontineActive.id, showPayout.id, showPayout.tour); succesOp();
                 await rechargerTontine();
 
                 const beneficiaire = membres.find((m) => m.id === showPayout.beneficiaireId);
@@ -6189,8 +6231,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                 setAjoutSuccess(false);
                 return;
               }
+              if (!(await confirmerOp("Ajouter ce membre au cycle ?"))) return;
               try {
-                await ajouterMembreAuCycle(tontineActive.id, ajoutMembreId, montantNum, toursClotures.map((t) => ({ id: t.id })));
+                await ajouterMembreAuCycle(tontineActive.id, ajoutMembreId, montantNum, toursClotures.map((t) => ({ id: t.id }))); succesOp();
                 await rechargerTontine();
                 setAjoutSuccess(true);
                 setAjoutErreur("");
@@ -6252,10 +6295,11 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   disabled={redistributionEnCours}
                   className="adm-btn adm-btn-action" style={{ marginTop: "6px", cursor: redistributionEnCours ? "default" : "pointer" }}
                   onClick={async () => {
+                    if (!(await confirmerOp("Redistribuer la commission ?"))) return;
                     setRedistributionEnCours(true);
                     setRedistributionErreur("");
                     try {
-                      await redistribuerCommission(tontineActive.id, redistributionApercu.membres);
+                      await redistribuerCommission(tontineActive.id, redistributionApercu.membres); succesOp();
                       redistributionApercu.membres.forEach((m) => {
                         if (m.telephone && m.part > 0) {
                           envoyerSMS({
@@ -6297,8 +6341,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                     color={C.sub}
                     style={{ cursor: "pointer" }}
                     onClick={async () => {
+                      if (!(await confirmerOp("Supprimer ce type d'amende ?", { danger: true }))) return;
                       try {
-                        await supprimerTypeAmendeSeance(t.id);
+                        await supprimerTypeAmendeSeance(t.id); succesOp();
                         await rechargerSeances();
                       } catch (e) {
                         console.error("Erreur de suppression du type d'amende", e);
@@ -6316,8 +6361,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   <button
                     onClick={async () => {
                       const val = parseInt((montantAmendeInputs[t.id] || "").replace(/[^\d]/g, ""), 10) || 0;
+                      if (!(await confirmerOp("Modifier le montant de cette amende ?"))) return;
                       try {
-                        await modifierTypeAmendeSeance(t.id, val);
+                        await modifierTypeAmendeSeance(t.id, val); succesOp();
                         await rechargerSeances();
                       } catch (e) {
                         console.error("Erreur de mise à jour du montant", e);
@@ -6337,8 +6383,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
           <button
             onClick={async () => {
               if (!newTypeAmendeNom.trim()) return;
+              if (!(await confirmerOp("Créer ce type d'amende ?"))) return;
               try {
-                await creerTypeAmendeSeance(groupId, newTypeAmendeNom.trim(), parseInt(newTypeAmendeMontant.replace(/[^\d]/g, ""), 10) || 0);
+                await creerTypeAmendeSeance(groupId, newTypeAmendeNom.trim(), parseInt(newTypeAmendeMontant.replace(/[^\d]/g, ""), 10) || 0); succesOp();
                 setNewTypeAmendeNom("");
                 setNewTypeAmendeMontant("");
                 await rechargerSeances();
@@ -6377,8 +6424,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
             onClick={async () => {
               const dateISO = versDateISO(seanceDate);
               if (!dateISO) { setSeanceCreationErreur("Date invalide (jj/mm/aaaa)."); return; }
+              if (!(await confirmerOp("Créer cette séance ?"))) return;
               try {
-                await creerSeance(groupId, { date: dateISO, lieu: seanceLieu.trim(), ordreDuJour: seanceOrdreDuJour.trim() });
+                await creerSeance(groupId, { date: dateISO, lieu: seanceLieu.trim(), ordreDuJour: seanceOrdreDuJour.trim() }); succesOp();
                 await rechargerSeances();
                 setShowCreerSeance(false);
               } catch (e) {
@@ -6424,8 +6472,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
           </div>
           <button
             onClick={async () => {
+              if (!(await confirmerOp("Enregistrer les présences ?"))) return;
               try {
-                await enregistrerPresences(showDetailSeance.id, presencesSeance);
+                await enregistrerPresences(showDetailSeance.id, presencesSeance); succesOp();
                 await rechargerSeances();
               } catch (e) {
                 console.error("Erreur d'enregistrement des présences", e);
@@ -6499,9 +6548,10 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                             disabled={paiementEnCours}
                             onClick={async () => {
                               if (paiementMode === "déduit banque" && !paiementEpargneId) return;
+                              if (!(await confirmerOp("Enregistrer le paiement de cette amende ?"))) return;
                               setPaiementEnCours(true);
                               try {
-                                await payerAmendeSeance(groupId, a.id, a.membreId, a.montant, paiementMode, paiementEpargneId || null);
+                                await payerAmendeSeance(groupId, a.id, a.membreId, a.montant, paiementMode, paiementEpargneId || null); succesOp();
                                 const amendes = await fetchAmendesSeance(showDetailSeance.id);
                                 setAmendesSeanceList(amendes);
                                 await rechargerSeances();
@@ -6565,8 +6615,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
               onClick={async () => {
                 const montant = parseInt(amendeSeanceMontant.replace(/[^\d]/g, ""), 10);
                 if (!amendeSeanceMembreId || !montant) return;
+                if (!(await confirmerOp("Appliquer cette amende ?"))) return;
                 try {
-                  await appliquerAmendeSeance(showDetailSeance.id, amendeSeanceMembreId, amendeSeanceTypeId || null, montant);
+                  await appliquerAmendeSeance(showDetailSeance.id, amendeSeanceMembreId, amendeSeanceTypeId || null, montant); succesOp();
                   const amendes = await fetchAmendesSeance(showDetailSeance.id);
                   setAmendesSeanceList(amendes);
                   const membre = membres.find((m) => m.id === amendeSeanceMembreId);
@@ -6598,8 +6649,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
           />
           <button
             onClick={async () => {
+              if (!(await confirmerOp("Enregistrer le compte rendu ?"))) return;
               try {
-                await enregistrerCompteRendu(showDetailSeance.id, seanceCompteRendu.trim());
+                await enregistrerCompteRendu(showDetailSeance.id, seanceCompteRendu.trim()); succesOp();
                 await rechargerSeances();
                 setShowDetailSeance(null);
               } catch (e) {
@@ -6702,6 +6754,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
               const facture = parseInt(rafraFacture.replace(/[^\d]/g, ""), 10);
               if (!facture) { setRafraErreur("Saisis le montant de la facture."); return; }
 
+              if (!(await confirmerOp("Enregistrer ce rafraîchissement ?"))) return;
               setRafraEnCours(true);
               setRafraErreur("");
               try {
@@ -6712,7 +6765,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   montantFacture: facture,
                   responsableId: rafraResponsableId || null,
                   date: dateISO,
-                });
+                }); succesOp();
                 await rechargerDepenses();
                 setShowCreerRafraichissement(false);
               } catch (e) {
@@ -6742,8 +6795,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   color={C.sub}
                   style={{ cursor: "pointer" }}
                   onClick={async () => {
+                    if (!(await confirmerOp("Supprimer ce type de dépense ?", { danger: true }))) return;
                     try {
-                      await supprimerTypeDepense(t.id);
+                      await supprimerTypeDepense(t.id); succesOp();
                       await rechargerDepenses();
                     } catch (e) {
                       console.error("Erreur de suppression du type de dépense", e);
@@ -6763,8 +6817,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
             <button
               onClick={async () => {
                 if (!newTypeDepenseNom.trim()) return;
+                if (!(await confirmerOp("Créer ce type de dépense ?"))) return;
                 try {
-                  await creerTypeDepense(groupId, newTypeDepenseNom.trim());
+                  await creerTypeDepense(groupId, newTypeDepenseNom.trim()); succesOp();
                   setNewTypeDepenseNom("");
                   await rechargerDepenses();
                 } catch (e) {
@@ -6852,6 +6907,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                 setDepenseErreur("Sélectionne le compte précis à débiter.");
                 return;
               }
+              if (!(await confirmerOp("Enregistrer cette dépense ?", { lignes: [["Montant", fmtFCFA(montant)], ["Date", depenseDate], ["Motif", depenseMotif.trim() || "—"], ["Payée depuis", libelleSourceDepense(depenseSourceType)]] }))) return;
               setDepenseEnCours(true);
               setDepenseErreur("");
               try {
@@ -6862,7 +6918,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   motif: depenseMotif.trim(),
                   sourceType: depenseSourceType,
                   sourceId: depenseSourceId || null,
-                });
+                }); succesOp();
                 await rechargerDepenses();
                 if (depenseSourceType === "epargne") await rechargerEpargnes();
                 if (depenseSourceType === "compte_externe") await rechargerComptes();
@@ -6905,10 +6961,11 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
               onClick={async () => {
                 const prix = parseInt(abonnementSmsPrixInput.replace(/[^\d]/g, ""), 10) || 0;
                 const credits = parseInt(abonnementSmsCreditsInput.replace(/[^\d]/g, ""), 10) || 0;
+                if (!(await confirmerOp("Enregistrer la configuration de l'abonnement SMS ?"))) return;
                 setAbonnementSmsTarifEnCours(true);
                 setAbonnementSmsErreur("");
                 try {
-                  await definirConfigAbonnementSms(groupId, prix, credits);
+                  await definirConfigAbonnementSms(groupId, prix, credits); succesOp();
                   setAbonnementSmsConfig({ prixMensuel: prix, credits });
                 } catch (e) {
                   console.error("Erreur de mise à jour du tarif", e);
@@ -6952,9 +7009,10 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                         disabled={toggleEnCours}
                         onChange={async (e) => {
                           const coche = e.target.checked;
+                          if (!(await confirmerOp("Changer l'abonnement SMS de ce membre ?"))) return;
                           setAbonnementToggleMembreId(m.id);
                           try {
-                            await toggleAbonnementSms(m.id, coche);
+                            await toggleAbonnementSms(m.id, coche); succesOp();
                             setAbonnesSmsListe((prev) =>
                               coche
                                 ? (prev.includes(m.id) ? prev : [...prev, m.id])
@@ -7016,10 +7074,11 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                           disabled={prelevementSmsEnCours}
                           onClick={async () => {
                             if (prelevementSmsMode === "déduit banque" && !prelevementSmsEpargneId) return;
+                            if (!(await confirmerOp("Effectuer ce prélèvement SMS ?"))) return;
                             setPrelevementSmsEnCours(true);
                             try {
                               const moisActuel = new Date().toISOString().slice(0, 7);
-                              await effectuerPrelevementSms(groupId, m.id, moisActuel, abonnementSmsConfig.prixMensuel, abonnementSmsConfig.credits, prelevementSmsMode, prelevementSmsEpargneId || null);
+                              await effectuerPrelevementSms(groupId, m.id, moisActuel, abonnementSmsConfig.prixMensuel, abonnementSmsConfig.credits, prelevementSmsMode, prelevementSmsEpargneId || null); succesOp();
                               setSmsDejaPreleves([...smsDejaPreleves, m.id]);
                               if (prelevementSmsMode === "déduit banque") await rechargerEpargnes();
                               const nouveauSolde = await fetchSoldeSms(groupId);
@@ -7219,6 +7278,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
               if (seances.length === 0) { setTontineError("Ajoutez au moins une date de séance."); setTontineSuccess(false); return; }
               const montantNum = parseInt(tontineMontant.replace(/[^\d]/g, ""), 10);
               if (!montantNum || montantNum <= 0) { setTontineError("Montant invalide."); setTontineSuccess(false); return; }
+              if (!(await confirmerOp("Créer cette tontine ?"))) return;
               try {
                 const membresActifs = membres.filter((m) => m.statut === "actif");
                 const rotationAvecParts = construireRotationAvecParts(membresActifs);
@@ -7232,7 +7292,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   seances: seancesISO,
                   membresActifs: rotationAvecParts,
                   dateDebut: dateDebutAuto,
-                });
+                }); succesOp();
                 await rechargerTontine();
                 setTontineError("");
                 setTontineSuccess(true);
