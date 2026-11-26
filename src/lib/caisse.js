@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseClient";
 import { totalBilletage, penaliteGarde } from "./calculsBancaires";
+import { executerOperations, etape } from "./operations";
 
 // ============================================================
 // CAISSE DE SÉANCE
@@ -65,15 +66,16 @@ export async function ouvrirSeanceCaisse(groupId, date, { fondOuverture } = {}) 
 // Réouverture : les sommes confiées à la clôture sont retirées (elles
 // seront ressaisies à la nouvelle clôture). Impossible si l'une a déjà
 // été rapportée.
-export async function reouvrirSeanceCaisse(seance, { motif, par }) {
+export async function reouvrirSeanceCaisse(groupId, seance, { motif, par }) {
   const { data: g, error: e1 } = await supabase.from("sommes_gardees").select("id, statut").eq("caisse_seance_id", seance.id);
   if (e1) throw e1;
   if ((g || []).some((x) => x.statut !== "gardee")) throw new Error("Une somme confiée à cette séance a déjà été rapportée : la caisse ne peut plus être rouverte.");
-  if ((g || []).length) {
-    const { error: e2 } = await supabase.from("sommes_gardees").delete().eq("caisse_seance_id", seance.id).eq("statut", "gardee");
-    if (e2) throw e2;
-  }
-  await majSeanceCaisse(seance.id, { statut: "ouverte", reouverture_motif: `${motif} (${par || "—"}, ${new Date().toLocaleDateString("fr-FR")})` });
+  // Une seule opération : sommes confiées retirées + caisse rouverte.
+  await executerOperations(groupId, [
+    (g || []).length ? etape.supprimerGardees(seance.id, { statut: "gardee" }) : null,
+    etape.modifier("caisse_seances", seance.id, { statut: "ouverte", reouverture_motif: `${motif} (${par || "—"}, ${new Date().toLocaleDateString("fr-FR")})` },
+      { statut: "cloturee" }, "Cette caisse est déjà ouverte."),
+  ]);
   return { gardesRetirees: (g || []).length };
 }
 
@@ -200,57 +202,50 @@ export async function recupererSommeGardee(groupId, garde, { rapporte, date, sea
   const manque = Math.max(0, garde.montant - r);
   const penalite = manque > 0 ? penaliteGarde(garde.montant, r, regle) : 0;
   const statut = manque === 0 ? "rendue" : r === 0 ? "non_rendue" : "partielle";
-  const { error } = await supabase.from("sommes_gardees").update({
-    rapporte: r, statut, traitement: manque ? traitement : null, penalite, motif: motif || null, recupere_le: date, recupere_dans: seanceId,
-  }).eq("id", garde.id);
-  if (error) throw error;
-
+  const etapes = [
+    // « si gardée » : une somme ne peut être récupérée qu'une fois
+    etape.modifier("sommes_gardees", garde.id, {
+      rapporte: r, statut, traitement: manque ? traitement : null, penalite, motif: motif || null, recupere_le: date, recupere_dans: seanceId,
+    }, { statut: "gardee" }, "Cette somme a déjà été récupérée."),
+  ];
   if (manque > 0) {
     if (traitement === "dette") {
-      const { error: e } = await supabase.from("dettes").insert({
+      etapes.push(etape.inserer("dettes", {
         group_id: groupId, membre_id: garde.membreId, origine: "garde", ref_id: garde.id, montant: manque + penalite, penalite,
         libelle: `Somme gardée non rapportée (${manque.toLocaleString("fr-FR")} F${penalite ? ` + pénalité ${penalite.toLocaleString("fr-FR")} F` : ""})`,
-        motif, saisi_par: saisiPar || null,
-      });
-      if (e) throw e;
+        motif, saisi_par: saisiPar || null, paiements: [],
+      }));
     } else if (traitement === "epargne" || traitement === "fonds") {
       // Le manque est couvert par ses avoirs : on prélève, et la pénalité
       // va au compte de la réunion.
       const total = manque + penalite;
-      if (traitement === "epargne") {
-        const { data: ep, error: e1 } = await supabase.from("epargnes").select("solde").eq("id", sourceId).single();
-        if (e1) throw e1;
-        const solde = num(ep.solde) - total;
-        const { error: e2 } = await supabase.from("epargne_mouvements").insert({ epargne_id: sourceId, membre_id: garde.membreId, type: "Retrait", montant: total, date_mouvement: date, solde_apres: solde, saisi_par: saisiPar || null, mode_paiement: "prelevement" });
-        if (e2) throw e2;
-        const { error: e3 } = await supabase.from("epargnes").update({ solde }).eq("id", sourceId);
-        if (e3) throw e3;
-      } else {
-        const { data: f, error: e1 } = await supabase.from("fonds_membres").select("solde").eq("membre_id", garde.membreId).eq("type_fonds_id", sourceId).single();
-        if (e1) throw e1;
-        if (num(f.solde) < total) throw new Error("Solde du fonds insuffisant.");
-        const { error: e2 } = await supabase.from("fonds_membres").update({ solde: num(f.solde) - total }).eq("membre_id", garde.membreId).eq("type_fonds_id", sourceId);
-        if (e2) throw e2;
-        const { error: e3 } = await supabase.from("fonds_mouvements").insert({ membre_id: garde.membreId, type_fonds_id: sourceId, montant: -total, date_mouvement: date, mode_paiement: "prelevement" });
-        if (e3) throw e3;
-      }
+      if (traitement === "epargne") etapes.push(etape.epargne({ epargneId: sourceId, membreId: garde.membreId, type: "Retrait", montant: total, date, saisiPar, modePaiement: "prelevement" }));
+      else etapes.push(etape.fonds({ membreId: garde.membreId, typeFondsId: sourceId, delta: -total, date, modePaiement: "prelevement" }));
       if (penalite > 0) {
-        const { error: e4 } = await supabase.from("compte_reunion_mouvements").insert({ group_id: groupId, date, montant: penalite, origine: "penalite_garde", libelle: `Pénalité somme gardée — ${garde.nom}`, ref_id: garde.id, saisi_par: saisiPar || null, mode_paiement: "prelevement" });
-        if (e4) throw e4;
+        etapes.push(etape.inserer("compte_reunion_mouvements", { group_id: groupId, date, montant: penalite, origine: "penalite_garde", libelle: `Pénalité somme gardée — ${garde.nom}`, ref_id: garde.id, saisi_par: saisiPar || null, mode_paiement: "prelevement" }));
       }
     }
   }
+  await executerOperations(groupId, etapes);
   return { manque, penalite, statut };
 }
 
 // À la fermeture : l'argent restant est confié à des gardiens.
 export async function confierSommes(groupId, seanceId, gardiens, aRapporterLe) {
-  const lignes = gardiens.filter((g) => g.membreId && num(g.montant) > 0).map((g) => ({
-    group_id: groupId, caisse_seance_id: seanceId, membre_id: g.membreId, montant: Math.round(num(g.montant)), a_rapporter_le: aRapporterLe || null,
-  }));
-  if (!lignes.length) return;
-  const { error } = await supabase.from("sommes_gardees").insert(lignes);
-  if (error) throw error;
+  await executerOperations(groupId, etapesGardiens(groupId, seanceId, gardiens, aRapporterLe));
+}
+
+const etapesGardiens = (groupId, seanceId, gardiens, aRapporterLe) => gardiens.filter((g) => g.membreId && num(g.montant) > 0).map((g) => etape.inserer("sommes_gardees", {
+  group_id: groupId, caisse_seance_id: seanceId, membre_id: g.membreId, montant: Math.round(num(g.montant)), a_rapporter_le: aRapporterLe || null,
+}));
+
+// Clôture de la caisse : chiffres, verrouillage et sommes confiées en
+// UNE opération (une caisse ne peut être clôturée qu'une fois).
+export async function cloturerSeanceCaisse(groupId, seanceId, champs, gardiens, aRapporterLe) {
+  await executerOperations(groupId, [
+    etape.modifier("caisse_seances", seanceId, { ...champs, statut: "cloturee" }, { statut: "ouverte" }, "Cette caisse est déjà clôturée."),
+    ...etapesGardiens(groupId, seanceId, gardiens, aRapporterLe),
+  ]);
 }
 
 // ---------- Dettes ----------
@@ -271,15 +266,15 @@ export async function payerDette(groupId, dette, { montant, date, mode = "espece
   if (m <= 0 || m > dette.reste) throw new Error(`Montant invalide (reste dû : ${dette.reste.toLocaleString("fr-FR")} F).`);
   const rembourse = dette.rembourse + m;
   const solde = rembourse >= dette.montant;
-  const { error } = await supabase.from("dettes").update({
-    rembourse, statut: solde ? "soldee" : "ouverte", paiements: [...dette.paiements, { date, montant: m, mode, par: saisiPar || null }],
-  }).eq("id", dette.id);
-  if (error) throw error;
-  // La pénalité rejoint le compte de la réunion une fois la dette soldée.
-  if (solde && dette.penalite > 0) {
-    const { error: e } = await supabase.from("compte_reunion_mouvements").insert({ group_id: groupId, date, montant: dette.penalite, origine: "penalite_garde", libelle: `Pénalité — ${dette.nom}`, ref_id: dette.id, saisi_par: saisiPar || null });
-    if (e) throw e;
-  }
+  await executerOperations(groupId, [
+    // « si rembourse = valeur lue » : si quelqu'un a encaissé entre-temps,
+    // on refuse au lieu d'écraser son paiement.
+    etape.modifier("dettes", dette.id, {
+      rembourse, statut: solde ? "soldee" : "ouverte", paiements: [...dette.paiements, { date, montant: m, mode, par: saisiPar || null }],
+    }, { rembourse: dette.rembourse }, "Cette dette vient d'être modifiée par quelqu'un d'autre : recharge la page."),
+    // La pénalité rejoint le compte de la réunion une fois la dette soldée.
+    solde && dette.penalite > 0 ? etape.inserer("compte_reunion_mouvements", { group_id: groupId, date, montant: dette.penalite, origine: "penalite_garde", libelle: `Pénalité — ${dette.nom}`, ref_id: dette.id, saisi_par: saisiPar || null, mode_paiement: "report" }) : null,
+  ]);
 }
 
 // ---------- Prêts en retard d'un membre (alerte gardien) ----------

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Lock, Unlock, Printer, AlertTriangle, HandCoins, Wallet } from "lucide-react";
 import {
   fetchSeancesCaisse, ouvrirSeanceCaisse, majSeanceCaisse, fetchMouvementsEspecesDuJour, fetchSommesGardees, recupererSommeGardee,
-  confierSommes, fetchDettes, payerDette, reouvrirSeanceCaisse, fetchMembresEnRetard, fetchReglesGroupe, sauverReglesGroupe,
+  fetchDettes, payerDette, reouvrirSeanceCaisse, cloturerSeanceCaisse, fetchMembresEnRetard, fetchReglesGroupe, sauverReglesGroupe,
 } from "../lib/caisse";
 import { fetchAvoirsMembre } from "../lib/banque2";
 import { RUBRIQUES, LECTURES_DEFAUT } from "../lib/lectures";
@@ -239,13 +239,12 @@ function SeanceCaisse({ seance, groupId, nomGroupe, membres, utilisateur, gardee
       alertes: [gardiensOk.some((g) => enRetard.has(g.membreId)) ? "Un gardien a un prêt en retard." : null, "Après clôture, la caisse est verrouillée (réouverture avec motif seulement)."],
       libelleConfirmer: "Clôturer la caisse", detailSucces: "Caisse clôturée et verrouillée",
     }, async () => {
-      await majSeanceCaisse(seance.id, {
+      await cloturerSeanceCaisse(groupId, seance.id, {
         fond_ouverture: nombre(fond), gardees_recuperees: recuperees, theorique: attendu, compte, ecart, ecart_motif: ecart ? motif.trim() : null,
         ecart_valide_par: ecart ? validePar.trim() : null, billetage: billets, depot_banque: nombre(depot), garde_tresorier: nombre(tresorier),
-        second_comptage_par: second.trim(), cloture_par: utilisateur || null, cloture_le: new Date().toISOString(), statut: "cloturee",
+        second_comptage_par: second.trim(), cloture_par: utilisateur || null, cloture_le: new Date().toISOString(),
         autres: autres.map((a) => ({ libelle: a.libelle, sens: a.sens, montant: nombre(a.montant) })),
-      });
-      await confierSommes(groupId, seance.id, gardiensOk, versDateISO(rapporterLe));
+      }, gardiensOk, versDateISO(rapporterLe));
       for (const g of gardiensOk) {
         const m = membres.find((x) => x.id === g.membreId);
         if (m?.telephone) envoyerSMS({ message: `Bonjour ${m.nom}, ${nomGroupe} vous confie ${nombre(g.montant).toLocaleString("fr-FR")} FCFA (séance du ${versDateFr(seance.date)}). À rapporter${rapporterLe ? ` le ${rapporterLe}` : " à la prochaine séance"}, sans intérêt.`, numeros: [m.telephone], groupId });
@@ -259,7 +258,7 @@ function SeanceCaisse({ seance, groupId, nomGroupe, membres, utilisateur, gardee
     if (!motifReouverture.trim()) { setErreur("Le motif de réouverture est obligatoire."); return; }
     const res = await executer({ titre: "Rouvrir cette caisse ?", lignes: [["Séance", versDateFr(seance.date)], ["Motif", motifReouverture]], danger: true, libelleConfirmer: "Rouvrir",
       alertes: ["Les sommes confiées aux gardiens à cette séance seront retirées : il faudra les ressaisir à la nouvelle clôture."] },
-      () => reouvrirSeanceCaisse(seance, { motif: motifReouverture.trim(), par: utilisateur }));
+      () => reouvrirSeanceCaisse(groupId, seance, { motif: motifReouverture.trim(), par: utilisateur }));
     if (res) onMaj();
   };
 

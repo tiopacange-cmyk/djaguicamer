@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { executerOperations, etape, aujourdhuiLocal } from "./operations";
 import {
   normaliserRegles, fraisDeDossier, situationPret, repartirPaiement,
   nombresParMembre, partagerCagnotte, versISO, versDate, joursEntre,
@@ -10,7 +11,7 @@ import {
 // Les calculs sont dans calculsBancaires.js (fonctions pures).
 // ============================================================
 
-const aujourdhui = () => new Date().toISOString().slice(0, 10);
+const aujourdhui = aujourdhuiLocal;
 
 // Types de mouvements d'une épargne :
 //  Versement (+) / Retrait (−)         → épargne du membre
@@ -18,25 +19,11 @@ const aujourdhui = () => new Date().toISOString().slice(0, 10);
 //  Intérêts (info) / Transfert (−)     → clôture
 const TYPES_EPARGNE_MEMBRE = { Versement: 1, Retrait: -1, Transfert: -1 };
 
-async function ajusterSoldeEpargne(epargneId, delta) {
-  const { data, error } = await supabase.from("epargnes").select("solde").eq("id", epargneId).single();
-  if (error) throw error;
-  const nouveau = Number(data.solde || 0) + delta;
-  const { error: e2 } = await supabase.from("epargnes").update({ solde: nouveau }).eq("id", epargneId);
-  if (e2) throw e2;
-  return nouveau;
-}
-
-async function mouvementEpargne({ epargneId, membreId, type, montant, date, pretId, saisiPar, modePaiement }) {
-  const signe = type === "Versement" || type === "Remboursement" ? 1 : type === "Intérêts" ? 0 : -1;
-  const soldeApres = await ajusterSoldeEpargne(epargneId, signe * montant);
-  const { error } = await supabase.from("epargne_mouvements").insert({
-    epargne_id: epargneId, membre_id: membreId, type, montant, date_mouvement: date,
-    solde_apres: soldeApres, pret_id: pretId || null, saisi_par: saisiPar || null, mode_paiement: modePaiement || "especes",
-  });
-  if (error) throw error;
-  return soldeApres;
-}
+// Toutes les écritures d'argent passent par executerOperations
+// (une opération = une transaction dans la base).
+const compteReunion = (groupId, { date, montant, origine, libelle, refId, saisiPar, modePaiement }) => etape.inserer("compte_reunion_mouvements", {
+  group_id: groupId, date, montant, origine, libelle: libelle || null, ref_id: refId || null, saisi_par: saisiPar || null, mode_paiement: modePaiement || "especes",
+});
 
 // ------------------------------------------------------------
 // ÉPARGNES ET RÈGLES
@@ -81,11 +68,7 @@ export async function fetchCompteReunion(groupId) {
 
 export async function ecrireCompteReunion(groupId, { date, montant, origine, libelle, refId, saisiPar, modePaiement }) {
   if (!montant) return;
-  const { error } = await supabase.from("compte_reunion_mouvements").insert({
-    group_id: groupId, date: date || aujourdhui(), montant, origine, libelle: libelle || null,
-    ref_id: refId || null, saisi_par: saisiPar || null, mode_paiement: modePaiement || "especes",
-  });
-  if (error) throw error;
+  await executerOperations(groupId, [compteReunion(groupId, { date: date || aujourdhui(), montant, origine, libelle, refId, saisiPar, modePaiement })]);
 }
 
 // ------------------------------------------------------------
@@ -151,6 +134,7 @@ export function etatPret(pret, date = aujourdhui()) {
 
 // Crée un prêt (normal ou spécial). Un prêt spécial reste « en
 // attente » : rien ne sort de la caisse avant la validation.
+// Tout part en une seule opération (prêt, avalistes, décaissement, frais).
 export async function creerPret(groupId, {
   epargneId, membreId, montant, dateDebut, dateFin, regles, special = false,
   garanties = [], decision = null, modeRemboursement = null, nbEcheances = null,
@@ -158,55 +142,52 @@ export async function creerPret(groupId, {
 }) {
   const reglesN = normaliserRegles(regles);
   const fraisMontant = frais !== null && frais !== undefined && frais !== "" ? Math.round(Number(frais)) : fraisDeDossier(montant, reglesN);
-  const { data: pret, error } = await supabase.from("prets").insert({
-    epargne_id: epargneId, membre_id: membreId, montant, frais_dossier: fraisMontant,
-    date_debut: dateDebut, date_fin: dateFin || null, statut: special ? "en attente" : "en cours",
-    regles: reglesN, special, garanties: garanties.length ? garanties : null, decision,
-    mode_remboursement: modeRemboursement, nb_echeances: nbEcheances, saisi_par: saisiPar || null,
-    mode_paiement: modePaiement,
-  }).select().single();
-  if (error) throw error;
-
-  for (const a of avalistes.filter((x) => x.id)) {
-    const { error: eA } = await supabase.from("avalisations").insert({ pret_id: pret.id, avaliste_id: a.id, montant_garanti: a.montant || montant });
-    if (eA) throw eA;
-  }
-
-  if (!special) await decaisserPret(groupId, pret.id, { epargneId, membreId, montant, dateDebut, frais: fraisMontant, saisiPar, modePaiement });
-  return pret;
+  const etapes = [
+    etape.inserer("prets", {
+      epargne_id: epargneId, membre_id: membreId, montant, frais_dossier: fraisMontant,
+      date_debut: dateDebut, date_fin: dateFin || null, statut: special ? "en attente" : "en cours",
+      regles: reglesN, special, garanties: garanties.length ? garanties : null, decision,
+      mode_remboursement: modeRemboursement, nb_echeances: nbEcheances, saisi_par: saisiPar || null,
+      mode_paiement: modePaiement,
+    }, "pret"),
+    ...avalistes.filter((x) => x.id).map((a) => etape.inserer("avalisations", { pret_id: "@pret", avaliste_id: a.id, montant_garanti: a.montant || montant })),
+    ...(special ? [] : etapesDecaissement(groupId, "@pret", { epargneId, membreId, montant, dateDebut, frais: fraisMontant, saisiPar, modePaiement })),
+  ];
+  const res = await executerOperations(groupId, etapes);
+  return { id: res.refs?.pret };
 }
 
-async function decaisserPret(groupId, pretId, { epargneId, membreId, montant, dateDebut, frais, saisiPar, modePaiement }) {
-  await mouvementEpargne({ epargneId, membreId, type: "Prêt", montant, date: dateDebut, pretId, saisiPar, modePaiement });
-  if (frais > 0) {
-    await ecrireCompteReunion(groupId, { date: dateDebut, montant: frais, origine: "frais_dossier", libelle: "Frais de dossier du prêt", refId: pretId, saisiPar, modePaiement });
-  }
+function etapesDecaissement(groupId, pretId, { epargneId, membreId, montant, dateDebut, frais, saisiPar, modePaiement }) {
+  return [
+    etape.epargne({ epargneId, membreId, type: "Prêt", montant, date: dateDebut, pretId, saisiPar, modePaiement, interditNegatif: true }),
+    frais > 0 ? compteReunion(groupId, { date: dateDebut, montant: frais, origine: "frais_dossier", libelle: "Frais de dossier du prêt", refId: pretId, saisiPar, modePaiement }) : null,
+  ];
 }
 
 export async function validerPretSpecial(groupId, pret, { validePar }) {
-  const { data: ep, error: e0 } = await supabase.from("epargnes").select("solde, nom").eq("id", pret.epargneId).single();
-  if (e0) throw e0;
-  if (Number(ep.solde || 0) < pret.montant) {
-    throw new Error(`Pas assez d'argent dans ${ep.nom} : ${Number(ep.solde || 0).toLocaleString("fr-FR")} F en caisse pour ${pret.montant.toLocaleString("fr-FR")} F.`);
-  }
   // Les intérêts courent à partir du décaissement (la validation), pas de
   // la demande : on décale le début et l'échéance d'autant.
   const auj = aujourdhui();
   const decalage = Math.max(0, joursEntre(pret.dateDebut, auj));
   const dateDebut = decalage > 0 ? auj : pret.dateDebut;
   const dateFin = pret.dateFin && decalage > 0 ? versISO(new Date(versDate(pret.dateFin).getTime() + decalage * 86400000)) : pret.dateFin;
-  const { error } = await supabase.from("prets").update({ statut: "en cours", valide_par: validePar, valide_le: new Date().toISOString(), date_debut: dateDebut, date_fin: dateFin }).eq("id", pret.id);
-  if (error) throw error;
-  await decaisserPret(groupId, pret.id, { epargneId: pret.epargneId, membreId: pret.membreId, montant: pret.montant, dateDebut, frais: pret.fraisDossier, saisiPar: validePar });
+  // « si en attente » : un prêt ne peut être validé (et décaissé) qu'une fois.
+  // « interditNegatif » : refusé s'il n'y a pas assez d'argent dans l'épargne.
+  await executerOperations(groupId, [
+    etape.modifier("prets", pret.id, { statut: "en cours", valide_par: validePar, valide_le: new Date().toISOString(), date_debut: dateDebut, date_fin: dateFin },
+      { statut: "en attente" }, "Ce prêt a déjà été validé ou refusé."),
+    ...etapesDecaissement(groupId, pret.id, { epargneId: pret.epargneId, membreId: pret.membreId, montant: pret.montant, dateDebut, frais: pret.fraisDossier, saisiPar: validePar }),
+  ]);
   return { dateDebut, dateFin };
 }
 
-export async function refuserPretSpecial(pretId, { motif, par }) {
-  const { error } = await supabase.from("prets").update({ statut: "refusé", refuse_motif: motif, valide_par: par, valide_le: new Date().toISOString() }).eq("id", pretId);
-  if (error) throw error;
+export async function refuserPretSpecial(groupId, pretId, { motif, par }) {
+  await executerOperations(groupId, [
+    etape.modifier("prets", pretId, { statut: "refusé", refuse_motif: motif, valide_par: par, valide_le: new Date().toISOString() }, { statut: "en attente" }, "Ce prêt a déjà été validé ou refusé."),
+  ]);
 }
 
-// Règle un prêt avec une ou plusieurs sources.
+// Règle un prêt avec une ou plusieurs sources, en une seule opération.
 // sources = [{ source: "especes"|"momo"|"epargne"|"assurance"|"fonds", montant, refId (épargne ou type de fonds) }]
 // Le paiement est réparti : pénalités → intérêts → capital.
 export async function reglerPret(groupId, pret, { date, sources, saisiPar }) {
@@ -216,58 +197,33 @@ export async function reglerPret(groupId, pret, { date, sources, saisiPar }) {
   const rep = repartirPaiement(total, situation);
   if (rep.surplus > 0) throw new Error(`Le montant dépasse ce qui est dû (${situation.totalDu.toLocaleString("fr-FR")} F).`);
 
-  // 1. Prélèvements sur les avoirs du membre
+  const etapes = [];
+  // 1. Prélèvements sur les avoirs du membre (refusés si le solde ne suffit pas)
   for (const s of sources) {
     const m = Math.round(Number(s.montant)) || 0;
     if (!m) continue;
-    if (s.source === "epargne") {
-      await mouvementEpargne({ epargneId: s.refId, membreId: pret.membreId, type: "Retrait", montant: m, date, pretId: pret.id, saisiPar });
-    } else if (s.source === "assurance") {
-      const { data: sol, error } = await supabase.from("assurance_soldes").select("*").eq("group_id", groupId).eq("membre_id", pret.membreId).single();
-      if (error) throw error;
-      const apres = Number(sol.solde) - m;
-      if (apres < 0) throw new Error("Solde d'assurance insuffisant.");
-      const { error: e1 } = await supabase.from("assurance_soldes").update({ solde: apres, updated_at: new Date().toISOString() }).eq("id", sol.id);
-      if (e1) throw e1;
-      const { error: e2 } = await supabase.from("assurance_mouvements").insert({ group_id: groupId, membre_id: pret.membreId, type: "Prélèvement", montant: m, date_mouvement: date, solde_apres: apres });
-      if (e2) throw e2;
-    } else if (s.source === "fonds") {
-      const { data: f, error } = await supabase.from("fonds_membres").select("solde").eq("membre_id", pret.membreId).eq("type_fonds_id", s.refId).single();
-      if (error) throw error;
-      const apres = Number(f.solde) - m;
-      if (apres < 0) throw new Error("Solde du fonds insuffisant.");
-      const { error: e1 } = await supabase.from("fonds_membres").update({ solde: apres }).eq("membre_id", pret.membreId).eq("type_fonds_id", s.refId);
-      if (e1) throw e1;
-      const { error: e2 } = await supabase.from("fonds_mouvements").insert({ membre_id: pret.membreId, type_fonds_id: s.refId, montant: -m, date_mouvement: date });
-      if (e2) throw e2;
-    }
+    if (s.source === "epargne") etapes.push(etape.epargne({ epargneId: s.refId, membreId: pret.membreId, type: "Retrait", montant: m, date, pretId: pret.id, saisiPar, modePaiement: "prelevement" }));
+    else if (s.source === "assurance") etapes.push(etape.assurance({ membreId: pret.membreId, type: "Prélèvement", delta: -m, date, modePaiement: "prelevement" }));
+    else if (s.source === "fonds") etapes.push(etape.fonds({ membreId: pret.membreId, typeFondsId: s.refId, delta: -m, date, modePaiement: "prelevement" }));
   }
-
-  // 2. Le remboursement, ventilé, sur la première source (les
-  // autres sources sont enregistrées au prorata de leur montant).
+  // 2. Une ligne de remboursement par source, et son retour dans l'épargne
   let restePen = rep.penalites, resteInt = rep.interets, resteCap = rep.capital;
-  const lignes = sources.filter((s) => Math.round(Number(s.montant)) > 0);
-  for (let i = 0; i < lignes.length; i++) {
-    const m = Math.round(Number(lignes[i].montant));
+  for (const l of sources.filter((x) => Math.round(Number(x.montant)) > 0)) {
+    const m = Math.round(Number(l.montant));
     const pen = Math.min(m, restePen); restePen -= pen;
     const int = Math.min(m - pen, resteInt); resteInt -= int;
     const cap = Math.min(m - pen - int, resteCap); resteCap -= cap;
-    const { error } = await supabase.from("pret_remboursements").insert({
+    etapes.push(etape.inserer("pret_remboursements", {
       group_id: groupId, pret_id: pret.id, date, montant: m, capital: cap, interets: int, penalites: pen,
-      source: lignes[i].source, source_ref: lignes[i].refId || null, saisi_par: saisiPar || null,
-    });
-    if (error) throw error;
-    // Capital et intérêts de CETTE ligne reviennent dans l'épargne qui a
-    // prêté (un mouvement par ligne : l'annulation d'une ligne reste juste).
-    if (cap + int > 0) await mouvementEpargne({ epargneId: pret.epargneId, membreId: pret.membreId, type: "Remboursement", montant: cap + int, date, pretId: pret.id, saisiPar, modePaiement: ["especes", "momo"].includes(lignes[i].source) ? lignes[i].source : "prelevement" });
+      source: l.source, source_ref: l.refId || null, saisi_par: saisiPar || null,
+    }));
+    if (cap + int > 0) etapes.push(etape.epargne({ epargneId: pret.epargneId, membreId: pret.membreId, type: "Remboursement", montant: cap + int, date, pretId: pret.id, saisiPar, modePaiement: ["especes", "momo"].includes(l.source) ? l.source : "prelevement" }));
   }
-
-  // 3. Les pénalités vont au compte de la réunion.
-  if (rep.penalites > 0) await ecrireCompteReunion(groupId, { date, montant: rep.penalites, origine: "penalite_pret", libelle: `Pénalité de retard — ${pret.membre}`, refId: pret.id, saisiPar });
-
+  // 3. Pénalités → compte de la réunion ; 4. statut du prêt
+  if (rep.penalites > 0) etapes.push(compteReunion(groupId, { date, montant: rep.penalites, origine: "penalite_pret", libelle: `Pénalité de retard — ${pret.membre}`, refId: pret.id, saisiPar }));
   const apres = situationPret(pret, [...pret.remboursements.filter((r) => !r.annule), { date, capital: rep.capital, interets: rep.interets, penalites: rep.penalites }], date);
-  const { error: eS } = await supabase.from("prets").update({ statut: apres.totalDu === 0 ? "remboursé" : "en cours" }).eq("id", pret.id);
-  if (eS) throw eS;
+  etapes.push(etape.modifier("prets", pret.id, { statut: apres.totalDu === 0 ? "remboursé" : "en cours" }));
+  await executerOperations(groupId, etapes);
   return { repartition: rep, resteDu: apres.totalDu };
 }
 
@@ -296,22 +252,22 @@ export async function fetchMouvementsBanque(groupId) {
 
 // Annule un versement ou un retrait saisi par erreur : la ligne reste
 // visible (barrée), le solde est corrigé, elle ne compte plus nulle part.
-export async function annulerMouvementEpargne(mouvement, { motif, par }) {
+export async function annulerMouvementEpargne(groupId, mouvement, { motif, par }) {
   if (!motif || !motif.trim()) throw new Error("Le motif est obligatoire.");
   if (mouvement.annule) throw new Error("Ce mouvement est déjà annulé.");
   if (!["Versement", "Retrait"].includes(mouvement.type) || mouvement.pretId) {
     throw new Error("Seuls les versements et retraits simples s'annulent ici. Pour un prêt, annule le remboursement concerné.");
   }
   const delta = mouvement.type === "Versement" ? -mouvement.montant : mouvement.montant;
-  await ajusterSoldeEpargne(mouvement.epargneId, delta);
-  const { error } = await supabase.from("epargne_mouvements").update({
-    annule: true, annule_motif: motif.trim(), annule_par: par || null, annule_le: new Date().toISOString(),
-  }).eq("id", mouvement.id);
-  if (error) throw error;
+  await executerOperations(groupId, [
+    etape.modifier("epargne_mouvements", mouvement.id, { annule: true, annule_motif: motif.trim(), annule_par: par || null, annule_le: new Date().toISOString() },
+      { annule: false }, "Ce mouvement est déjà annulé."),
+    etape.soldeEpargne(mouvement.epargneId, delta),
+  ]);
 }
 
-// Annule un remboursement de prêt saisi par erreur (en espèces
-// uniquement : les prélèvements sur avoirs se corrigent à la main).
+// Annule un remboursement de prêt saisi par erreur (espèces ou Mobile
+// Money : les prélèvements sur avoirs se corrigent avec le trésorier).
 export async function annulerRemboursement(groupId, pret, remboursement, { motif, par }) {
   if (!motif || !motif.trim()) throw new Error("Le motif est obligatoire.");
   if (!["especes", "momo"].includes(remboursement.source)) {
@@ -341,18 +297,13 @@ export async function annulerRemboursement(groupId, pret, remboursement, { motif
   }
   const totalVers = lignes.reduce((s, r) => s + r.capital + r.interets, 0);
   const totalPen = lignes.reduce((s, r) => s + r.penalites, 0);
-  if (mouvementId) {
-    const { error: eM } = await supabase.from("epargne_mouvements").update(annulation).eq("id", mouvementId);
-    if (eM) throw eM;
-    await ajusterSoldeEpargne(pret.epargneId, -totalVers);
-  }
-  if (totalPen > 0) {
-    await ecrireCompteReunion(groupId, { date: aujourdhui(), montant: -totalPen, origine: "penalite_pret", libelle: `Annulation : ${motif.trim()}`, refId: pret.id, saisiPar: par });
-  }
-  const { error } = await supabase.from("pret_remboursements").update(annulation).in("id", lignes.map((r) => r.id));
-  if (error) throw error;
-  const { error: eS } = await supabase.from("prets").update({ statut: "en cours" }).eq("id", pret.id);
-  if (eS) throw eS;
+  await executerOperations(groupId, [
+    ...lignes.map((r) => etape.modifier("pret_remboursements", r.id, annulation, { annule: false }, "Ce remboursement est déjà annulé.")),
+    mouvementId ? etape.modifier("epargne_mouvements", mouvementId, annulation, { annule: false }) : null,
+    mouvementId ? etape.soldeEpargne(pret.epargneId, -totalVers) : null,
+    totalPen > 0 ? compteReunion(groupId, { date: aujourdhui(), montant: -totalPen, origine: "penalite_pret", libelle: `Annulation : ${motif.trim()}`, refId: pret.id, saisiPar: par }) : null,
+    etape.modifier("prets", pret.id, { statut: "en cours" }),
+  ]);
 }
 
 // ------------------------------------------------------------
@@ -406,43 +357,46 @@ export async function preparerCloture(groupId, epargne, dateCloture) {
 
 // Clôture : intérêts versés, puis chaque membre récupère ou reconduit.
 // decisions = { membreId: "recuperer" | "reconduire" }
+// Toute la clôture part en UNE opération : si une étape échoue, rien
+// n'est clôturé et l'épargne reste telle quelle.
 export async function cloturerEpargneBanque(groupId, epargne, calcul, { decisions, nomNouvelle, caisseComptee, saisiPar }) {
   const date = calcul.dateCloture;
-  let nouvelle = null;
+  const etapes = [
+    // L'épargne ne peut être clôturée qu'une fois
+    etape.modifier("epargnes", epargne.id, { statut: epargne.statut ?? null }, { statut: epargne.statut ?? null }, "Cette épargne a déjà été clôturée ou a changé : recharge la page."),
+  ];
   // Un nouveau cycle est créé si quelqu'un reconduit ou si un prêt
   // non soldé doit y être reporté.
-  if (calcul.membres.some((m) => decisions[m.membreId] === "reconduire") || calcul.pretsOuverts.length > 0) {
-    const { data, error } = await supabase.from("epargnes").insert({
+  const avecNouvelle = calcul.membres.some((m) => decisions[m.membreId] === "reconduire") || calcul.pretsOuverts.length > 0;
+  if (avecNouvelle) {
+    etapes.push(etape.inserer("epargnes", {
       group_id: groupId, nom: nomNouvelle, type: epargne.type || "Personnalisée", solde: 0, statut: "active",
       regles: epargne.regles, cotisation_par_seance: epargne.cotisation || null, date_debut: date,
-    }).select().single();
-    if (error) throw error;
-    nouvelle = data;
+    }, "nouvelle"));
   }
   // Prêts non soldés : reportés au nouveau cycle. L'ancienne épargne
   // est remboursée du capital restant, le nouveau cycle le prête.
   for (const p of calcul.pretsOuverts) {
     const capital = p.etat.capitalRestant;
     if (capital > 0) {
-      await mouvementEpargne({ epargneId: epargne.id, membreId: p.membreId, type: "Remboursement", montant: capital, date, pretId: p.id, saisiPar });
-      await mouvementEpargne({ epargneId: nouvelle.id, membreId: p.membreId, type: "Prêt", montant: capital, date, pretId: p.id, saisiPar });
+      etapes.push(etape.epargne({ epargneId: epargne.id, membreId: p.membreId, type: "Remboursement", montant: capital, date, pretId: p.id, saisiPar, modePaiement: "report" }));
+      etapes.push(etape.epargne({ epargneId: "@nouvelle", membreId: p.membreId, type: "Prêt", montant: capital, date, pretId: p.id, saisiPar, modePaiement: "report" }));
     }
-    const { error: eP } = await supabase.from("prets").update({ epargne_id: nouvelle.id }).eq("id", p.id);
-    if (eP) throw eP;
+    etapes.push(etape.modifier("prets", p.id, { epargne_id: "@nouvelle" }));
   }
   for (const m of calcul.membres) {
-    if (m.interets > 0) await mouvementEpargne({ epargneId: epargne.id, membreId: m.membreId, type: "Intérêts", montant: m.interets, date, saisiPar });
+    if (m.interets > 0) etapes.push(etape.epargne({ epargneId: epargne.id, membreId: m.membreId, type: "Intérêts", montant: m.interets, date, saisiPar }));
     if (m.total <= 0) continue;
-    if (decisions[m.membreId] === "reconduire" && nouvelle) {
-      await mouvementEpargne({ epargneId: epargne.id, membreId: m.membreId, type: "Transfert", montant: m.total, date, saisiPar });
-      await mouvementEpargne({ epargneId: nouvelle.id, membreId: m.membreId, type: "Versement", montant: m.total, date, saisiPar });
+    if (decisions[m.membreId] === "reconduire" && avecNouvelle) {
+      etapes.push(etape.epargne({ epargneId: epargne.id, membreId: m.membreId, type: "Transfert", montant: m.total, date, saisiPar, modePaiement: "report" }));
+      etapes.push(etape.epargne({ epargneId: "@nouvelle", membreId: m.membreId, type: "Versement", montant: m.total, date, saisiPar, modePaiement: "report" }));
     } else {
-      await mouvementEpargne({ epargneId: epargne.id, membreId: m.membreId, type: "Retrait", montant: m.total, date, saisiPar });
+      etapes.push(etape.epargne({ epargneId: epargne.id, membreId: m.membreId, type: "Retrait", montant: m.total, date, saisiPar }));
     }
   }
   if (calcul.reste > 0) {
-    await ajusterSoldeEpargne(epargne.id, -calcul.reste);
-    await ecrireCompteReunion(groupId, { date, montant: calcul.reste, origine: "arrondi", libelle: `Reste d'arrondi — clôture de ${epargne.nom}`, refId: epargne.id, saisiPar });
+    etapes.push(etape.soldeEpargne(epargne.id, -calcul.reste));
+    etapes.push(compteReunion(groupId, { date, montant: calcul.reste, origine: "arrondi", libelle: `Reste d'arrondi — clôture de ${epargne.nom}`, refId: epargne.id, saisiPar, modePaiement: "report" }));
   }
   const resume = {
     date, caisseAttendue: calcul.caisseAttendue, caisseComptee: Number(caisseComptee), cagnotte: calcul.cagnotte, reste: calcul.reste,
@@ -450,9 +404,9 @@ export async function cloturerEpargneBanque(groupId, epargne, calcul, { decision
     pretsOuverts: calcul.pretsOuverts.map((p) => ({ id: p.id, membre: p.membre, du: p.etat.totalDu })),
     cloturePar: saisiPar || null,
   };
-  const { error } = await supabase.from("epargnes").update({ statut: "clôturée", date_cloture: date, cloture: resume }).eq("id", epargne.id);
-  if (error) throw error;
-  return { nouvelle, resume };
+  etapes.push(etape.modifier("epargnes", epargne.id, { statut: "clôturée", date_cloture: date, cloture: resume }));
+  const res = await executerOperations(groupId, etapes);
+  return { nouvelle: avecNouvelle ? { id: res.refs?.nouvelle, nom: nomNouvelle } : null, resume };
 }
 
 // ------------------------------------------------------------

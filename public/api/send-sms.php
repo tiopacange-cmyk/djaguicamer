@@ -74,11 +74,17 @@ if (!is_array($payload)) {
 
 $message = $payload['message'] ?? '';
 $msisdn = $payload['msisdn'] ?? null;
-$senderId = $payload['senderId'] ?? '';
+$groupId = $payload['groupId'] ?? '';
 $flag = $payload['flag'] ?? '';
 
 if (!is_string($message) || $message === '' || !is_array($msisdn) || count($msisdn) === 0) {
     repondre(400, ['error' => 'message et msisdn (tableau) sont obligatoires.']);
+}
+if (mb_strlen($message) > 900) {
+    repondre(400, ['error' => 'Message trop long (900 caractères au plus).']);
+}
+if (!is_string($groupId) || !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $groupId)) {
+    repondre(400, ['error' => 'Groupe manquant pour l\'envoi du SMS.']);
 }
 
 $msisdnNormalises = [];
@@ -87,16 +93,40 @@ foreach ($msisdn as $n) {
     if ($chiffres === '') continue;
     $msisdnNormalises[] = strpos($chiffres, '237') === 0 ? $chiffres : '237' . ltrim($chiffres, '0');
 }
+$msisdnNormalises = array_values(array_unique($msisdnNormalises));
 if (count($msisdnNormalises) === 0) {
     repondre(400, ['error' => 'Aucun numéro de téléphone valide.']);
 }
+if (count($msisdnNormalises) > 500) {
+    repondre(400, ['error' => 'Trop de destinataires (500 au plus par envoi).']);
+}
+
+// Appelle une fonction de la base AU NOM de la personne connectée.
+function rpcSupabase($supabaseUrl, $supabaseAnon, $jeton, $fonction, $params) {
+    return appelHttp($supabaseUrl . '/rest/v1/rpc/' . $fonction, [
+        'Content-Type: application/json',
+        'apikey: ' . $supabaseAnon,
+        'Authorization: Bearer ' . $jeton,
+    ], json_encode($params));
+}
+
+// La base vérifie : administrateur de CE groupe (ou super admin), et
+// crédit SMS suffisant. Elle renvoie le nom d'expéditeur du groupe :
+// le navigateur ne peut plus choisir l'expéditeur.
+[$statutAuto, $reponseAuto, ] = rpcSupabase($supabaseUrl, $supabaseAnon, $m[1], 'djangui_sms_autoriser', ['gid' => $groupId, 'nb' => count($msisdnNormalises)]);
+$auto = json_decode((string) $reponseAuto, true);
+if ($statutAuto !== 200 || !is_array($auto)) {
+    $raison = is_array($auto) && isset($auto['message']) ? $auto['message'] : 'Envoi de SMS refusé.';
+    repondre(403, ['error' => $raison]);
+}
+$senderId = ($auto['sender_id'] ?? '') ?: $senderIdDefaut;
 
 [$statut, $reponse, $erreur] = appelHttp('https://sms.lmtgroup.com/api/v1/pushes', [
     'Content-Type: application/json',
     'X-Api-Key: ' . $apiKey,
     'X-Secret: ' . $apiSecret,
 ], json_encode([
-    'senderId' => $senderId ?: $senderIdDefaut,
+    'senderId' => $senderId,
     'message' => $message,
     'msisdn' => $msisdnNormalises,
     'flag' => $flag ?: 'GSM7',
@@ -113,6 +143,12 @@ if (!is_array($data)) $data = [];
 
 if ($statut !== 201) {
     repondre($statut ?: 502, ['error' => $data['message'] ?? 'Erreur lors de l\'envoi du SMS.', 'details' => $data]);
+}
+
+// Décompte du crédit SMS par la base, après un envoi réussi.
+[$statutDecompte, $reponseDecompte, ] = rpcSupabase($supabaseUrl, $supabaseAnon, $m[1], 'djangui_sms_decompter', ['gid' => $groupId, 'nb' => count($msisdnNormalises)]);
+if ($statutDecompte < 200 || $statutDecompte >= 300) {
+    error_log('Décompte SMS impossible pour ' . $groupId . ' : ' . $reponseDecompte);
 }
 
 repondre(200, array_merge(['success' => true], $data));

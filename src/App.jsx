@@ -3895,7 +3895,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                 const cotisations = membres
                   .filter((m) => cotisationTontineMontants[m.nom])
                   .map((m) => ({ membreId: m.id, montant: cotisationTontineMontants[m.nom], date: versDateISO(cotisationTontineDate) }));
-                await enregistrerCotisationsTontine(tourEnCours.id, cotisations); succesOp();
+                await enregistrerCotisationsTontine(tourEnCours.id, cotisations, groupId); succesOp();
                 await rechargerTontine();
 
                 // Notifie chaque membre par SMS de sa cotisation enregistrée
@@ -4537,7 +4537,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                 const cotisations = membres
                   .filter((m) => cotisationMontants[m.nom])
                   .map((m) => ({ membreId: m.id, montant: cotisationMontants[m.nom], date: versDateISO(cotisationDate) }));
-                const resultatCotisation = await enregistrerCotisationsEpargne(cotisationEpargneId, cotisations); succesOp();
+                const resultatCotisation = await enregistrerCotisationsEpargne(cotisationEpargneId, cotisations, groupId); succesOp();
                 await rechargerEpargnes();
                 await rechargerHistoriqueBanque();
 
@@ -5227,7 +5227,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                 if (versementNum > 0) {
                   let typeGarantie = typesFonds.find((t) => t.nom === "Fonds de garantie");
                   if (!typeGarantie) typeGarantie = await creerTypeFonds(groupId, "Fonds de garantie", 0);
-                  await enregistrerVersementFonds(resultat.membre.id, typeGarantie.id, versementNum);
+                  await enregistrerVersementFonds(resultat.membre.id, typeGarantie.id, versementNum, undefined, groupId);
                   await rechargerFonds();
                 }
 
@@ -5412,7 +5412,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                 const typeChoisi = typesFonds.find((t) => t.id === cotisationFondsTypeId);
                 for (const m of aVerser) {
                   const montant = parseInt(cotisationFondsMontants[m.id].replace(/[^\d]/g, ""), 10);
-                  const nouveauSolde = await enregistrerVersementFonds(m.id, cotisationFondsTypeId, montant, dateISO); succesOp();
+                  const nouveauSolde = await enregistrerVersementFonds(m.id, cotisationFondsTypeId, montant, dateISO, groupId); succesOp();
                   if (m.telephone) {
                     envoyerSMS({
                       message: msgOperation(m.nom, `versement "${typeChoisi?.nom}"`, montant, nouveauSolde),

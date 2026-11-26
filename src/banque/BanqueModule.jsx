@@ -507,7 +507,7 @@ function FichePret({ pret, groupId, membres, utilisateur, nomGroupe, onFermer, o
     setErreur("");
     if (!motifRefus.trim() || !president.trim()) { setErreur("Indique le nom du Président et le motif du refus."); return; }
     const res = await executer({ titre: "Refuser ce prêt spécial ?", lignes: [["Membre", pret.membre], ["Montant", fmtF(pret.montant)], ["Motif", motifRefus]], danger: true, libelleConfirmer: "Refuser", detailSucces: "Prêt spécial refusé" },
-      () => refuserPretSpecial(pret.id, { motif: motifRefus.trim(), par: president.trim() }));
+      () => refuserPretSpecial(groupId, pret.id, { motif: motifRefus.trim(), par: president.trim() }));
     if (res) onFait();
   };
 
@@ -703,7 +703,7 @@ function Annulation({ demande, groupId, utilisateur, onFermer, onFait }) {
       danger: true, libelleConfirmer: "Annuler l'opération", detailSucces: "Opération annulée",
     }, () => demande.type === "remboursement"
       ? annulerRemboursement(groupId, demande.pret, o, { motif, par: utilisateur })
-      : annulerMouvementEpargne(o, { motif, par: utilisateur }));
+      : annulerMouvementEpargne(groupId, o, { motif, par: utilisateur }));
     if (res) onFait();
   };
   return (

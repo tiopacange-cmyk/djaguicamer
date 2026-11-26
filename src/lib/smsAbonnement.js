@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { executerOperations, etape, aujourdhuiLocal } from "./operations";
 
 // ============================================================
 // CONFIGURATION (tarif fixé par l'admin du groupe)
@@ -75,16 +76,9 @@ export async function fetchDejaPreleves(groupId, mois) {
 export async function effectuerPrelevementSms(groupId, membreId, mois, montant, credits, modePaiement, epargneId) {
   if (modePaiement === "déduit banque") {
     if (!epargneId) throw new Error("Choisis l'épargne à débiter.");
-    const { data: ep, error: errLecture } = await supabase.from("epargnes").select("solde").eq("id", epargneId).single();
-    if (errLecture) throw errLecture;
-    const nouveauSolde = ep.solde - montant;
-    const { error: errMvt } = await supabase.from("epargne_mouvements").insert({
-      epargne_id: epargneId, membre_id: membreId, type: "Retrait", montant, date_mouvement: new Date().toISOString().slice(0, 10), solde_apres: nouveauSolde,
-      mode_paiement: "prelevement", // pas une sortie d'espèces de la caisse
-    });
-    if (errMvt) throw errMvt;
-    const { error: errMaj } = await supabase.from("epargnes").update({ solde: nouveauSolde }).eq("id", epargneId);
-    if (errMaj) throw errMaj;
+    // Prélèvement sur l'épargne (pas une sortie d'espèces de la caisse),
+    // solde et ligne en une seule opération.
+    await executerOperations(groupId, [etape.epargne({ epargneId, membreId, type: "Retrait", montant, date: aujourdhuiLocal(), modePaiement: "prelevement" })]);
   }
 
   const { error: errPrelevement } = await supabase.from("sms_prelevements").insert({
