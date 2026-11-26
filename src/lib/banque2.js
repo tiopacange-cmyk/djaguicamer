@@ -138,20 +138,23 @@ export function etatPret(pret, date = aujourdhui()) {
 export async function creerPret(groupId, {
   epargneId, membreId, montant, dateDebut, dateFin, regles, special = false,
   garanties = [], decision = null, modeRemboursement = null, nbEcheances = null,
-  avalistes = [], saisiPar, modePaiement = "especes", frais = null,
+  avalistes = [], saisiPar, modePaiement = "especes", frais = null, enAttente = false,
 }) {
+  // Prêt spécial, ou prêt préparé par un poste qui ne peut pas le
+  // valider : il reste « en attente », rien ne sort de la caisse.
+  const attente = special || enAttente;
   const reglesN = normaliserRegles(regles);
   const fraisMontant = frais !== null && frais !== undefined && frais !== "" ? Math.round(Number(frais)) : fraisDeDossier(montant, reglesN);
   const etapes = [
     etape.inserer("prets", {
       epargne_id: epargneId, membre_id: membreId, montant, frais_dossier: fraisMontant,
-      date_debut: dateDebut, date_fin: dateFin || null, statut: special ? "en attente" : "en cours",
+      date_debut: dateDebut, date_fin: dateFin || null, statut: attente ? "en attente" : "en cours",
       regles: reglesN, special, garanties: garanties.length ? garanties : null, decision,
       mode_remboursement: modeRemboursement, nb_echeances: nbEcheances, saisi_par: saisiPar || null,
       mode_paiement: modePaiement,
     }, "pret"),
     ...avalistes.filter((x) => x.id).map((a) => etape.inserer("avalisations", { pret_id: "@pret", avaliste_id: a.id, montant_garanti: a.montant || montant })),
-    ...(special ? [] : etapesDecaissement(groupId, "@pret", { epargneId, membreId, montant, dateDebut, frais: fraisMontant, saisiPar, modePaiement })),
+    ...(attente ? [] : etapesDecaissement(groupId, "@pret", { epargneId, membreId, montant, dateDebut, frais: fraisMontant, saisiPar, modePaiement })),
   ];
   const res = await executerOperations(groupId, etapes);
   return { id: res.refs?.pret };

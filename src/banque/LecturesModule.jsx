@@ -4,6 +4,7 @@ import { fetchOperationsEnAttente, enregistrerLecture, validerOperation, abandon
 import { versDateFr } from "../ui/ChampDate";
 import { useConfirmation, fmtF } from "../ui/Confirmation";
 import { Fenetre, Champ, Pastille, Message, ChampMontant, nombre } from "./communs";
+import { useDroits } from "../ui/Droits";
 
 const ETAPE = { saisie: "1re lecture à faire", lecture1: "2e lecture à faire", lecture2: "Prête à valider", validation: "Validation en cours", validee: "Validée", abandonnee: "Abandonnée" };
 const TON = { saisie: "or", lecture1: "or", lecture2: "violet", validation: "violet", validee: "vert", abandonnee: "neutre" };
@@ -58,6 +59,7 @@ export default function LecturesModule({ groupId, nomGroupe, membres, utilisateu
 
 function Lecture({ op, groupId, nomGroupe, membres, utilisateur, onFermer, onMaj }) {
   const { executer } = useConfirmation();
+  const { peut } = useDroits();
   const totauxEgaux = !!(op.lecture1 && op.lecture2 && op.lecture1.total === op.lecture2.total && op.lecture2.total === op.total);
   // 2e lecture à refaire si les totaux ne correspondent pas
   const numero = op.statut === "saisie" ? 1 : op.statut === "lecture1" || (op.statut === "lecture2" && !totauxEgaux) ? 2 : null;
@@ -102,6 +104,7 @@ function Lecture({ op, groupId, nomGroupe, membres, utilisateur, onFermer, onMaj
     if (!tousLus) { setErreur("Coche chaque ligne une fois lue et vérifiée."); return; }
     const corrections = lignes.filter((l) => nombre(l.montantLu) !== l.montant);
     const res = await executer({
+      module: "lectures",
       titre: `Terminer la ${numero === 1 ? "1re" : "2e"} lecture ?`,
       lignes: [["Lecteur", lecteur.trim()], ["Lignes vérifiées", String(lignes.length)], ["Total lu", fmtF(totalLu)], ["Total saisi", fmtF(op.total)], corrections.length ? ["Corrections", String(corrections.length)] : null].filter(Boolean),
       alertes: [corrections.length ? `${corrections.length} montant(s) corrigé(s) : la correction reste visible.` : null, numero === 2 && corrections.length ? "Un montant a changé à la 2e lecture : il faudra refaire les deux lectures." : null],
@@ -119,6 +122,7 @@ function Lecture({ op, groupId, nomGroupe, membres, utilisateur, onFermer, onMaj
 
   const valider = async () => {
     const res = await executer({
+      module: "lectures", niveau: "valider",
       titre: "Valider cette saisie ?",
       lignes: [["Saisie", op.titre], ["Saisi par", op.saisiPar || "—"], ["1re lecture", `${op.lecture1.par} · ${fmtF(op.lecture1.total)}`], ["2e lecture", `${op.lecture2.par} · ${fmtF(op.lecture2.total)}`], ["Total validé", fmtF(op.total)]],
       alertes: ["Les soldes vont être mis à jour et chaque membre recevra son SMS."],
@@ -182,7 +186,9 @@ function Lecture({ op, groupId, nomGroupe, membres, utilisateur, onFermer, onMaj
       <Message>{erreur}</Message>
       {numero && <button type="button" className="adm-btn adm-btn-action bq-plein" onClick={terminer}><FileCheck2 size={15} aria-hidden="true" /> Terminer la {numero === 1 ? "1re" : "2e"} lecture</button>}
       {op.statut === "lecture2" && (
-        totauxEgaux
+        totauxEgaux && !peut("lectures", "valider")
+          ? <Message ton="info">Les deux lectures sont faites : la validation revient au Président (ou au poste qui valide).</Message>
+          : totauxEgaux
           ? <button type="button" className="adm-btn adm-btn-action bq-plein" onClick={valider}><CheckCircle2 size={15} aria-hidden="true" /> Valider ({fmtF(op.total)})</button>
           : <Message>Les totaux des deux lectures ne sont pas identiques : refaire la 2e lecture ou abandonner la saisie.</Message>
       )}

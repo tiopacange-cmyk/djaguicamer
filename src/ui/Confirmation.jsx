@@ -14,11 +14,23 @@ export function ConfirmationProvider({ children }) {
   const [toast, setToast] = useState(null);
   const resolveRef = useRef(null);
   const minuterie = useRef(null);
+  // Garde des droits : renvoie un message si l'opération n'est pas
+  // permise au poste de la personne connectée (sinon null).
+  const gardeRef = useRef(null);
+  const definirGarde = useCallback((fn) => { gardeRef.current = fn; }, []);
 
-  const confirmer = useCallback((options) => new Promise((resolve) => {
-    resolveRef.current = resolve;
-    setDemande(options);
-  }), []);
+  const confirmer = useCallback((options = {}) => {
+    const refus = gardeRef.current?.(options);
+    if (refus) {
+      montrerRef.current?.({ type: "erreur", message: "Action non autorisée pour votre poste", detail: refus });
+      return Promise.resolve(false);
+    }
+    return new Promise((resolve) => {
+      resolveRef.current = resolve;
+      setDemande(options);
+    });
+  }, []);
+  const montrerRef = useRef(null);
 
   const fermer = (valeur) => {
     setDemande(null);
@@ -32,6 +44,7 @@ export function ConfirmationProvider({ children }) {
     minuterie.current = setTimeout(() => setToast(null), t.type === "erreur" ? 8000 : 4500);
   }, []);
 
+  montrerRef.current = montrer;
   const succes = useCallback((message = "Opération effectuée avec succès", detail = "") => montrer({ type: "succes", message, detail }), [montrer]);
   const echec = useCallback((message, detail = "") => montrer({ type: "erreur", message, detail }), [montrer]);
 
@@ -59,7 +72,7 @@ export function ConfirmationProvider({ children }) {
   }, [demande]);
 
   return (
-    <Ctx.Provider value={{ confirmer, succes, echec, executer }}>
+    <Ctx.Provider value={{ confirmer, succes, echec, executer, definirGarde }}>
       {children}
       {demande && (
         <div className="modal-fond conf-fond">
@@ -113,6 +126,7 @@ export function useConfirmation() {
       succes: () => {},
       echec: () => {},
       executer: async (_o, action) => action(),
+      definirGarde: () => {},
     };
   }
   return c;

@@ -148,12 +148,12 @@ function Reglages({ groupId, regles, onFait }) {
   const [lectures, setLectures] = useState({ ...LECTURES_DEFAUT, ...(regles.lectures || {}) });
   const exemple = penaliteGarde(200000, 150000, g);
   const enregistrerLectures = async () => {
-    const res = await executer({ titre: "Enregistrer le réglage des lectures ?", lignes: Object.entries(RUBRIQUES).map(([k, l]) => [l, lectures[k] ? "deux lectures" : "validation directe"]) },
+    const res = await executer({ module: "caisse", niveau: "valider", titre: "Enregistrer le réglage des lectures ?", lignes: Object.entries(RUBRIQUES).map(([k, l]) => [l, lectures[k] ? "deux lectures" : "validation directe"]) },
       () => sauverReglesGroupe(groupId, { ...regles, lectures }));
     if (res) onFait();
   };
   const enregistrer = async () => {
-    const res = await executer({ titre: "Enregistrer la règle ?", lignes: [["Pénalité", g.type === "fixe" ? fmtF(g.valeur) : `${g.valeur} % ${g.base === "garde" ? "de la somme confiée" : "du montant manquant"}`], ["Exemple", `200 000 confiés, 150 000 rapportés → ${fmtF(exemple)}`]] },
+    const res = await executer({ module: "caisse", niveau: "valider", titre: "Enregistrer la règle ?", lignes: [["Pénalité", g.type === "fixe" ? fmtF(g.valeur) : `${g.valeur} % ${g.base === "garde" ? "de la somme confiée" : "du montant manquant"}`], ["Exemple", `200 000 confiés, 150 000 rapportés → ${fmtF(exemple)}`]] },
       () => sauverReglesGroupe(groupId, { ...regles, garde: { ...g, valeur: Number(g.valeur) || 0 } }));
     if (res) onFait();
   };

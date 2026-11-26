@@ -5,6 +5,7 @@ import { envoyerSMS } from "../lib/sms";
 import { ChampDate, versDateISO, versDateFr } from "../ui/ChampDate";
 import { useConfirmation, fmtF } from "../ui/Confirmation";
 import { Fenetre, Champ, Pastille, Message, Choix, ChampMontant, nombre } from "./communs";
+import { useDroits } from "../ui/Droits";
 
 // ============================================================
 // CLÔTURE D'UNE ÉPARGNE — méthode des nombres (montant × jours)
@@ -13,6 +14,7 @@ import { Fenetre, Champ, Pastille, Message, Choix, ChampMontant, nombre } from "
 // ============================================================
 export function ClotureEpargne({ epargne, groupId, nomGroupe, utilisateur, version = 0, onRegler, onFermer }) {
   const { executer } = useConfirmation();
+  const { peut } = useDroits();
   const [date, setDate] = useState(epargne.dateCloture ? versDateFr(epargne.dateCloture) : "");
   const [calcul, setCalcul] = useState(null);
   const [enCalcul, setEnCalcul] = useState(false);
@@ -52,6 +54,7 @@ export function ClotureEpargne({ epargne, groupId, nomGroupe, utilisateur, versi
     const reconduits = calcul.membres.filter((m) => decisions[m.membreId] === "reconduire").length;
     if ((reconduits > 0 || calcul.pretsOuverts.length > 0) && !nomNouvelle.trim()) { setErreur("Donne un nom au nouveau cycle."); return; }
     const res = await executer({
+      module: "clotures", niveau: "valider",
       titre: `Clôturer ${epargne.nom} ?`,
       lignes: [["Date de clôture", versDateFr(calcul.dateCloture)], ["Épargne des membres", fmtF(calcul.capitalMembres)], ["Intérêts à partager", fmtF(calcul.cagnotte)],
         ["Caisse attendue", fmtF(calcul.caisseAttendue)], ["Caisse comptée", fmtF(compte)], ecart ? ["Écart", `${ecart > 0 ? "+" : "−"} ${fmtF(Math.abs(ecart))} — ${motifEcart}`] : null,
@@ -140,7 +143,9 @@ export function ClotureEpargne({ epargne, groupId, nomGroupe, utilisateur, versi
           )}
           <label className="bq-case"><input type="checkbox" checked={sms} onChange={(e) => setSms(e.target.checked)} /> Envoyer à chaque membre son montant par SMS</label>
           <Message>{erreur}</Message>
-          <button type="button" className="adm-btn adm-btn-action bq-plein" onClick={cloturer}>Clôturer l'épargne</button>
+          {peut("clotures", "valider")
+            ? <button type="button" className="adm-btn adm-btn-action bq-plein" onClick={cloturer}>Clôturer l'épargne</button>
+            : <Message ton="info">Calcul préparé. La clôture elle-même est faite par le Président (ou le poste qui valide les clôtures).</Message>}
         </>
       )}
       {!calcul && <Message>{erreur}</Message>}

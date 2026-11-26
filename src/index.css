@@ -1993,3 +1993,22 @@ textarea.adm-input { min-height: 88px; resize: vertical; line-height: 1.5; }
 .bq-table tr.est-en-lecture td { background: color-mix(in srgb, var(--gold) 20%, var(--surface)); }
 .bq-controles { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
 .bq-abandon { margin-top: 18px; }
+
+/* ---------- Postes et droits ---------- */
+.bq-bleu { background: var(--indigo-clair); color: var(--primary); }
+[data-theme="dark"] .bq-bleu { color: #B9C3F5; }
+.pt-matrice th.pt-col { text-align: center; vertical-align: top; min-width: 120px; white-space: normal; }
+.pt-poste { font-size: 13px; color: var(--ink); text-transform: none; letter-spacing: 0; }
+.pt-titulaires { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: 0; margin: 2px 0 6px; }
+.pt-modifier { font-size: 12px; }
+.pt-cellule { text-align: center; }
+.pt-aide { font-size: 12px; font-weight: 400; }
+.pt-edition { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.pt-ligne { display: grid; grid-template-columns: minmax(180px, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.pt-ligne .bq-choix { margin: 0; justify-content: flex-end; }
+@media (max-width: 640px) { .pt-ligne { grid-template-columns: 1fr; } .pt-ligne .bq-choix { justify-content: flex-start; } }
+.av-liste { display: flex; flex-direction: column; gap: 10px; }
+.av-carte { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: 14px 16px; border-radius: var(--radius-card); background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--gold); }
+.av-titre { font-weight: 800; color: var(--ink); }
+.sidebar-badge { margin-left: auto; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: rgba(255,255,255,0.12); }
+.sidebar-badge.est-alerte { background: #D62828; color: #fff; }

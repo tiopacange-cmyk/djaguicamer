@@ -10,6 +10,7 @@ import { envoyerSMS } from "../lib/sms";
 import { ChampDate, versDateISO, versDateFr, dateDuJour } from "../ui/ChampDate";
 import { useConfirmation, fmtF } from "../ui/Confirmation";
 import { Fenetre, Champ, Pastille, Message, Choix, ChampMontant, nombre } from "./communs";
+import { useDroits } from "../ui/Droits";
 import { ClotureEpargne } from "./Cloture";
 
 const UNITES = [{ valeur: "jour", libelle: "jour(s)" }, { valeur: "semaine", libelle: "semaine(s)" }, { valeur: "mois", libelle: "mois" }];
@@ -20,8 +21,9 @@ const TON_STATUT = { "en cours": "or", "en retard": "rouge", "remboursé": "vert
 
 const aujourdhuiISO = () => new Date().toISOString().slice(0, 10);
 
-export default function BanqueModule({ groupId, nomGroupe, membres, utilisateur, onCotisation, onCreerEpargne, rafraichir = 0 }) {
-  const [onglet, setOnglet] = useState("epargnes");
+export default function BanqueModule({ groupId, nomGroupe, membres, utilisateur, onCotisation, onCreerEpargne, rafraichir = 0, ongletInitial = "epargnes" }) {
+  const { peut } = useDroits();
+  const [onglet, setOnglet] = useState(ongletInitial);
   const [epargnes, setEpargnes] = useState([]);
   const [prets, setPrets] = useState([]);
   const [mouvements, setMouvements] = useState([]);
@@ -65,10 +67,10 @@ export default function BanqueModule({ groupId, nomGroupe, membres, utilisateur,
           <p className="adm-sous-titre">Épargnes, prêts, remboursements et compte de la réunion. Chaque réunion fixe ses propres règles.</p>
         </div>
         <div className="bq-actions">
-          <button type="button" className="adm-btn adm-btn-secondaire" onClick={onCotisation}><Plus size={15} aria-hidden="true" /> Enregistrer une cotisation</button>
-          <button type="button" className="adm-btn adm-btn-secondaire" onClick={() => setNouveauPret("special")}><Star size={15} aria-hidden="true" /> Prêt spécial</button>
-          <button type="button" className="adm-btn adm-btn-secondaire" onClick={() => setNouveauPret("normal")}><Plus size={15} aria-hidden="true" /> Nouveau prêt</button>
-          <button type="button" className="adm-btn adm-btn-action" onClick={onCreerEpargne}><Plus size={15} aria-hidden="true" /> Créer une épargne</button>
+          {peut("banque", "saisir") && <button type="button" className="adm-btn adm-btn-secondaire" onClick={onCotisation}><Plus size={15} aria-hidden="true" /> Enregistrer une cotisation</button>}
+          {peut("credits", "saisir") && <button type="button" className="adm-btn adm-btn-secondaire" onClick={() => setNouveauPret("special")}><Star size={15} aria-hidden="true" /> Prêt spécial</button>}
+          {peut("credits", "saisir") && <button type="button" className="adm-btn adm-btn-secondaire" onClick={() => setNouveauPret("normal")}><Plus size={15} aria-hidden="true" /> Nouveau prêt</button>}
+          {peut("banque", "valider") && <button type="button" className="adm-btn adm-btn-action" onClick={onCreerEpargne}><Plus size={15} aria-hidden="true" /> Créer une épargne</button>}
         </div>
       </div>
 
@@ -77,7 +79,7 @@ export default function BanqueModule({ groupId, nomGroupe, membres, utilisateur,
       {enAttente.length > 0 && (
         <div className="bq-attente" role="status">
           <Star size={16} aria-hidden="true" />
-          <span><b>{enAttente.length} prêt(s) spécial(aux)</b> en attente de la validation du Président.</span>
+          <span><b>{enAttente.length} prêt(s)</b> en attente de validation.</span>
           <button type="button" className="adm-btn-ligne" onClick={() => { setOnglet("prets"); setFiche(enAttente[0]); }}>Voir</button>
         </div>
       )}
@@ -109,8 +111,8 @@ export default function BanqueModule({ groupId, nomGroupe, membres, utilisateur,
                 {(ep.dateDebut || ep.dateCloture) && <div className="bq-carte-sub">Cycle : {ep.dateDebut ? versDateFr(ep.dateDebut) : "—"} → {ep.dateCloture ? versDateFr(ep.dateCloture) : "—"}</div>}
                 {ep.statut !== "clôturée" ? (
                   <div className="bq-carte-actions">
-                    <button type="button" className="adm-btn-ligne" onClick={() => setReglesPour(ep)}><Settings2 size={14} aria-hidden="true" /> Règles</button>
-                    <button type="button" className="adm-btn-ligne" onClick={() => setCloture(ep)}><Lock size={14} aria-hidden="true" /> Clôturer</button>
+                    {peut("banque", "valider") && <button type="button" className="adm-btn-ligne" onClick={() => setReglesPour(ep)}><Settings2 size={14} aria-hidden="true" /> Règles</button>}
+                    {peut("clotures", "saisir") && <button type="button" className="adm-btn-ligne" onClick={() => setCloture(ep)}><Lock size={14} aria-hidden="true" /> Clôturer</button>}
                   </div>
                 ) : ep.cloture && (
                   <div className="bq-carte-sub">Clôturée le {versDateFr(ep.cloture.date)} · intérêts partagés {fmtF(ep.cloture.cagnotte)}</div>
@@ -137,11 +139,11 @@ export default function BanqueModule({ groupId, nomGroupe, membres, utilisateur,
       )}
 
       {!chargement && onglet === "historique" && (
-        <Historique mouvements={mouvements} onAnnuler={(m) => setAnnulation({ type: "mouvement", objet: m })} />
+        <Historique mouvements={mouvements} onAnnuler={peut("annulations", "valider") ? (m) => setAnnulation({ type: "mouvement", objet: m }) : null} />
       )}
 
       {!chargement && onglet === "compte" && (
-        <CompteReunion compte={compte} onEcrire={() => setEcritureCompte(true)} />
+        <CompteReunion compte={compte} onEcrire={peut("banque", "valider") ? () => setEcritureCompte(true) : null} />
       )}
 
       {reglesPour && <ReglesEpargne epargne={reglesPour} onFermer={() => setReglesPour(null)} onFait={() => { setReglesPour(null); recharger(); }} />}
@@ -151,7 +153,7 @@ export default function BanqueModule({ groupId, nomGroupe, membres, utilisateur,
       )}
       {fiche && (
         <FichePret pret={pretsAvecEtat.find((p) => p.id === fiche.id) || fiche} groupId={groupId} membres={membresActifs} utilisateur={utilisateur} nomGroupe={nomGroupe}
-          onFermer={() => setFiche(null)} onRegler={(p) => setReglement(p)} onAnnulerRemb={(p, r) => setAnnulation({ type: "remboursement", objet: r, pret: p })} onFait={recharger} />
+          onFermer={() => setFiche(null)} onRegler={(p) => setReglement(p)} onAnnulerRemb={peut("annulations", "valider") ? (p, r) => setAnnulation({ type: "remboursement", objet: r, pret: p }) : null} onFait={recharger} />
       )}
       {cloture && (
         <ClotureEpargne epargne={cloture} groupId={groupId} nomGroupe={nomGroupe} utilisateur={utilisateur} version={version}
@@ -197,6 +199,7 @@ function ReglesEpargne({ epargne, onFermer, onFait }) {
     const dFin = fin ? versDateISO(fin) : null;
     if ((debut && !dDebut) || (fin && !dFin)) { setErreur("Date invalide (jj/mm/aaaa)."); return; }
     const res = await executer({
+      module: "banque", niveau: "valider",
       titre: "Enregistrer les règles ?",
       lignes: [["Épargne", epargne.nom], ["Intérêt des prêts", libelleRegle(r)], ["Frais de dossier", r.fraisValeur ? (r.fraisType === "pourcent" ? `${r.fraisValeur} %` : fmtF(r.fraisValeur)) : "aucun"],
         ["Pénalité de retard", r.penaliteValeur ? `${r.penaliteType === "pourcent" ? r.penaliteValeur + " %" : fmtF(r.penaliteValeur)} par ${r.penaliteUnite} (grâce ${r.graceJours || 0} j)` : "aucune"],
@@ -299,6 +302,9 @@ function ListePrets({ prets, onOuvrir }) {
 function NouveauPret({ type, groupId, epargnes, membres, utilisateur, nomGroupe, prets, onFermer, onFait }) {
   const special = type === "special";
   const { executer } = useConfirmation();
+  const { peut } = useDroits();
+  // Un poste qui prépare sans pouvoir valider : le prêt attend la validation.
+  const aValider = !special && !peut("credits", "valider");
   const [epargneId, setEpargneId] = useState(epargnes[0]?.id || "");
   const ep = epargnes.find((e) => e.id === epargneId);
   const [membreId, setMembreId] = useState("");
@@ -356,7 +362,8 @@ function NouveauPret({ type, groupId, epargnes, membres, utilisateur, nomGroupe,
     const av = avalistes.filter((a) => a.id).map((a) => ({ id: a.id, montant: nombre(a.montant) || m }));
     const gar = garanties.filter((g) => g.description.trim() || g.type).map((g) => ({ ...g, valeur: nombre(g.valeur) }));
     const res = await executer({
-      titre: special ? "Soumettre ce prêt spécial ?" : "Accorder ce prêt ?",
+      module: "credits",
+      titre: special ? "Soumettre ce prêt spécial ?" : aValider ? "Préparer ce prêt ?" : "Accorder ce prêt ?",
       lignes: [["Membre", membre?.nom], ["Épargne", ep?.nom], ["Montant", fmtF(m)], ["Décaissé le", versDateFr(dDebut)], ["Échéance", versDateFr(dFin)],
         ["Conditions", libelleRegle(regles)], ["Intérêts prévus", fmtF(interetPrevu)], fraisCalc ? ["Frais de dossier (compte de la réunion)", fmtF(fraisCalc)] : null,
         av.length ? ["Avaliste(s)", av.map((a) => membres.find((x) => x.id === a.id)?.nom).join(", ")] : null].filter(Boolean),
@@ -367,15 +374,16 @@ function NouveauPret({ type, groupId, epargnes, membres, utilisateur, nomGroupe,
         special && m > (ep?.solde || 0) ? `${ep?.nom} n'a que ${fmtF(ep?.solde)} en caisse : le Président ne pourra pas valider tant qu'il manque de l'argent.` : null,
         special ? "Le prêt restera en attente : rien ne sort de la caisse avant la validation du Président." : null,
       ],
-      libelleConfirmer: special ? "Soumettre au Président" : "Accorder le prêt",
-      detailSucces: special ? "Prêt spécial en attente de validation" : `${fmtF(m)} prêtés à ${membre?.nom}`,
+      libelleConfirmer: special || aValider ? "Soumettre pour validation" : "Accorder le prêt",
+      detailSucces: special || aValider ? "Prêt en attente de validation" : `${fmtF(m)} prêtés à ${membre?.nom}`,
     }, async () => {
       await creerPret(groupId, {
         epargneId, membreId, montant: m, dateDebut: dDebut, dateFin: dFin, regles: special ? { ...regles, ...(modeRemb === "mensualites" ? { periode: 1, unite: "mois" } : {}) } : regles,
         special, garanties: gar, decision: special ? { date: versDateISO(decisionDate), comite, motif: motif.trim() } : null,
         modeRemboursement: modeRemb, nbEcheances: modeRemb === "mensualites" ? Number(nbEch) || 1 : null, avalistes: av, saisiPar: utilisateur, frais: fraisCalc,
+        enAttente: aValider,
       });
-      if (!special && membre?.telephone) {
+      if (!special && !aValider && membre?.telephone) {
         envoyerSMS({ message: `Bonjour ${membre.nom}, prêt de ${m.toLocaleString("fr-FR")} FCFA accordé le ${versDateFr(dDebut)}. Échéance : ${versDateFr(dFin)}.`, numeros: [membre.telephone], groupId });
       }
     });
@@ -473,7 +481,8 @@ function NouveauPret({ type, groupId, epargnes, membres, utilisateur, nomGroupe,
         </>
       )}
       <Message>{erreur}</Message>
-      <button type="button" className="adm-btn adm-btn-action bq-plein" onClick={valider}>{special ? "Soumettre au Président" : "Accorder le prêt"}</button>
+      {aValider && <Message ton="info">Votre poste prépare le prêt : il attendra la validation (menu « À valider ») avant que l'argent ne sorte.</Message>}
+      <button type="button" className="adm-btn adm-btn-action bq-plein" onClick={valider}>{special || aValider ? "Soumettre pour validation" : "Accorder le prêt"}</button>
     </Fenetre>
   );
 }
@@ -483,6 +492,7 @@ function NouveauPret({ type, groupId, epargnes, membres, utilisateur, nomGroupe,
 // ------------------------------------------------------------
 function FichePret({ pret, groupId, membres, utilisateur, nomGroupe, onFermer, onRegler, onAnnulerRemb, onFait }) {
   const { executer } = useConfirmation();
+  const { peut } = useDroits();
   const [president, setPresident] = useState("");
   const [motifRefus, setMotifRefus] = useState("");
   const [erreur, setErreur] = useState("");
@@ -492,7 +502,8 @@ function FichePret({ pret, groupId, membres, utilisateur, nomGroupe, onFermer, o
     setErreur("");
     if (!president.trim()) { setErreur("Indique le nom du Président qui valide."); return; }
     const res = await executer({
-      titre: "Valider ce prêt spécial ?",
+      module: "credits", niveau: "valider",
+      titre: pret.special ? "Valider ce prêt spécial ?" : "Valider ce prêt ?",
       lignes: [["Membre", pret.membre], ["Montant", fmtF(pret.montant)], ["Conditions", libelleRegle(pret.regles)], ["Validé par", president]],
       alertes: [`${fmtF(pret.montant)} vont sortir de ${pret.epargneNom}.`, "Les intérêts courent à partir d'aujourd'hui (date du décaissement) ; l'échéance est décalée d'autant."],
       libelleConfirmer: "Valider et décaisser",
@@ -506,7 +517,7 @@ function FichePret({ pret, groupId, membres, utilisateur, nomGroupe, onFermer, o
   const refuser = async () => {
     setErreur("");
     if (!motifRefus.trim() || !president.trim()) { setErreur("Indique le nom du Président et le motif du refus."); return; }
-    const res = await executer({ titre: "Refuser ce prêt spécial ?", lignes: [["Membre", pret.membre], ["Montant", fmtF(pret.montant)], ["Motif", motifRefus]], danger: true, libelleConfirmer: "Refuser", detailSucces: "Prêt spécial refusé" },
+    const res = await executer({ module: "credits", niveau: "valider", titre: "Refuser ce prêt ?", lignes: [["Membre", pret.membre], ["Montant", fmtF(pret.montant)], ["Motif", motifRefus]], danger: true, libelleConfirmer: "Refuser", detailSucces: "Prêt spécial refusé" },
       () => refuserPretSpecial(groupId, pret.id, { motif: motifRefus.trim(), par: president.trim() }));
     if (res) onFait();
   };
@@ -562,18 +573,19 @@ function FichePret({ pret, groupId, membres, utilisateur, nomGroupe, onFermer, o
                 <tr key={r.id} className={r.annule ? "est-annule" : ""}>
                   <td>{versDateFr(r.date)}</td><td className="m">{LIBELLE_SOURCE[r.source] || r.source}</td>
                   <td className="d num">{fmtF(r.montant)}</td><td className="d num">{fmtF(r.penalites)}</td><td className="d num bq-or">{fmtF(r.interets)}</td><td className="d num">{fmtF(r.capital)}</td>
-                  <td className="d">{r.annule ? <Pastille ton="rouge" title={r.annuleMotif}>Annulé</Pastille> : <button type="button" className="adm-btn-ligne" onClick={() => onAnnulerRemb(pret, r)} aria-label="Annuler ce remboursement"><Undo2 size={14} aria-hidden="true" /></button>}</td>
+                  <td className="d">{r.annule ? <Pastille ton="rouge" title={r.annuleMotif}>Annulé</Pastille> : onAnnulerRemb && <button type="button" className="adm-btn-ligne" onClick={() => onAnnulerRemb(pret, r)} aria-label="Annuler ce remboursement"><Undo2 size={14} aria-hidden="true" /></button>}</td>
                 </tr>
               ))}</tbody>
             </table>
           )}
-          {e.totalDu > 0 && <button type="button" className="adm-btn adm-btn-action bq-plein" onClick={() => onRegler(pret)}>Enregistrer un remboursement</button>}
+          {e.totalDu > 0 && peut("credits", "saisir") && <button type="button" className="adm-btn adm-btn-action bq-plein" onClick={() => onRegler(pret)}>Enregistrer un remboursement</button>}
         </>
       )}
 
-      {pret.statutBase === "en attente" && (
+      {pret.statutBase === "en attente" && !peut("credits", "valider") && <Message ton="attente">En attente de validation par le Président (ou le poste qui valide les crédits).</Message>}
+      {pret.statutBase === "en attente" && peut("credits", "valider") && (
         <>
-          <h3 className="bq-section">Validation du Président</h3>
+          <h3 className="bq-section">Validation</h3>
           <Champ label="Nom du Président qui décide"><input className="adm-input" value={president} onChange={(ev) => setPresident(ev.target.value)} placeholder="ex. Paul Ewane" /></Champ>
           <Champ label="Motif en cas de refus"><input className="adm-input" value={motifRefus} onChange={(ev) => setMotifRefus(ev.target.value)} /></Champ>
           <Message>{erreur}</Message>
@@ -621,6 +633,7 @@ function ReglementPret({ pret, groupId, utilisateur, onFermer, onFait }) {
     for (const s of sources) if (s.dispo !== undefined && nombre(lignes[s.cle]) > s.dispo) { setErreur(`${s.libelle} : seulement ${fmtF(s.dispo)} disponible.`); return; }
     const choisies = sources.filter((s) => nombre(lignes[s.cle]) > 0).map((s) => ({ source: s.source, refId: s.refId, montant: nombre(lignes[s.cle]) }));
     const res = await executer({
+      module: "credits",
       titre: "Enregistrer ce remboursement ?",
       lignes: [["Membre", pret.membre], ["Date", versDateFr(dISO)], ...choisies.map((c) => [sources.find((s) => s.source === c.source && s.refId === c.refId)?.libelle, fmtF(c.montant)]),
         ["Pénalités (compte de la réunion)", fmtF(rep.penalites)], ["Intérêts (cagnotte)", fmtF(rep.interets)], ["Capital", fmtF(rep.capital)], ["Reste dû après", fmtF(reste)]],
@@ -677,7 +690,7 @@ function Historique({ mouvements, onAnnuler }) {
               <td className="d num"><b>{fmtF(m.montant)}</b></td><td className="d num m">{m.solde !== null && m.solde !== undefined ? fmtF(m.solde) : "—"}</td>
               <td className="d">{m.annule
                 ? <span className="bq-annule-info" title={`${m.annuleMotif || ""} — ${m.annulePar || ""}`}><Pastille ton="rouge">Annulé</Pastille></span>
-                : ["Versement", "Retrait"].includes(m.type) && !m.pretId && <button type="button" className="adm-btn-ligne" onClick={() => onAnnuler(m)}><Undo2 size={14} aria-hidden="true" /> Annuler</button>}</td>
+                : onAnnuler && ["Versement", "Retrait"].includes(m.type) && !m.pretId && <button type="button" className="adm-btn-ligne" onClick={() => onAnnuler(m)}><Undo2 size={14} aria-hidden="true" /> Annuler</button>}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -697,6 +710,7 @@ function Annulation({ demande, groupId, utilisateur, onFermer, onFait }) {
     setErreur("");
     if (!motif.trim()) { setErreur("Le motif est obligatoire."); return; }
     const res = await executer({
+      module: "annulations", niveau: "valider",
       titre: "Annuler cette opération ?",
       lignes: [["Opération", demande.type === "remboursement" ? `Remboursement — ${demande.pret.membre}` : `${o.type} — ${o.membre}`], ["Date", versDateFr(o.date)], ["Montant", fmtF(o.montant)], ["Motif", motif]],
       alertes: ["La ligne restera visible, barrée, avec ce motif et ton nom."],
@@ -725,7 +739,7 @@ function CompteReunion({ compte, onEcrire }) {
     <>
       <div className="bq-resume">
         <span>Solde du compte de la réunion : <b className="num">{fmtF(compte.solde)}</b></span>
-        <button type="button" className="adm-btn-ligne" onClick={onEcrire}><Wallet size={14} aria-hidden="true" /> Ajouter une entrée ou une sortie</button>
+        {onEcrire && <button type="button" className="adm-btn-ligne" onClick={onEcrire}><Wallet size={14} aria-hidden="true" /> Ajouter une entrée ou une sortie</button>}
       </div>
       <div className="bq-table-cadre">
         <table className="bq-table">
@@ -757,7 +771,7 @@ function EcritureCompte({ groupId, utilisateur, onFermer, onFait }) {
     const m = nombre(montant);
     const d = versDateISO(date);
     if (!m || !d || !libelle.trim()) { setErreur("Montant, date et motif sont obligatoires."); return; }
-    const res = await executer({ titre: sens === "sortie" ? "Enregistrer cette sortie ?" : "Enregistrer cette entrée ?", lignes: [["Date", versDateFr(d)], ["Motif", libelle], ["Montant", `${sens === "sortie" ? "−" : "+"} ${fmtF(m)}`]] },
+    const res = await executer({ module: "banque", niveau: "valider", titre: sens === "sortie" ? "Enregistrer cette sortie ?" : "Enregistrer cette entrée ?", lignes: [["Date", versDateFr(d)], ["Motif", libelle], ["Montant", `${sens === "sortie" ? "−" : "+"} ${fmtF(m)}`]] },
       () => ecrireCompteReunion(groupId, { date: d, montant: sens === "sortie" ? -m : m, origine: sens === "sortie" ? "depense" : "autre", libelle: libelle.trim(), saisiPar: utilisateur }));
     if (res) onFait();
   };

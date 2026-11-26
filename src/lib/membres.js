@@ -22,6 +22,7 @@ export async function fetchMembres(groupId) {
       type_membre,
       statut,
       created_at,
+      poste_id, is_admin, is_president,
       poste:postes_bureau ( nom ),
       profile:profiles ( id, nom_complet, telephone, email, identifiant, auth_user_id )
     `)
@@ -38,6 +39,9 @@ export async function fetchMembres(groupId) {
     email: m.profile?.email || "",
     identifiant: m.profile?.identifiant || "",
     role: m.type_membre === "Membre du bureau" ? (m.poste?.nom || "Bureau") : "Membre",
+    posteId: m.poste_id || null,
+    isAdmin: !!m.is_admin,
+    isPresident: !!m.is_president,
     statut: m.statut,
     compteActive: !!m.profile?.auth_user_id,
   }));

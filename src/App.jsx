@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre, reinitialiserMotDePasseMembre, televerserDocumentMembre, fetchDocumentsMembre } from "./lib/membres";
 import { fetchTypesFonds, creerTypeFonds, supprimerTypeFonds, fetchFondsTousMembres, fixerCibleTypeFonds, enregistrerVersementFonds, fetchFondsMembre } from "./lib/fonds";
 import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse } from "./lib/auth";
@@ -20,6 +20,9 @@ import { useConfirmation } from "./ui/Confirmation";
 import { fetchCompteReunion } from "./lib/banque2";
 import { fetchSommesGardees, fetchDettes, fetchReglesGroupe } from "./lib/caisse";
 import LecturesModule from "./banque/LecturesModule";
+import PostesModule, { AValider, compterAValider } from "./banque/PostesModule";
+import { fetchPostes, attribuerPoste, droitsEffectifs, peut as peutDroit, MODULES as MODULES_DROITS } from "./lib/postes";
+import { DroitsProvider } from "./ui/Droits";
 import { soumettreOperation, fetchOperationsEnAttente, LECTURES_DEFAUT } from "./lib/lectures";
 import { fetchTableauDeBordMembre } from "./lib/moncompte";
 
@@ -452,7 +455,7 @@ export default function AppPrototype() {
         ) : groupeAdmin && vueEspacePersonnel ? (
           <MembreScreen groupId={groupeAdmin.group?.id} nomGroupe={groupeAdmin.group?.nom} profileId={monProfil?.id} nomComplet={monProfil?.nom_complet} />
         ) : groupeAdmin ? (
-          <AdminGroupeScreen groupId={groupeAdmin.group?.id} nomGroupe={groupeAdmin.group?.nom} utilisateur={monProfil?.nom_complet || ""} />
+          <AdminGroupeScreen groupId={groupeAdmin.group?.id} nomGroupe={groupeAdmin.group?.nom} utilisateur={monProfil?.nom_complet || ""} monMembre={groupeAdmin} />
         ) : groupeMembreSimple ? (
           <MembreScreen groupId={groupeMembreSimple.group?.id} nomGroupe={groupeMembreSimple.group?.nom} profileId={monProfil?.id} nomComplet={monProfil?.nom_complet} />
         ) : (
@@ -2040,8 +2043,8 @@ function SuperAdminScreen() {
 // ============================================================
 // ÉCRAN 3 — ADMIN DE GROUPE (modules Tontine / Banque / Assurance / Bilan / Membres)
 // ============================================================
-function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
-  const { confirmer: confirmerFenetre, succes: succesOp, executer: executerOp } = useConfirmation();
+function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "", monMembre = null }) {
+  const { confirmer: confirmerFenetre, succes: succesOp, executer: executerOp, definirGarde } = useConfirmation();
   const confirmerOp = (titre, options = {}) => confirmerFenetre({ titre, ...options });
   const fmtFCFA = (n) => `${Math.round(n).toLocaleString("fr-FR")} FCFA`;
 
@@ -2098,6 +2101,38 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
     return `${a.padStart(4, "0")}-${m.padStart(2, "0")}-${j.padStart(2, "0")}`;
   };
   const [view, setView] = useState("tontine");
+
+  // ---------- Postes du bureau et droits ----------
+  const [postesBureau, setPostesBureau] = useState([]);
+  const [postesCharges, setPostesCharges] = useState(false);
+  useEffect(() => {
+    if (!groupId) return;
+    fetchPostes(groupId).then(setPostesBureau).catch(() => setPostesBureau([])).finally(() => setPostesCharges(true));
+  }, [groupId]);
+  const droits = useMemo(() => droitsEffectifs(monMembre, postesBureau), [monMembre, postesBureau]);
+  const posteActuel = postesBureau.find((p) => p.id === monMembre?.poste_id) || null;
+  const peut = (module, niveau = "lire") => peutDroit(droits, module, niveau);
+  const MODULE_DE_VUE = { seances: "seances", tontine: "tontine", banque: "banque", caisse: "caisse", lectures: "lectures", assurance: "assurance", fonds: "fonds", depenses: "depenses", depots: "depots", bilan: "bilan", sms: "sms", membres: "membres", postes: "postes" };
+  // Chaque opération est vérifiée : saisir par défaut, valider pour une
+  // suppression ou une action irréversible.
+  useEffect(() => {
+    definirGarde((opt) => {
+      const module = opt.module || MODULE_DE_VUE[view];
+      if (!module) return null;
+      const niveau = opt.niveau || (opt.danger ? "valider" : "saisir");
+      if (peutDroit(droits, module, niveau)) return null;
+      const libelle = MODULES_DROITS.find((m) => m.cle === module)?.libelle || module;
+      return `« ${libelle} » : votre poste${posteActuel ? ` (${posteActuel.nom})` : ""} ne permet pas de ${niveau === "valider" ? "valider ou supprimer" : "saisir"}. Demandez au Président.`;
+    });
+    return () => definirGarde(null);
+  }, [droits, view, posteActuel]);
+  const [nbAValider, setNbAValider] = useState(0);
+  const valideQuelqueChose = peut("credits", "valider") || peut("lectures", "valider");
+  useEffect(() => {
+    if (groupId && valideQuelqueChose) compterAValider(groupId).then(setNbAValider).catch(() => setNbAValider(0));
+  }, [groupId, view, valideQuelqueChose]);
+  const [banqueOnglet, setBanqueOnglet] = useState("epargnes");
+  const allerA = (vue, onglet) => { if (onglet) setBanqueOnglet(onglet); setView(vue); };
   const [showCreateTontine, setShowCreateTontine] = useState(false);
   const [tontineNom, setTontineNom] = useState("");
   const [tontineMontant, setTontineMontant] = useState("");
@@ -2522,6 +2557,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
   const [deleteErreur, setDeleteErreur] = useState("");
   const [editMembre, setEditMembre] = useState(null);
   const [editNom, setEditNom] = useState("");
+  const [editPoste, setEditPoste] = useState(""); // "" = inchangé / aucun, "__aucun__" = retirer du bureau
   const [editEmail, setEditEmail] = useState("");
   const [editTelephone, setEditTelephone] = useState("");
   const [editError, setEditError] = useState("");
@@ -2548,7 +2584,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
   const [parrain, setParrain] = useState("");
   const [roleType, setRoleType] = useState("Membre simple");
   const [postes, setPostes] = useState(["Président", "Secrétaire général", "Trésorier", "Comptable", "Commissaire aux comptes", "Censeur"]);
-  const [posteChoisi, setPosteChoisi] = useState("Président");
+  const [posteChoisi, setPosteChoisi] = useState("");
   const [showNewPoste, setShowNewPoste] = useState(false);
   const [newPosteName, setNewPosteName] = useState("");
   const addPoste = () => {
@@ -2782,6 +2818,16 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
   };
   useEffect(() => { if (view === "depenses" || view === "bilan") rechargerDepenses(); }, [groupId, view]);
 
+  // Si l'écran affiché n'est pas permis au poste, on va au premier permis.
+  useEffect(() => {
+    if (!postesCharges) return;
+    const module = MODULE_DE_VUE[view];
+    if (module && !peut(module, "lire")) {
+      const premier = ["tontine", "seances", "banque", "caisse", "lectures", "assurance", "fonds", "depenses", "depots", "bilan", "sms", "membres", "postes"].find((v) => peut(MODULE_DE_VUE[v], "lire"));
+      if (premier) setView(premier);
+    }
+  }, [postesCharges, droits, view]);
+
   // Deux lectures avant validation (réglable par groupe)
   const [reglesGroupe, setReglesGroupe] = useState(null);
   const [nbLectures, setNbLectures] = useState(0);
@@ -2873,13 +2919,14 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
   ) : (
     <div className="app-layout" style={{ minHeight: "680px", background: C.bg, display: "flex", color: C.ink }}>
       <Sidebar
-        role="Admin Groupe" sub={nomGroupe || "—"} logoUrl={logoGroupeUrlSidebar}
+        role={posteActuel?.nom || (monMembre?.is_president ? "Président" : "Admin Groupe")} sub={nomGroupe || "—"} logoUrl={logoGroupeUrlSidebar}
         items={[
+          ...(valideQuelqueChose ? [{ icon: <CheckCircle2 size={16} />, label: "À valider", key: "avalider", badge: nbAValider || null, alerte: nbAValider > 0 }] : []),
           { icon: <Calendar size={16} />, label: "Séances", key: "seances" },
           { icon: <Banknote size={16} />, label: "Tontine", key: "tontine" },
           { icon: <PiggyBank size={16} />, label: "Banque", key: "banque" },
           { icon: <Coins size={16} />, label: "Caisse", key: "caisse" },
-          { icon: <ListChecks size={16} />, label: nbLectures ? `Lectures (${nbLectures})` : "Lectures", key: "lectures" },
+          { icon: <ListChecks size={16} />, label: "Lectures", key: "lectures", badge: nbLectures || null },
           { icon: <HeartHandshake size={16} />, label: "Assurance", key: "assurance" },
           { icon: <Wallet size={16} />, label: "Fonds", key: "fonds" },
           { icon: <ShoppingCart size={16} />, label: "Dépenses", key: "depenses" },
@@ -2887,7 +2934,9 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
           { icon: <FileBarChart size={16} />, label: "Bilan", key: "bilan" },
           { icon: <Repeat size={16} />, label: "SMS", key: "sms" },
           { icon: <UserCog size={16} />, label: "Membres", key: "membres" },
-        ]}
+          { icon: <ShieldCheck size={16} />, label: "Postes et droits", key: "postes" },
+        ].filter((it) => !MODULE_DE_VUE[it.key] || peut(MODULE_DE_VUE[it.key], "lire"))
+         .map((it) => ({ ...it, badge: it.badge ?? (MODULE_DE_VUE[it.key] && !peut(MODULE_DE_VUE[it.key], "saisir") ? "lire" : null) }))}
         active={view} onSelect={setView}
       />
       <div className="app-main" style={{ flex: 1, minWidth: 0 }}>
@@ -3042,16 +3091,32 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
           </>
         )}
 
+        {view === "avalider" && (
+          <AValider groupId={groupId} droits={droits} onAller={allerA} />
+        )}
+
+        {view === "postes" && (
+          <DroitsProvider droits={droits}>
+            <PostesModule groupId={groupId} membres={membres} droits={droits}
+              onChange={(p, membresChanges) => { setPostesBureau(p); if (membresChanges) rechargerMembres(); }} />
+          </DroitsProvider>
+        )}
+
         {view === "lectures" && (
-          <LecturesModule groupId={groupId} nomGroupe={nomGroupe} membres={membres} utilisateur={utilisateur} onChange={setNbLectures} />
+          <DroitsProvider droits={droits}>
+            <LecturesModule groupId={groupId} nomGroupe={nomGroupe} membres={membres} utilisateur={utilisateur} onChange={setNbLectures} />
+          </DroitsProvider>
         )}
 
         {view === "caisse" && (
-          <CaisseModule groupId={groupId} nomGroupe={nomGroupe} membres={membres} utilisateur={utilisateur} />
+          <DroitsProvider droits={droits}><CaisseModule groupId={groupId} nomGroupe={nomGroupe} membres={membres} utilisateur={utilisateur} /></DroitsProvider>
         )}
 
         {view === "banque" && (
+          <DroitsProvider droits={droits}>
           <BanqueModule
+            key={banqueOnglet}
+            ongletInitial={banqueOnglet}
             groupId={groupId}
             nomGroupe={nomGroupe}
             membres={membres}
@@ -3060,6 +3125,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
             onCotisation={() => { setCotisationEpargneId(""); setCotisationDate(""); setCotisationMontants({}); setCotisationBanqueErreur(""); setShowCotisationBanque(true); }}
             onCreerEpargne={() => { setEpargneNom(""); setEpargneCotisation(""); setEpargneTaux(""); setEpargneCloture(""); setEpargneType("Personnalisée"); setEpargneError(""); setEpargneSuccess(false); setShowCreateEpargne(true); }}
           />
+          </DroitsProvider>
         )}
 
         {view === "fonds" && (
@@ -3808,6 +3874,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                     onClick={async () => {
                       setEditMembre(m);
                       setEditNom(m.nom);
+                      setEditPoste(m.posteId || "");
                       setEditEmail(m.email || "");
                       setEditTelephone(m.telephone || "");
                       setEditError("");
@@ -5122,6 +5189,7 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
             </div>
           </div>
 
+          {peut("postes", "valider") && (
           <div>
             <label className="adm-label">Type de membre</label>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -5136,40 +5204,17 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
               ))}
             </div>
           </div>
+          )}
 
-          {roleType === "Membre du bureau" && (
+          {peut("postes", "valider") && roleType === "Membre du bureau" && (
             <div>
-              <label className="adm-label">Poste</label>
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                <select
-                  value={posteChoisi}
-                  onChange={(e) => setPosteChoisi(e.target.value)}
-                  className="adm-input adm-flex"
-                >
-                  {postes.map((p) => <option key={p}>{p}</option>)}
-                </select>
-                <button
-                  onClick={() => setShowNewPoste(!showNewPoste)}
-                  className="adm-btn-mini adm-btn-mini-doux"
-                >
-                  <Plus size={14} />
-                </button>
-              </div>
-              {showNewPoste && (
-                <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
-                  <input
-                    value={newPosteName}
-                    onChange={(e) => setNewPosteName(e.target.value)}
-                    placeholder="Ex. Chargé des sanctions"
-                    className="adm-input adm-input-compact adm-flex"
-                  />
-                  <button onClick={addPoste} className="adm-btn-mini">
-                    Ajouter
-                  </button>
-                </div>
-              )}
+              <label className="adm-label" htmlFor="invite-poste">Poste au bureau</label>
+              <select id="invite-poste" value={posteChoisi} onChange={(e) => setPosteChoisi(e.target.value)} className="adm-input">
+                <option value="">Choisir un poste</option>
+                {postesBureau.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
+              </select>
               <div className="adm-aide">
-                Les membres du bureau ont des accès plus avancés que les membres simples.
+                Les droits de chaque poste se règlent dans « Postes et droits », où vous pouvez aussi créer d'autres postes.
               </div>
             </div>
           )}
@@ -5209,15 +5254,18 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                 setInviteSuccess(false);
                 return;
               }
+              if (roleType === "Membre du bureau" && !posteChoisi) { setInviteError("Choisis le poste au bureau."); return; }
               if (!(await confirmerOp("Inviter ce membre ?"))) return;
               try {
                 const resultat = await inviterMembre(groupId, {
                   nom: inviteNom.trim(),
                   email: inviteEmail.trim(),
                   telephone: inviteTelephone.trim(),
-                  typeMembre: roleType,
-                  posteId: null, // ⚠️ à relier au vrai id du poste choisi (table postes_bureau) une fois les postes créés en base
+                  typeMembre: "Membre simple",
+                  posteId: null,
                 }); succesOp();
+                // Le poste (et l'accès bureau) est attribué juste après, par la base.
+                if (roleType === "Membre du bureau" && posteChoisi) await attribuerPoste(resultat.membre.id, posteChoisi);
 
                 // Enregistre un éventuel versement immédiat vers le
                 // "Fonds de garantie" (l'objectif, lui, est commun à
@@ -5493,6 +5541,22 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
           <FormField label="Nom complet" placeholder="Ex. André Fotso" value={editNom} onChange={(e) => setEditNom(e.target.value)} />
           <FormField label="Email" placeholder="Ex. andre.fotso@exemple.com" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
           <FormField label="Téléphone" placeholder="Ex. 6XX XXX XXX" value={editTelephone} onChange={(e) => setEditTelephone(e.target.value)} />
+          {peut("postes", "valider") && (
+            <div>
+              <label className="adm-label" htmlFor="edit-poste">Poste au bureau</label>
+              <select id="edit-poste" className="adm-input" value={editPoste} onChange={(e) => setEditPoste(e.target.value)}>
+                {!editMembre.posteId && editMembre.isAdmin
+                  ? <><option value="">Accès complet (sans poste, inchangé)</option><option value="__aucun__">Aucun — membre simple</option></>
+                  : <option value="">Aucun — membre simple</option>}
+                {postesBureau.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
+              </select>
+              {editPoste && editPoste !== "__aucun__" && (
+                <div className="adm-aide">
+                  Ce que ce poste pourra faire : {MODULES_DROITS.filter((m) => peutDroit(postesBureau.find((p) => p.id === editPoste)?.droits, m.cle, "saisir")).map((m) => m.libelle).join(", ") || "consulter seulement"}.
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <label style={{ fontSize: "13px", color: C.sub, marginBottom: "8px", display: "block" }}>Documents</label>
@@ -5573,6 +5637,12 @@ function AdminGroupeScreen({ groupId, nomGroupe, utilisateur = "" }) {
                   email: editEmail.trim(),
                   telephone: editTelephone.trim(),
                 }); succesOp();
+                // Poste au bureau (et accès) : seulement s'il a changé
+                const ancienPoste = editMembre.posteId || "";
+                const legacyInchange = !editMembre.posteId && editMembre.isAdmin && editPoste === "";
+                if (peut("postes", "valider") && !legacyInchange && (editPoste === "__aucun__" ? (editMembre.posteId || editMembre.isAdmin) : editPoste !== ancienPoste)) {
+                  await attribuerPoste(editMembre.id, editPoste === "__aucun__" ? null : (editPoste || null));
+                }
                 await rechargerMembres();
                 setEditError("");
                 setEditSuccess(true);
@@ -7784,6 +7854,7 @@ function Sidebar({ role, sub, items, active, onSelect, logoUrl }) {
             >
               <span className="sidebar-icone" aria-hidden="true">{item.icon}</span>
               <span>{item.label}</span>
+              {item.badge ? <span className={`sidebar-badge${item.alerte ? " est-alerte" : ""}`}>{item.badge}</span> : null}
             </button>
           </li>
         ))}

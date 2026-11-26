@@ -69,7 +69,7 @@ export async function getMesGroupes() {
   const { data, error } = await supabase
     .from("group_members")
     .select(`
-      id, is_admin, is_president, statut, type_membre,
+      id, is_admin, is_president, statut, type_membre, poste_id,
       group:groups ( id, nom, slug )
     `)
     .eq("profile_id", monProfil.id)
