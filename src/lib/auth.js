@@ -88,13 +88,36 @@ export async function demanderReinitialisationMotDePasse(identifiant) {
     "get_email_pour_identifiant",
     { p_identifiant: identifiant }
   );
-  if (lookupError) throw lookupError;
-  if (!email) throw new Error("Identifiant introuvable.");
+  if (lookupError) throw new Error("Vérification impossible pour le moment. Réessaie dans un instant.");
+  if (!email) throw new Error("Identifiant introuvable. Vérifie l'orthographe (ex. jeanne41).");
 
+  // Le lien ramène sur la page d'où vient la demande (ex. /armens), pour
+  // retrouver la page de son groupe.
+  const chemin = window.location.pathname && window.location.pathname !== "/" ? window.location.pathname : "";
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin,
+    redirectTo: `${window.location.origin}${chemin}`,
   });
-  if (error) throw error;
+  if (error) {
+    if (error.status === 429 || /rate limit|too many|security purposes/i.test(error.message || "")) {
+      throw new Error("Trop de demandes : attends quelques minutes avant de réessayer.");
+    }
+    throw new Error("L'e-mail n'a pas pu être envoyé. Si cela continue, demande à l'administrateur de ton groupe de réinitialiser ton mot de passe (Membres → Accès d'urgence).");
+  }
+  return email;
+}
+
+// Un lien de réinitialisation expiré ou déjà utilisé revient avec une
+// erreur dans l'adresse : on la lit, on l'efface, et on l'explique.
+export function lireErreurLienEmail() {
+  const brut = `${window.location.hash.replace(/^#/, "")}&${window.location.search.replace(/^\?/, "")}`;
+  const params = new URLSearchParams(brut);
+  const code = params.get("error_code") || params.get("error");
+  if (!code) return "";
+  window.history.replaceState(null, "", window.location.pathname);
+  if (/otp_expired|expired/i.test(`${code} ${params.get("error_description") || ""}`)) {
+    return "Ce lien de réinitialisation a expiré ou a déjà été utilisé. Fais une nouvelle demande avec « Mot de passe oublié » : le lien est valable 1 heure et ne sert qu'une fois.";
+  }
+  return "Ce lien n'est pas valable. Fais une nouvelle demande avec « Mot de passe oublié ».";
 }
 
 // Écoute les changements de connexion/déconnexion en direct

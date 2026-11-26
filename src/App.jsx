@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre, reinitialiserMotDePasseMembre, televerserDocumentMembre, fetchDocumentsMembre } from "./lib/membres";
 import { fetchTypesFonds, creerTypeFonds, supprimerTypeFonds, fetchFondsTousMembres, fixerCibleTypeFonds, enregistrerVersementFonds, fetchFondsMembre } from "./lib/fonds";
-import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse } from "./lib/auth";
+import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse, lireErreurLienEmail } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement, televerserLogoGroupe, fetchLogoGroupe, modifierGroupe, suspendreGroupe, reactiverGroupe, fetchStatsPlateforme, fetchSoldeSms, vendreCreditsSms, definirBlocageSms, fetchHistoriqueSms, fetchSmsSenderId, definirSmsSenderId, fetchVitrineGroupe, genererSlug, SLUGS_RESERVES } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere, fetchApercuRedistribution, redistribuerCommission, fetchTotalRedistributions } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit, fetchApercuCloture, cloturerEpargne } from "./lib/banque";
@@ -270,7 +270,8 @@ export default function AppPrototype() {
   const [statutAbonnement, setStatutAbonnement] = useState(null);
   // Message affiché sur la page de connexion quand un compte est refusé
   // sur le lien d'un groupe (Super Admin, ou membre d'un autre groupe).
-  const [refusLienGroupe, setRefusLienGroupe] = useState("");
+  // (aussi : lien de réinitialisation expiré ou déjà utilisé)
+  const [refusLienGroupe, setRefusLienGroupe] = useState(() => lireErreurLienEmail());
 
   const chargerSessionEtRole = async () => {
     setChargementSession(true);
@@ -558,7 +559,7 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode, messageRefus = ""
       setOubliSuccess(true);
     } catch (e) {
       console.error("Erreur de demande de réinitialisation", e);
-      setOubliErreur("Identifiant introuvable, ou erreur lors de l'envoi.");
+      setOubliErreur(e.message || "Erreur lors de l'envoi. Réessaie.");
     } finally {
       setOubliChargement(false);
     }
@@ -767,10 +768,11 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode, messageRefus = ""
                       <AlertTriangle size={16} aria-hidden="true" /> {oubliErreur}
                     </div>
                   )}
+                  <p className="carte-auth-aide">Pas d'adresse e-mail, ou rien reçu ? L'administrateur de ton groupe peut te donner un mot de passe provisoire (Membres → Accès d'urgence).</p>
                   {oubliSuccess && (
                     <div className="message message-succes" role="status">
                       <Mail size={16} aria-hidden="true" />
-                      Email envoyé ! Ouvre le lien reçu pour choisir un nouveau mot de passe.
+                      E-mail envoyé ! Ouvre le lien reçu pour choisir un nouveau mot de passe. Regarde aussi dans les courriers indésirables (spams). Le lien est valable 1 heure et ne sert qu'une fois.
                     </div>
                   )}
 
