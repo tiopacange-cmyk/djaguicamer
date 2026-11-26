@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { compresserImage, PROFILS_IMAGE } from "./images";
 
 // Génère un mot de passe temporaire lisible (ex. Tontine-4821)
 function genererMotDePasseTemp() {
@@ -316,11 +317,14 @@ export async function renouvelerAbonnement(groupId, formule, periodicite) {
 // ============================================================
 // LOGO DU GROUPE
 // ============================================================
-export async function televerserLogoGroupe(groupId, fichier) {
+export async function televerserLogoGroupe(groupId, fichierOriginal) {
+  // Logo réduit à 512 px et compressé avant l'envoi (une photo de
+  // téléphone de plusieurs Mo devient quelques dizaines de Ko).
+  const fichier = await compresserImage(fichierOriginal, PROFILS_IMAGE.logo);
   const extension = fichier.name.split(".").pop();
   const chemin = `${groupId}/logo-${Date.now()}.${extension}`;
 
-  const { error: errUpload } = await supabase.storage.from("logos-groupes").upload(chemin, fichier);
+  const { error: errUpload } = await supabase.storage.from("logos-groupes").upload(chemin, fichier, { contentType: fichier.type, cacheControl: "31536000" });
   if (errUpload) throw errUpload;
 
   const { data: urlData } = supabase.storage.from("logos-groupes").getPublicUrl(chemin);

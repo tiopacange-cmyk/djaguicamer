@@ -579,7 +579,7 @@ function ConnexionScreen({ onLoggedIn, sombre, onBasculerMode, messageRefus = ""
           {groupe ? (
             <div className="accueil-logo accueil-logo-groupe">
               {groupe.logo_url ? (
-                <img className="accueil-logo-image" src={groupe.logo_url} alt={`Logo ${groupe.nom}`} />
+                <img className="accueil-logo-image" src={groupe.logo_url} alt={`Logo ${groupe.nom}`} decoding="async" fetchPriority="high" />
               ) : (
                 <div className="accueil-logo-mark" aria-hidden="true">
                   <MarqueCauri taille={30} couleur="#16225A" fond="#FFFFFF" />
@@ -1748,7 +1748,7 @@ function SuperAdminScreen() {
             <label className="adm-label">Logo du groupe</label>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               {modifierGroupeLogo ? (
-                <img src={modifierGroupeLogo} alt="Logo" style={{ width: "44px", height: "44px", borderRadius: "9px", objectFit: "cover", border: `1px solid ${C.border}` }} />
+                <img src={modifierGroupeLogo} alt="Logo" width="44" height="44" loading="lazy" decoding="async" style={{ width: "44px", height: "44px", borderRadius: "9px", objectFit: "cover", border: `1px solid ${C.border}` }} />
               ) : (
                 <div style={{ width: "44px", height: "44px", borderRadius: "9px", background: C.sunken, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Building2 size={18} color={C.sub} />
@@ -1919,7 +1919,7 @@ function SuperAdminScreen() {
                 <div style={{ marginBottom: "8px" }}>Logo du groupe (optionnel)</div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   {logoGroupeUrl && (
-                    <img src={logoGroupeUrl} alt="Logo" style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "cover" }} />
+                    <img src={logoGroupeUrl} alt="Logo" width="36" height="36" loading="lazy" decoding="async" style={{ width: "36px", height: "36px", borderRadius: "8px", objectFit: "cover" }} />
                   )}
                   <input
                     type="file"
@@ -7504,7 +7504,7 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
       <header className="tdb-entete">
         <div className="tdb-entete-inner">
           {maPhotoUrl ? (
-            <img src={maPhotoUrl} alt="" className="tdb-avatar" />
+            <img src={maPhotoUrl} alt="" className="tdb-avatar" loading="lazy" decoding="async" />
           ) : (
             <div className="tdb-avatar tdb-avatar-initiales" aria-hidden="true">{initiales(nomComplet)}</div>
           )}
@@ -7513,7 +7513,7 @@ function MembreScreen({ groupId, nomGroupe, profileId, nomComplet }) {
             <h1 className="tdb-nom">{nomComplet || "—"}</h1>
             <div className="tdb-groupe">{nomGroupe || "—"}</div>
           </div>
-          {logoGroupeUrl && <img src={logoGroupeUrl} alt={`Logo de ${nomGroupe || "ton groupe"}`} className="tdb-logo-groupe" />}
+          {logoGroupeUrl && <img src={logoGroupeUrl} alt={`Logo de ${nomGroupe || "ton groupe"}`} className="tdb-logo-groupe" decoding="async" />}
         </div>
         {monCompte && (
           <div className="tdb-entete-inner tdb-pastilles">
@@ -7762,7 +7762,7 @@ function Sidebar({ role, sub, items, active, onSelect, logoUrl }) {
     <nav className="app-sidebar" aria-label="Navigation de l'espace">
       <div className="sidebar-header">
         {logoUrl ? (
-          <img src={logoUrl} alt="" className="sidebar-logo" />
+          <img src={logoUrl} alt="" className="sidebar-logo" decoding="async" />
         ) : (
           <div className="sidebar-logo sidebar-logo-defaut" aria-hidden="true">
             <MarqueCauri taille={28} couleur="#16225A" fond="#FFFFFF" />

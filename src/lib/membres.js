@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { compresserImage, PROFILS_IMAGE } from "./images";
 
 function genererIdentifiant(nom) {
   return nom.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
@@ -217,11 +218,14 @@ export async function supprimerMembre(groupMemberId) {
 // DOCUMENTS DU MEMBRE (photo, CNI, plan de localisation)
 // ============================================================
 
-export async function televerserDocumentMembre(groupMemberId, type, fichier) {
+export async function televerserDocumentMembre(groupMemberId, type, fichierOriginal) {
+  // Photo réduite à 600 px ; CNI et plan à 1600 px (restent lisibles).
+  // Les PDF sont envoyés tels quels.
+  const fichier = await compresserImage(fichierOriginal, type === "photo" ? PROFILS_IMAGE.photo : PROFILS_IMAGE.document);
   const extension = fichier.name.split(".").pop();
   const chemin = `${groupMemberId}/${type}-${Date.now()}.${extension}`;
 
-  const { error: errUpload } = await supabase.storage.from("documents-membres").upload(chemin, fichier);
+  const { error: errUpload } = await supabase.storage.from("documents-membres").upload(chemin, fichier, { contentType: fichier.type, cacheControl: "31536000" });
   if (errUpload) throw errUpload;
 
   const { data: urlData } = supabase.storage.from("documents-membres").getPublicUrl(chemin);
