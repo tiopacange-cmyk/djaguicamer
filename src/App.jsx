@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { fetchMembres, inviterMembre, validerMembre, modifierMembre, toggleActifMembre, fetchMonCompteMembre, supprimerMembre, reinitialiserMotDePasseMembre, televerserDocumentMembre, fetchDocumentsMembre } from "./lib/membres";
 import { fetchTypesFonds, creerTypeFonds, supprimerTypeFonds, fetchFondsTousMembres, fixerCibleTypeFonds, enregistrerVersementFonds, fetchFondsMembre } from "./lib/fonds";
-import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse, lireErreurLienEmail } from "./lib/auth";
+import { signIn, signOut, getSession, getMonProfil, getMesGroupes, onAuthStateChange, demanderReinitialisationMotDePasse, lireErreurLienEmail, lireLienRecuperation, reinitialiserAvecLien } from "./lib/auth";
 import { fetchGroupes, creerGroupeAvecAdmin, fetchAdminsDesGroupes, reinitialiserMotDePasseDirect, changerMotDePasse, fetchAuditLog, fetchPlansTarifaires, modifierPlanTarifaire, fetchStatutAbonnement, renouvelerAbonnement, televerserLogoGroupe, fetchLogoGroupe, modifierGroupe, suspendreGroupe, reactiverGroupe, fetchStatsPlateforme, fetchSoldeSms, vendreCreditsSms, definirBlocageSms, fetchHistoriqueSms, fetchSmsSenderId, definirSmsSenderId, fetchVitrineGroupe, genererSlug, SLUGS_RESERVES } from "./lib/groups";
 import { fetchTontineActive, creerTontine, verserTour, enregistrerCotisationsTontine, fetchCotisationsTour, appliquerAmendeTontine, ajouterMembreAuCycle, enregistrerEnchere, fetchApercuRedistribution, redistribuerCommission, fetchTotalRedistributions } from "./lib/tontine";
 import { fetchEpargnes, creerEpargne, enregistrerCotisationsEpargne, fetchHistoriqueEpargnes, fetchPrets, mettreEnPlaceCredit, fetchApercuCloture, cloturerEpargne } from "./lib/banque";
@@ -266,6 +266,8 @@ export default function AppPrototype() {
   const [monProfil, setMonProfil] = useState(null);
   const [mesGroupes, setMesGroupes] = useState([]);
   const [modeRecuperation, setModeRecuperation] = useState(false);
+  // Lien « sûr » reçu par e-mail (vérifié seulement au clic sur Enregistrer)
+  const [lienRecuperation, setLienRecuperation] = useState(() => lireLienRecuperation());
   const [vueEspacePersonnel, setVueEspacePersonnel] = useState(false);
   const [statutAbonnement, setStatutAbonnement] = useState(null);
   // Message affiché sur la page de connexion quand un compte est refusé
@@ -365,6 +367,18 @@ export default function AppPrototype() {
     setMonProfil(null);
     setMesGroupes([]);
   };
+
+  if (lienRecuperation) {
+    return (
+      <div style={{ fontFamily: "var(--font-sans)" }}>
+        <ChangerMotDePasseScreen
+          valider={(mdp) => reinitialiserAvecLien(lienRecuperation, mdp)}
+          onAnnuler={() => setLienRecuperation(null)}
+          onDone={async () => { setLienRecuperation(null); setModeRecuperation(false); await chargerSessionEtRole(); }}
+        />
+      </div>
+    );
+  }
 
   if (chargementSession) {
     return (
@@ -821,7 +835,7 @@ function Field({ label, placeholder, border, dark, sub, ink }) {
 // ÉCRAN — CHANGEMENT DE MOT DE PASSE OBLIGATOIRE
 // (après une réinitialisation d'urgence par le Super Admin)
 // ============================================================
-function ChangerMotDePasseScreen({ onDone }) {
+function ChangerMotDePasseScreen({ onDone, valider = null, onAnnuler = null }) {
   const [motDePasse, setMotDePasse] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [erreur, setErreur] = useState("");
@@ -839,11 +853,12 @@ function ChangerMotDePasseScreen({ onDone }) {
     setChargement(true);
     setErreur("");
     try {
-      await changerMotDePasse(motDePasse);
+      if (valider) await valider(motDePasse);
+      else await changerMotDePasse(motDePasse);
       await onDone();
     } catch (e) {
       console.error("Erreur de changement de mot de passe", e);
-      setErreur("Erreur lors du changement de mot de passe.");
+      setErreur(valider ? (e.message || "Erreur lors du changement de mot de passe.") : "Erreur lors du changement de mot de passe.");
     } finally {
       setChargement(false);
     }
@@ -858,7 +873,7 @@ function ChangerMotDePasseScreen({ onDone }) {
         <div className="carte-auth-surtitre">Sécurité du compte</div>
         <h1>Choisis ton nouveau mot de passe</h1>
         <p className="carte-auth-desc">
-          Ton mot de passe a été réinitialisé. Choisis-en un nouveau pour continuer.
+          {valider ? "Choisis un nouveau mot de passe pour ton compte, puis valide." : "Ton mot de passe a été réinitialisé. Choisis-en un nouveau pour continuer."}
         </p>
         <div className="carte-auth-champs">
           <div className="champ">
@@ -902,6 +917,7 @@ function ChangerMotDePasseScreen({ onDone }) {
           <button type="button" className="btn-principal" onClick={handleValider} disabled={chargement}>
             {chargement ? "Enregistrement…" : "Valider et continuer"}
           </button>
+          {onAnnuler && <button type="button" className="lien-retour" onClick={onAnnuler}>Retour à la connexion</button>}
         </div>
       </div>
     </div>

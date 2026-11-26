@@ -127,3 +127,26 @@ export function onAuthStateChange(callback) {
   });
   return data.subscription;
 }
+
+// Lien « sûr » de réinitialisation : l'e-mail contient ?token_hash=…&type=recovery.
+// Ouvrir la page ne consomme rien (les boîtes mail qui vérifient les liens
+// toutes seules ne le cassent plus) : le lien n'est utilisé qu'au clic sur
+// « Enregistrer », avec le nouveau mot de passe.
+export function lireLienRecuperation() {
+  const params = new URLSearchParams(window.location.search);
+  const tokenHash = params.get("token_hash");
+  if (!tokenHash || params.get("type") !== "recovery") return null;
+  window.history.replaceState(null, "", window.location.pathname);
+  return tokenHash;
+}
+
+export async function reinitialiserAvecLien(tokenHash, nouveauMotDePasse) {
+  const { error: eV } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" });
+  if (eV) {
+    throw new Error("Ce lien a expiré ou a déjà été utilisé. Retourne à la connexion et fais une nouvelle demande avec « Mot de passe oublié ».");
+  }
+  const { error } = await supabase.auth.updateUser({ password: nouveauMotDePasse });
+  if (error) throw new Error(/should be different|same/i.test(error.message || "") ? "Choisis un mot de passe différent de l'ancien." : "Le mot de passe n'a pas pu être changé. Réessaie.");
+  const { data } = await supabase.auth.getUser();
+  if (data?.user) await supabase.from("profiles").update({ doit_changer_mdp: false }).eq("auth_user_id", data.user.id);
+}
