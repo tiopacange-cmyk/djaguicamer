@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { executerOperations, etapesCotisations, aujourdhuiLocal } from "./operations";
 
 // ============================================================
 // TONTINE
@@ -105,20 +106,11 @@ export async function verserTour(tontineId, tourId, numeroActuel) {
   if (errSuivant) throw errSuivant;
 }
 
-export async function enregistrerCotisationsTontine(tourId, cotisations) {
-  const lignes = cotisations
-    .filter((c) => c.montant && parseFloat(c.montant) > 0)
-    .map((c) => ({
-      tour_id: tourId,
-      membre_id: c.membreId,
-      montant: parseFloat(c.montant),
-      date_paiement: c.date,
-    }));
-
-  if (lignes.length === 0) return;
-
-  const { error } = await supabase.from("tontine_cotisations").insert(lignes);
-  if (error) throw error;
+export async function enregistrerCotisationsTontine(tourId, cotisations, groupId) {
+  // Une seule opération : toutes les cotisations, ou aucune.
+  const etapes = etapesCotisations(groupId, "tontine", { tourId }, cotisations);
+  if (!etapes.length) return;
+  await executerOperations(groupId, etapes);
 }
 
 export async function ajouterMembreAuCycle(tontineId, membreId, montantRappel, toursClotures) {

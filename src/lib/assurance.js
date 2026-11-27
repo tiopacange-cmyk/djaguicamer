@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { executerOperations, etapesCotisations, aujourdhuiLocal } from "./operations";
 
 const SOLDE_MIN_DEFAUT = 80000;
 const DELAI_JOURS_DEFAUT = 60;
@@ -54,8 +55,9 @@ export async function sauvegarderConfigAssurance(groupId, { soldeMinimum, delaiJ
 // ============================================================
 
 // Récupère les soldes de tous les membres du groupe. Si un membre
-// n'a pas encore de ligne (nouveau), on lui attribue le solde
-// minimum par défaut, initialisé en base au passage.
+// n'a pas encore de ligne (nouveau), sa ligne est créée à 0 F : le
+// solde ne vient que de ses vraies cotisations, jamais d'un montant
+// offert (il est « en reconstitution » jusqu'à atteindre le minimum).
 export async function fetchSoldesAssurance(groupId, membres, soldeMinimum) {
   const { data, error } = await supabase
     .from("assurance_soldes")
@@ -67,7 +69,7 @@ export async function fetchSoldesAssurance(groupId, membres, soldeMinimum) {
   const manquants = membres.filter((m) => m && m.id && !soldesParMembre[m.id]);
 
   if (manquants.length > 0) {
-    const lignes = manquants.map((m) => ({ group_id: groupId, membre_id: m.id, solde: soldeMinimum }));
+    const lignes = manquants.map((m) => ({ group_id: groupId, membre_id: m.id, solde: 0 }));
     const { data: crees, error: errInsert } = await supabase.from("assurance_soldes").insert(lignes).select();
     if (errInsert) throw errInsert;
     crees.forEach((s) => { soldesParMembre[s.membre_id] = s; });
@@ -81,44 +83,11 @@ export async function fetchSoldesAssurance(groupId, membres, soldeMinimum) {
 // ============================================================
 
 export async function enregistrerCotisationsAssurance(groupId, cotisations, soldeMinimum) {
-  const lignes = cotisations.filter((c) => c.montant && parseFloat(c.montant) > 0);
-  if (lignes.length === 0) return {};
-
-  const soldesApres = {};
-
-  for (const c of lignes) {
-    const { data: actuel, error: errLecture } = await supabase
-      .from("assurance_soldes")
-      .select("*")
-      .eq("group_id", groupId)
-      .eq("membre_id", c.membreId)
-      .single();
-    if (errLecture) throw errLecture;
-
-    const nouveauSolde = actuel.solde + parseFloat(c.montant);
-    soldesApres[c.membreId] = nouveauSolde;
-    const { error: errMaj } = await supabase
-      .from("assurance_soldes")
-      .update({
-        solde: nouveauSolde,
-        delai_expire_le: nouveauSolde >= soldeMinimum ? null : actuel.delai_expire_le,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", actuel.id);
-    if (errMaj) throw errMaj;
-
-    const { error: errHisto } = await supabase.from("assurance_mouvements").insert({
-      group_id: groupId,
-      membre_id: c.membreId,
-      type: "Cotisation",
-      montant: parseFloat(c.montant),
-      date_mouvement: c.date || new Date().toISOString().slice(0, 10),
-      solde_apres: nouveauSolde,
-    });
-    if (errHisto) throw errHisto;
-  }
-
-  return soldesApres;
+  // Une seule opération : toutes les cotisations, ou aucune.
+  const etapes = etapesCotisations(groupId, "assurance", { soldeMinimum }, cotisations);
+  if (!etapes.length) return {};
+  const res = await executerOperations(groupId, etapes);
+  return res.soldes || {};
 }
 
 // Récupère l'historique complet des mouvements d'assurance

@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { executerOperations, etapesCotisations, aujourdhuiLocal } from "./operations";
 
 // ============================================================
 // TYPES DE FONDS (rubriques créées par l'admin du groupe)
@@ -63,31 +64,9 @@ export async function fetchFondsTousMembres(groupId) {
 
 // Enregistre un versement vers un fonds, met à jour le solde, et
 // trace le mouvement dans l'historique.
-export async function enregistrerVersementFonds(membreId, typeFondsId, montant, date) {
-  const { data: existant, error: errLecture } = await supabase
-    .from("fonds_membres")
-    .select("solde")
-    .eq("membre_id", membreId)
-    .eq("type_fonds_id", typeFondsId)
-    .maybeSingle();
-  if (errLecture) throw errLecture;
-
-  const nouveauSolde = (existant?.solde || 0) + montant;
-
-  const { error: errUpsert } = await supabase
-    .from("fonds_membres")
-    .upsert({ membre_id: membreId, type_fonds_id: typeFondsId, solde: nouveauSolde }, { onConflict: "membre_id,type_fonds_id" });
-  if (errUpsert) throw errUpsert;
-
-  const { error: errMouvement } = await supabase.from("fonds_mouvements").insert({
-    membre_id: membreId,
-    type_fonds_id: typeFondsId,
-    montant,
-    date_mouvement: date || new Date().toISOString().slice(0, 10),
-  });
-  if (errMouvement) throw errMouvement;
-
-  return nouveauSolde;
+export async function enregistrerVersementFonds(membreId, typeFondsId, montant, date, groupId) {
+  const res = await executerOperations(groupId, etapesCotisations(groupId, "fonds", { typeFondsId }, [{ membreId, montant, date: date || aujourdhuiLocal() }]));
+  return res.soldes?.[membreId];
 }
 
 // Récupère le détail des fonds d'UN membre (tous types confondus,

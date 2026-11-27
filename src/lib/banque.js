@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { executerOperations, etapesCotisations, aujourdhuiLocal } from "./operations";
 
 // ============================================================
 // ÉPARGNES (banque scolaire, annuelle, personnalisée)
@@ -49,35 +50,13 @@ export async function creerEpargne(groupId, { nom, type, cotisationParSeance, ta
 
 // Enregistre une cotisation (versement) pour plusieurs membres à la
 // fois sur une épargne donnée, et met à jour son solde en conséquence.
-export async function enregistrerCotisationsEpargne(epargneId, cotisations) {
-  const lignes = cotisations.filter((c) => c.montant && parseFloat(c.montant) > 0);
-  if (lignes.length === 0) return;
-
-  const { data: epargne, error: errLecture } = await supabase
-    .from("epargnes")
-    .select("solde")
-    .eq("id", epargneId)
-    .single();
-  if (errLecture) throw errLecture;
-
-  let soldeCourant = epargne.solde;
-  for (const c of lignes) {
-    soldeCourant += parseFloat(c.montant);
-    const { error: errMouvement } = await supabase.from("epargne_mouvements").insert({
-      epargne_id: epargneId,
-      membre_id: c.membreId,
-      type: "Versement",
-      montant: parseFloat(c.montant),
-      date_mouvement: c.date,
-      solde_apres: soldeCourant,
-    });
-    if (errMouvement) throw errMouvement;
-  }
-
-  const { error: errMaj } = await supabase.from("epargnes").update({ solde: soldeCourant }).eq("id", epargneId);
-  if (errMaj) throw errMaj;
-
-  return { soldeFinal: soldeCourant };
+export async function enregistrerCotisationsEpargne(epargneId, cotisations, groupId) {
+  // Une seule opération : toutes les cotisations, ou aucune. Le solde
+  // est augmenté par la base (pas de lecture puis réécriture).
+  const etapes = etapesCotisations(groupId, "epargne", { epargneId }, cotisations);
+  if (!etapes.length) return;
+  const res = await executerOperations(groupId, etapes);
+  return { soldeFinal: res.soldes?.solde };
 }
 
 export async function fetchHistoriqueEpargnes(groupId) {

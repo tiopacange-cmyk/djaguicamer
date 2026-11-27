@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { executerOperations, etape, aujourdhuiLocal } from "./operations";
 
 // ============================================================
 // RAFRAÎCHISSEMENT — boissons de séance, avec caisse "reliquat
@@ -154,15 +155,8 @@ export function libelleSourceDepense(sourceType) {
 export async function creerDepense(groupId, { typeDepenseId, montant, date, motif, sourceType, sourceId }) {
   // Débite la source choisie
   if (sourceType === "epargne") {
-    const { data: ep, error: errLecture } = await supabase.from("epargnes").select("solde").eq("id", sourceId).single();
-    if (errLecture) throw errLecture;
-    const nouveauSolde = ep.solde - montant;
-    const { error: errMvt } = await supabase.from("epargne_mouvements").insert({
-      epargne_id: sourceId, membre_id: null, type: "Retrait", montant, date_mouvement: date, solde_apres: nouveauSolde,
-    });
-    if (errMvt) throw errMvt;
-    const { error: errMaj } = await supabase.from("epargnes").update({ solde: nouveauSolde }).eq("id", sourceId);
-    if (errMaj) throw errMaj;
+    // Retrait et nouveau solde en une seule opération (dépense payée en espèces)
+    await executerOperations(groupId, [etape.epargne({ epargneId: sourceId, type: "Retrait", montant, date })]);
   } else if (sourceType === "compte_externe") {
     const { data: compte, error: errLecture } = await supabase.from("comptes_bancaires_externes").select("solde").eq("id", sourceId).single();
     if (errLecture) throw errLecture;
